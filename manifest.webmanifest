@@ -1,6 +1,6 @@
 {
-  "name": "Minha Evolução",
-  "short_name": "Evolução",
+  "name": "Fit Body Stats",
+  "short_name": "FBS",
   "description": "Acompanhamento pessoal de peso, cintura, IMC e percentual de gordura corporal.",
   "start_url": "./index.html",
   "display": "standalone",
