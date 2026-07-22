@@ -1,19 +1,30 @@
-# Minha Evolução
+# FitBodyStat
 
-PWA pessoal para acompanhamento de peso, cintura, IMC, percentual de gordura corporal, metas e planejamento mensal.
+Um Progressive Web App (PWA) para acompanhamento pessoal de peso corporal, IMC, medidas corporais, percentual de gordura estimado e metas de composição corporal.
 
-## Uso local
+O **FitBodyStat** ajuda a registrar métricas, calcular indicadores, planejar metas de perda ou ganho de peso e visualizar tendências ao longo do tempo.
 
-```powershell
-node dev-server.mjs
-```
+## Funcionalidades
 
-Depois acesse:
+- **Registro de métricas:** peso, cintura, pescoço, quadril, observações e método de gordura corporal.
+- **Cálculo automático:** IMC, classificação por IMC e percentual de gordura estimado pelo método da Marinha dos EUA.
+- **Metas personalizadas:** peso alvo, mudança semanal desejada, prazo estimado e planejamento mensal.
+- **Análise visual:** gráficos de peso e cintura reais vs planejados.
+- **PWA:** instalável no smartphone ou desktop, com cache offline básico.
+- **Dados locais:** armazenamento no navegador com exportação em CSV e JSON.
 
-```txt
-http://127.0.0.1:4173
-```
+## Tecnologias utilizadas
 
-## Publicação
+- HTML5
+- CSS3
+- JavaScript Vanilla com ES Modules
+- LocalStorage
+- Service Worker
+- Web App Manifest
 
-O app é estático e pode ser publicado diretamente no GitHub Pages a partir da branch `main`.
+## Como rodar localmente
+
+1. Clone este repositório:
+
+```bash
+git clone https://github.com/EngNascimentoRenato/fitbodystat.git
