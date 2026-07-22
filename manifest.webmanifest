@@ -1,0 +1,17 @@
+{
+  "name": "Minha Evolução",
+  "short_name": "Evolução",
+  "description": "Acompanhamento pessoal de peso, cintura, IMC e percentual de gordura corporal.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#25636f",
+  "icons": [
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
