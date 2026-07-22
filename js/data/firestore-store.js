@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   query,
   serverTimestamp,
   setDoc,
@@ -78,7 +79,11 @@ export async function updateUserRole(userId, role) {
 
 export async function findUserByEmail(email) {
   const normalized = email.trim().toLowerCase();
-  const snapshot = await getDocs(query(collection(db, "users"), where("emailLower", "==", normalized)));
+  const snapshot = await getDocs(query(
+    collection(db, "users"),
+    where("emailLower", "==", normalized),
+    limit(1)
+  ));
   return snapshot.empty ? null : { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
 }
 

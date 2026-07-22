@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return signedIn() && currentRole() == "admin";
+    }
+
+    function isProfessional() {
+      return signedIn() && currentRole() == "professional";
+    }
+
+    function hasCareLink(patientId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/careLinks/$(request.auth.uid + "_" + patientId));
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == "user";
+
+      allow get: if signedIn()
+        && (request.auth.uid == userId || isAdmin() || (isProfessional() && hasCareLink(userId)));
+
+      // A consulta limitada permite que o profissional encontre um paciente pelo e-mail.
+      allow list: if isAdmin()
+        || (isProfessional() && request.query.limit != null && request.query.limit <= 1);
+
+      allow update: if signedIn()
+        && (isAdmin()
+          || (request.auth.uid == userId
+            && request.resource.data.role == resource.data.role));
+
+      allow delete: if isAdmin();
+
+      match /app/{documentId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /careLinks/{linkId} {
+      allow read: if signedIn()
+        && (isAdmin()
+          || resource.data.professionalId == request.auth.uid
+          || resource.data.patientId == request.auth.uid);
+
+      allow create: if signedIn()
+        && (isAdmin()
+          || (isProfessional()
+            && request.resource.data.professionalId == request.auth.uid));
+
+      allow update: if signedIn()
+        && (isAdmin()
+          || (isProfessional()
+            && resource.data.professionalId == request.auth.uid
+            && request.resource.data.professionalId == resource.data.professionalId
+            && request.resource.data.patientId == resource.data.patientId));
+
+      allow delete: if isAdmin()
+        || (isProfessional() && resource.data.professionalId == request.auth.uid);
+    }
+  }
+}
