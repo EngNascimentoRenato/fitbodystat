@@ -47,7 +47,7 @@ export function renderDashboard(state) {
         <div>
           <p class="eyebrow">Resumo atual</p>
           <h2>${latest ? `Último registro em ${formatDate(latest.date)}` : "Comece pelo primeiro registro"}</h2>
-          <p>${next ? `Próximo marco: ${next.title}.` : "Todos os marcos principais foram alcançados."}</p>
+          <p>${next ? `Próximo marco: ${next.title}.` : "Todos as principais metas foram alcançadas."}</p>
           ${progressBar(progress)}
         </div>
         ${progressRing(progress, "da meta")}
@@ -63,7 +63,7 @@ export function renderDashboard(state) {
       <div class="split">
         ${lineChart({ title: "Peso real vs planejado", description: "A linha planejada cobre todo o prazo da meta.", actual: actualWeight, planned: plannedWeight, unit: "kg" })}
         <section class="card">
-          <h2>Marcos</h2>
+          <h2>Metas</h2>
           ${milestoneList(getMilestones(profile, latest))}
         </section>
       </div>

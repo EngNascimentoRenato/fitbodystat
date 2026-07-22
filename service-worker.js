@@ -1,4 +1,4 @@
-const CACHE_NAME = "minha-evolucao-v3";
+const CACHE_NAME = "fitbodystat-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -15,6 +15,7 @@ const APP_SHELL = [
   "./js/router.js",
   "./js/menu.js",
   "./js/config/firebase-config.example.js",
+  "./js/config/firebase-config.js",
   "./js/data/local-store.js",
   "./js/data/firestore-store.js",
   "./js/data/seed-plan.js",
@@ -26,12 +27,15 @@ const APP_SHELL = [
   "./js/services/progress-service.js",
   "./js/services/export-service.js",
   "./js/services/pwa-service.js",
+  "./js/services/firebase-core.js",
+  "./js/services/auth-service.js",
   "./js/views/dashboard-view.js",
   "./js/views/profile-view.js",
   "./js/views/entry-view.js",
   "./js/views/history-view.js",
   "./js/views/goals-view.js",
   "./js/views/settings-view.js",
+  "./js/views/account-view.js",
   "./js/components/stat-card.js",
   "./js/components/progress-ring.js",
   "./js/components/progress-bar.js",

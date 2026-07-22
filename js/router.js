@@ -5,6 +5,7 @@ import { renderEntry, bindEntry } from "./views/entry-view.js";
 import { renderHistory, bindHistory } from "./views/history-view.js";
 import { renderGoals } from "./views/goals-view.js";
 import { renderSettings, bindSettings } from "./views/settings-view.js";
+import { renderAccount, bindAccount } from "./views/account-view.js";
 
 export function currentPath() {
   return location.hash.replace("#", "") || "/dashboard";
@@ -24,7 +25,8 @@ export function renderRoute(context) {
     "/registro": () => renderEntry(context.state),
     "/historico": () => renderHistory(context.state),
     "/metas": () => renderGoals(context.state),
-    "/configuracoes": () => renderSettings(context.state)
+    "/conta": () => renderAccount(context.state, context.authState),
+    "/configuracoes": () => renderSettings(context.state, context.authState)
   };
 
   app.innerHTML = (viewMap[route.path] || viewMap["/dashboard"])();
@@ -32,7 +34,8 @@ export function renderRoute(context) {
   if (route.path === "/perfil") bindProfile(context.state, context.persist, context.render);
   if (route.path === "/registro") bindEntry(context.state, context.persist, context.render);
   if (route.path === "/historico") bindHistory(context.state, context.persist, context.render);
-  if (route.path === "/configuracoes") bindSettings(context.state, context.persist, context.render, context.replaceState);
+  if (route.path === "/conta") bindAccount(context);
+  if (route.path === "/configuracoes") bindSettings(context.state, context.persist, context.render, context.replaceState, context.authState);
 
   document.body.classList.remove("menu-open");
 }

@@ -4,6 +4,7 @@ export const routes = [
   { path: "/registro", title: "Novo registro", eyebrow: "Registro semanal", label: "Novo registro", icon: "+" },
   { path: "/historico", title: "Histórico", eyebrow: "Evolução registrada", label: "Histórico", icon: "≡" },
   { path: "/metas", title: "Metas", eyebrow: "Planejamento", label: "Metas", icon: "◇" },
+  { path: "/conta", title: "Conta", eyebrow: "Login e sincronização", label: "Conta", icon: "◉" },
   { path: "/configuracoes", title: "Configurações", eyebrow: "Dados e PWA", label: "Configurações", icon: "⚙" }
 ];
 

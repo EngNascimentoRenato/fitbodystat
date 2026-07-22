@@ -1,6 +1,6 @@
 {
-  "name": "Fit Body Stats",
-  "short_name": "FBS",
+  "name": "FitBodyStat",
+  "short_name": "FitBodyStat",
   "description": "Acompanhamento pessoal de peso, cintura, IMC e percentual de gordura corporal.",
   "start_url": "./index.html",
   "display": "standalone",
