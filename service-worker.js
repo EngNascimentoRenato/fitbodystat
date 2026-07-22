@@ -1,7 +1,8 @@
-const CACHE_NAME = "fitbodystat-v5";
+const CACHE_NAME = "fitbodystat-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./login.html",
   "./manifest.webmanifest",
   "./assets/icons/icon.svg",
   "./css/theme.css",
@@ -12,6 +13,7 @@ const APP_SHELL = [
   "./css/charts.css",
   "./css/dashboard.css",
   "./js/app.js",
+  "./js/login.js",
   "./js/router.js",
   "./js/menu.js",
   "./js/config/firebase-config.example.js",

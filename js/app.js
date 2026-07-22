@@ -1,28 +1,31 @@
-import { loadState, saveState } from "./data/local-store.js";
+import { createBlankState, loadState, saveState } from "./data/local-store.js";
 import { ensureUserDocument, loadCloudState, saveCloudState } from "./data/firestore-store.js";
 import { observeAuth } from "./services/auth-service.js";
 import { registerServiceWorker } from "./services/pwa-service.js";
 import { renderRoute } from "./router.js";
 
-let state = loadState();
+let state = createBlankState();
 let authState = {
   user: null,
   role: "user",
-  syncStatus: "Dados locais salvos neste navegador.",
+  syncStatus: "Verificando login...",
   adminUsers: null,
   patients: null
 };
 let isApplyingCloudState = false;
+let authReady = false;
 
 function applyTheme() {
   document.documentElement.dataset.theme = state.settings?.theme || "light";
 }
 
 function persist() {
-  saveState(state);
+  if (!authState.user) return;
+
+  saveState(state, authState.user.uid);
   applyTheme();
 
-  if (authState.user && !isApplyingCloudState) {
+  if (!isApplyingCloudState) {
     saveCloudState(authState.user.uid, state)
       .then(() => {
         authState.syncStatus = "Sincronizado com Firestore.";
@@ -52,21 +55,17 @@ document.getElementById("menu-toggle").addEventListener("click", () => {
 
 window.addEventListener("hashchange", render);
 registerServiceWorker();
-render();
 
 observeAuth(async (user) => {
   authState.user = user;
 
   if (!user) {
-    authState.role = "user";
-    authState.syncStatus = "Dados locais salvos neste navegador.";
-    authState.adminUsers = null;
-    authState.patients = null;
-    render();
+    location.replace("login.html");
     return;
   }
 
   try {
+    authReady = true;
     authState.syncStatus = "Carregando dados da nuvem...";
     render();
 
@@ -76,22 +75,23 @@ observeAuth(async (user) => {
     authState.patients = null;
     const cloudState = await loadCloudState(user.uid);
 
+    isApplyingCloudState = true;
     if (cloudState?.profile) {
-      isApplyingCloudState = true;
       state = {
-        ...state,
+        ...createBlankState(),
         profile: cloudState.profile,
         entries: cloudState.entries || [],
         goalPlan: cloudState.goalPlan || [],
-        settings: { ...state.settings, ...(cloudState.settings || {}) }
+        settings: { ...createBlankState().settings, ...(cloudState.settings || {}) }
       };
-      saveState(state);
-      isApplyingCloudState = false;
+      saveState(state, user.uid);
       authState.syncStatus = "Dados carregados do Firestore.";
     } else {
+      state = loadState(user.uid);
       await saveCloudState(user.uid, state);
-      authState.syncStatus = "Dados locais enviados para o Firestore.";
+      authState.syncStatus = "Conta nova pronta. Preencha seu perfil.";
     }
+    isApplyingCloudState = false;
   } catch (error) {
     isApplyingCloudState = false;
     authState.syncStatus = `Falha no Firebase: ${error.message}`;
@@ -99,3 +99,7 @@ observeAuth(async (user) => {
 
   render();
 });
+
+if (!authReady) {
+  render();
+}
