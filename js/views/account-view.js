@@ -1,4 +1,9 @@
-import { signInWithGoogle, signOutUser } from "../services/auth-service.js";
+import {
+  createAccountWithEmail,
+  signInWithEmail,
+  signInWithGoogle,
+  signOutUser
+} from "../services/auth-service.js";
 import { showToast } from "../components/toast.js";
 
 function userLabel(authState) {
@@ -13,7 +18,7 @@ export function renderAccount(state, authState) {
     <div class="view-stack">
       <section class="card">
         <h2>Conta</h2>
-        <p class="muted">${user ? "Seus dados são sincronizados com o Firestore desta conta." : "Entre com Google para salvar e recuperar seus dados na nuvem."}</p>
+        <p class="muted">${user ? "Seus dados são sincronizados com o Firestore desta conta." : "Entre para salvar e recuperar seus dados na nuvem."}</p>
         <div class="grid two">
           <article class="mini-stat">
             <span>Usuário</span>
@@ -26,10 +31,38 @@ export function renderAccount(state, authState) {
             <small>${user ? "Definido no cadastro do usuário" : "Disponível após login"}</small>
           </article>
         </div>
-        <div class="button-row">
-          ${user ? `<button class="button danger" id="sign-out" type="button">Sair</button>` : `<button class="button primary" id="sign-in-google" type="button">Entrar com Google</button>`}
-        </div>
       </section>
+
+      ${user ? `
+        <section class="card">
+          <h2>Sessão</h2>
+          <div class="button-row">
+            <button class="button danger" id="sign-out" type="button">Sair</button>
+          </div>
+        </section>
+      ` : `
+        <section class="card">
+          <h2>Entrar com e-mail</h2>
+          <form class="form" id="email-auth-form">
+            <div class="form-grid">
+              <div class="field">
+                <label for="auth-email">E-mail</label>
+                <input id="auth-email" name="email" type="email" autocomplete="email" required />
+              </div>
+              <div class="field">
+                <label for="auth-password">Senha</label>
+                <input id="auth-password" name="password" type="password" autocomplete="current-password" required minlength="6" />
+              </div>
+            </div>
+            <div class="button-row">
+              <button class="button primary" id="sign-in-email" type="submit">Entrar</button>
+              <button class="button" id="create-email-account" type="button">Criar conta</button>
+              <button class="button" id="sign-in-google" type="button">Entrar com Google</button>
+            </div>
+          </form>
+        </section>
+      `}
+
       <section class="card">
         <h2>Sincronização</h2>
         <p class="muted">${authState?.syncStatus || "Dados locais salvos neste navegador."}</p>
@@ -39,10 +72,33 @@ export function renderAccount(state, authState) {
 }
 
 export function bindAccount(context) {
-  const signInButton = document.getElementById("sign-in-google");
+  const form = document.getElementById("email-auth-form");
+  const createButton = document.getElementById("create-email-account");
+  const googleButton = document.getElementById("sign-in-google");
   const signOutButton = document.getElementById("sign-out");
 
-  signInButton?.addEventListener("click", async () => {
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    try {
+      await signInWithEmail(data.get("email"), data.get("password"));
+      showToast("Login realizado.");
+    } catch (error) {
+      showToast(`Não foi possível entrar: ${error.message}`);
+    }
+  });
+
+  createButton?.addEventListener("click", async () => {
+    const data = new FormData(form);
+    try {
+      await createAccountWithEmail(data.get("email"), data.get("password"));
+      showToast("Conta criada.");
+    } catch (error) {
+      showToast(`Não foi possível criar a conta: ${error.message}`);
+    }
+  });
+
+  googleButton?.addEventListener("click", async () => {
     try {
       await signInWithGoogle();
       showToast("Login realizado.");

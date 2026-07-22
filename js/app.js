@@ -8,7 +8,9 @@ let state = loadState();
 let authState = {
   user: null,
   role: "user",
-  syncStatus: "Dados locais salvos neste navegador."
+  syncStatus: "Dados locais salvos neste navegador.",
+  adminUsers: null,
+  patients: null
 };
 let isApplyingCloudState = false;
 
@@ -58,6 +60,8 @@ observeAuth(async (user) => {
   if (!user) {
     authState.role = "user";
     authState.syncStatus = "Dados locais salvos neste navegador.";
+    authState.adminUsers = null;
+    authState.patients = null;
     render();
     return;
   }
@@ -68,6 +72,8 @@ observeAuth(async (user) => {
 
     const userDoc = await ensureUserDocument(user);
     authState.role = userDoc.role || "user";
+    authState.adminUsers = null;
+    authState.patients = null;
     const cloudState = await loadCloudState(user.uid);
 
     if (cloudState?.profile) {
