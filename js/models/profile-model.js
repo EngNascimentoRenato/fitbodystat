@@ -16,5 +16,7 @@ export const defaultProfile = {
   targetBmi: 24.9,
   weeklyChangeGoalKg: 0.5,
   weeklyLossGoalKg: 0.5,
-  goalDeadlineMonths: null
+  goalDeadlineMonths: null,
+  weeklyActivityGoalDays: 3,
+  preferredActivities: []
 };

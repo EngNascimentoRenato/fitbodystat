@@ -12,6 +12,7 @@ export function createBlankState() {
   return {
     profile: defaultProfile,
     entries: [],
+    activities: [],
     goalPlan: createDefaultMonthlyPlan(defaultProfile),
     settings: {
       theme: "light"
@@ -33,6 +34,7 @@ export function normalizeState(parsed = {}) {
     ...parsed,
     profile,
     entries,
+    activities: parsed.activities || [],
     goalPlan: parsed.goalPlan || parsed.monthlyPlan || defaultMonthlyPlan
   };
 }

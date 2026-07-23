@@ -1,14 +1,16 @@
 import { escapeHtml } from "./utils/html-utils.js";
 
 export const routes = [
+  { path: "/atividades", title: "Atividades", eyebrow: "Frequência de atividades", label: "Atividades", icon: "A" },
+  { path: "/me/atividades", title: "Minhas atividades", eyebrow: "Meu espaço", label: "Minhas atividades", icon: "A", roles: ["professional", "admin"] },
   { path: "/dashboard", title: "Dashboard", eyebrow: "Acompanhamento pessoal", label: "Dashboard", icon: "D" },
   { path: "/perfil", title: "Perfil", eyebrow: "Dados corporais", label: "Perfil", icon: "P" },
-  { path: "/registro", title: "Novo registro", eyebrow: "Registro semanal", label: "Novo registro", icon: "+" },
+  { path: "/registro", title: "Novo registro", eyebrow: "Medidas ou atividade", label: "Novo registro", icon: "+" },
   { path: "/historico", title: "Histórico", eyebrow: "Evolução registrada", label: "Histórico", icon: "H" },
   { path: "/metas", title: "Metas", eyebrow: "Planejamento", label: "Metas", icon: "M" },
   { path: "/vinculos", title: "Meus profissionais", eyebrow: "Convites e vínculos", label: "Meus profissionais", icon: "V" },
   { path: "/me/dashboard", title: "Meu dashboard", eyebrow: "Meu espaço", label: "Meu dashboard", icon: "D", roles: ["professional", "admin"] },
-  { path: "/me/registro", title: "Meu novo registro", eyebrow: "Meu espaço", label: "Meu novo registro", icon: "+", roles: ["professional", "admin"] },
+  { path: "/me/registro", title: "Meu novo registro", eyebrow: "Medidas ou atividade", label: "Meu novo registro", icon: "+", roles: ["professional", "admin"] },
   { path: "/me/historico", title: "Meu histórico", eyebrow: "Meu espaço", label: "Meu histórico", icon: "H", roles: ["professional", "admin"] },
   { path: "/me/metas", title: "Minhas metas", eyebrow: "Meu espaço", label: "Minhas metas", icon: "M", roles: ["professional", "admin"] },
   { path: "/me/perfil", title: "Meu perfil", eyebrow: "Meu espaço", label: "Meu perfil", icon: "P", roles: ["professional", "admin"] },
@@ -23,7 +25,7 @@ export const routes = [
   { path: "/configuracoes", title: "Configurações", eyebrow: "Dados e PWA", label: "Configurações", icon: "S" }
 ];
 
-const personalPaths = ["/me/dashboard", "/me/registro", "/me/historico", "/me/metas", "/me/perfil", "/me/vinculos"];
+const personalPaths = ["/me/dashboard", "/me/registro", "/me/historico", "/me/atividades", "/me/metas", "/me/perfil", "/me/vinculos"];
 
 function routeIsAllowed(route, authState) {
   if (authState?.needsName && !["/perfil", "/conta"].includes(route.path)) return false;
@@ -47,6 +49,7 @@ function navSection(label, links) {
 function personalLinks(currentPath) {
   return [
     navLink("/me/dashboard", "Meu dashboard", "D", currentPath),
+    navLink("/me/atividades", "Minhas atividades", "A", currentPath),
     navLink("/me/registro", "Meu novo registro", "+", currentPath),
     navLink("/me/historico", "Meu histórico", "H", currentPath),
     navLink("/me/metas", "Minhas metas", "M", currentPath),
@@ -84,6 +87,7 @@ export function renderMenu(currentPath, authState) {
     menu.innerHTML = [
       navSection("Minha evolução", [
         navLink("/dashboard", "Dashboard", "D", currentPath),
+        navLink("/atividades", "Atividades", "A", currentPath),
         navLink("/registro", "Novo registro", "+", currentPath),
         navLink("/historico", "Histórico", "H", currentPath),
         navLink("/metas", "Metas", "M", currentPath),
@@ -99,6 +103,7 @@ export function renderMenu(currentPath, authState) {
     const patient = authState.activePatient;
     const patientLinks = patient ? navSection(`Paciente: ${escapeHtml(patient.name)}`, [
       navLink("/dashboard", "Dashboard do paciente", "D", currentPath),
+      navLink("/atividades", "Atividades do paciente", "A", currentPath),
       navLink("/registro", "Novo registro do paciente", "+", currentPath),
       navLink("/historico", "Histórico do paciente", "H", currentPath),
       navLink("/metas", "Metas e planejamento", "M", currentPath),
@@ -128,7 +133,8 @@ export function renderMenu(currentPath, authState) {
 }
 
 export function getRoute(path) {
-  return routes.find((route) => route.path === path) || routes[0];
+  return routes.find((route) => route.path === path)
+    || routes.find((route) => route.path === "/dashboard");
 }
 
 export function canAccessRoute(route, authState) {

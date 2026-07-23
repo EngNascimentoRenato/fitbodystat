@@ -1,10 +1,12 @@
 import { createBlankState, loadState, normalizeState, saveState } from "./data/local-store.js";
 import {
+  deleteActivity,
   deleteMeasurement,
   ensureUserDocument,
   getUser,
   loadCloudState,
   saveCloudState,
+  saveActivity,
   saveMeasurement,
   saveMeasurementAndProfile,
   saveProfileAndPlan,
@@ -65,6 +67,8 @@ function saveChangeToCloud(userId, stateToSave, change) {
       : saveMeasurement(userId, change.entry, actor);
   }
   if (change?.type === "entry-delete") return deleteMeasurement(userId, change.entryId);
+  if (change?.type === "activity-upsert") return saveActivity(userId, change.activity, actor);
+  if (change?.type === "activity-delete") return deleteActivity(userId, change.activityId);
   return saveCloudState(userId, stateToSave, actor);
 }
 
@@ -270,7 +274,15 @@ observeAuth(async (user) => {
       await updateCurrentUserName(personalState.profile.name);
       await updateOwnDirectoryName(user.uid, personalState.profile.name);
     }
-    await saveCloudState(user.uid, personalState, { uid: user.uid, role: authState.role });
+    const actor = { uid: user.uid, role: authState.role };
+    if (cloudState?.profile) {
+      await Promise.all([
+        saveProfileAndPlan(user.uid, personalState, actor),
+        saveSettings(user.uid, personalState.settings, actor)
+      ]);
+    } else {
+      await saveCloudState(user.uid, personalState, actor);
+    }
     isApplyingCloudState = false;
 
     if (!location.hash) {

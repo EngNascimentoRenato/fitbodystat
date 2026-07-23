@@ -9,9 +9,10 @@ import { renderAccount, bindAccount } from "./views/account-view.js";
 import { renderAdmin, bindAdmin } from "./views/admin-view.js";
 import { renderPatients, bindPatients } from "./views/patients-view.js";
 import { renderConnections, bindConnections } from "./views/connections-view.js";
+import { renderActivities, bindActivities } from "./views/activities-view.js";
 
-const patientDataPaths = ["/dashboard", "/perfil", "/registro", "/historico", "/metas"];
-const personalDataPaths = ["/me/dashboard", "/me/perfil", "/me/registro", "/me/historico", "/me/metas"];
+const patientDataPaths = ["/dashboard", "/perfil", "/registro", "/historico", "/atividades", "/metas"];
+const personalDataPaths = ["/me/dashboard", "/me/perfil", "/me/registro", "/me/historico", "/me/atividades", "/me/metas"];
 const dataPaths = [...patientDataPaths, ...personalDataPaths];
 
 export function currentPath() {
@@ -42,6 +43,7 @@ function configureTopbar(activeRoute, authState) {
     "/historico": ["Histórico do paciente", "Paciente selecionado"],
     "/metas": ["Metas e planejamento", "Paciente selecionado"]
   };
+  patientTitles["/atividades"] = ["Atividades do paciente", "Frequência de atividades"];
   const [title, eyebrow] = patientTitles[activeRoute.path];
   document.getElementById("route-title").textContent = title;
   document.getElementById("route-eyebrow").textContent = eyebrow;
@@ -70,12 +72,14 @@ export function renderRoute(context) {
     "/perfil": () => renderProfile(context.state),
     "/registro": () => renderEntry(context.state),
     "/historico": () => renderHistory(context.state),
+    "/atividades": () => renderActivities(context.state),
     "/metas": () => renderGoals(context.state),
     "/vinculos": () => renderConnections(context.authState),
-    "/me/dashboard": () => renderDashboard(context.personalState),
+    "/me/dashboard": () => renderDashboard(context.personalState, "/me"),
     "/me/perfil": () => renderProfile(context.personalState),
     "/me/registro": () => renderEntry(context.personalState),
     "/me/historico": () => renderHistory(context.personalState),
+    "/me/atividades": () => renderActivities(context.personalState),
     "/me/metas": () => renderGoals(context.personalState),
     "/me/vinculos": () => renderConnections(context.authState),
     "/pacientes": () => renderPatients(context.state, context.authState),
@@ -93,10 +97,12 @@ export function renderRoute(context) {
   if (activeRoute.path === "/perfil") bindProfile(context.state, context.persist, context.render);
   if (activeRoute.path === "/registro") bindEntry(context.state, context.persist, context.render);
   if (activeRoute.path === "/historico") bindHistory(context.state, context.persist, context.render);
+  if (activeRoute.path === "/atividades") bindActivities(context.state, context.persist, context.render);
   if (activeRoute.path === "/vinculos") bindConnections(context);
   if (activeRoute.path === "/me/perfil") bindProfile(context.personalState, context.persistPersonal, context.render);
   if (activeRoute.path === "/me/registro") bindEntry(context.personalState, context.persistPersonal, context.render);
   if (activeRoute.path === "/me/historico") bindHistory(context.personalState, context.persistPersonal, context.render);
+  if (activeRoute.path === "/me/atividades") bindActivities(context.personalState, context.persistPersonal, context.render);
   if (activeRoute.path === "/me/vinculos") bindConnections(context);
   if (activeRoute.path === "/pacientes") bindPatients(context);
   if (activeRoute.path.startsWith("/admin")) bindAdmin(context);

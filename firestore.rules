@@ -82,6 +82,11 @@ service cloud.firestore {
         allow read: if canReadHealthData(userId);
         allow create, update, delete: if canEditHealthData(userId);
       }
+
+      match /activities/{activityId} {
+        allow read: if canReadHealthData(userId);
+        allow create, update, delete: if canEditHealthData(userId);
+      }
     }
 
     match /profiles/{userId} {

@@ -11,6 +11,7 @@ import {
 import { createDefaultMonthlyPlan, normalizeMonthlyPlan } from "../data/seed-plan.js";
 import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../utils/number-utils.js";
 import { escapeAttribute } from "../utils/html-utils.js";
+import { preferredActivityPicker } from "../components/activity-picker.js";
 
 function renderProfileInsight(profile) {
   const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
@@ -120,7 +121,9 @@ function readProfileForm(form, currentProfile) {
     targetBmi: toNumber(data.get("targetBmi")) || 24.9,
     goalWeightKg: toNumber(data.get("goalWeightKg")),
     weeklyChangeGoalKg: toNumber(data.get("weeklyChangeGoalKg")) || 0.5,
-    goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths"))
+    goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
+    weeklyActivityGoalDays: Math.min(7, Math.max(1, toNumber(data.get("weeklyActivityGoalDays")) || 3)),
+    preferredActivities: data.getAll("preferredActivities")
   };
 
   if (nextProfile.goalDeadlineMonths) {
@@ -209,6 +212,23 @@ export function renderProfile(state) {
             <input id="goalDeadlineMonths" name="goalDeadlineMonths" inputmode="decimal" value="${escapeAttribute(suggestedDeadline ?? "")}" />
             <span class="help-text">Se alterado, o app recalcula a mudança semanal necessária.</span>
           </div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="chart-header">
+          <div>
+            <h2>Atividades físicas</h2>
+            <p class="muted">Escolha as modalidades que pratica com frequência para agilizar o registro diário.</p>
+          </div>
+        </div>
+        <div class="field activity-goal-field">
+          <label for="weeklyActivityGoalDays">Meta semanal de dias ativos</label>
+          <input id="weeklyActivityGoalDays" name="weeklyActivityGoalDays" type="number" min="1" max="7"
+            value="${escapeAttribute(p.weeklyActivityGoalDays ?? 3)}" />
+        </div>
+        <div class="field">
+          <label>Atividades preferidas</label>
+          ${preferredActivityPicker(p.preferredActivities || [])}
         </div>
       </section>
       ${renderProfileInsight({ ...p, goalWeightKg: p.goalWeightKg ?? suggestedGoal, goalDeadlineMonths: suggestedDeadline })}

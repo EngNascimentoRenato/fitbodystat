@@ -13,8 +13,9 @@ import {
 } from "../services/progress-service.js";
 import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
 import { formatDate } from "../utils/date-utils.js";
+import { weeklyActivityCard } from "../components/activity-summary.js";
 
-export function renderDashboard(state) {
+export function renderDashboard(state, routePrefix = "") {
   const { profile, entries } = state;
   const enriched = enrichEntries(profile, entries);
   const latest = getLatestEntry(profile, entries);
@@ -59,6 +60,8 @@ export function renderDashboard(state) {
         ${statCard("Cintura", formatCm(latest?.waistCm), `Inicial: ${formatCm(profile.startWaistCm)}`)}
         ${statCard("Gordura corporal", formatPercent(latest?.bodyFat), latest?.bodyFatClass || "Por medidas ou medidor")}
       </section>
+
+      ${weeklyActivityCard(profile, state.activities || [], routePrefix)}
 
       <div class="split">
         ${lineChart({ title: "Peso real vs planejado", description: "A linha planejada cobre todo o prazo da meta.", actual: actualWeight, planned: plannedWeight, unit: "kg" })}

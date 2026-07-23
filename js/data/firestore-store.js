@@ -58,17 +58,19 @@ export async function getUser(userId) {
 }
 
 export async function loadCloudState(userId) {
-  const [profileSnapshot, planSnapshot, settingsSnapshot, entriesSnapshot] = await Promise.all([
+  const [profileSnapshot, planSnapshot, settingsSnapshot, entriesSnapshot, activitiesSnapshot] = await Promise.all([
     getDoc(doc(db, "profiles", userId)),
     getDoc(doc(db, "plans", userId)),
     getDoc(doc(db, "settings", userId)),
-    getDocs(collection(db, "users", userId, "measurements"))
+    getDocs(collection(db, "users", userId, "measurements")),
+    getDocs(collection(db, "users", userId, "activities"))
   ]);
 
   const hasData = profileSnapshot.exists()
     || planSnapshot.exists()
     || settingsSnapshot.exists()
-    || !entriesSnapshot.empty;
+    || !entriesSnapshot.empty
+    || !activitiesSnapshot.empty;
 
   if (!hasData) return null;
 
@@ -79,13 +81,20 @@ export async function loadCloudState(userId) {
     settings: settingsSnapshot.exists() ? withoutMetadata(settingsSnapshot.data()) : {},
     entries: entriesSnapshot.docs
       .map((item) => ({ id: item.id, ...withoutMetadata(item.data()) }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    activities: activitiesSnapshot.docs
+      .map((item) => ({ id: item.id, ...withoutMetadata(item.data()) }))
       .sort((a, b) => a.date.localeCompare(b.date))
   };
 }
 
 export async function saveCloudState(userId, state, actor = {}) {
   const measurementsRef = collection(db, "users", userId, "measurements");
-  const existingEntries = await getDocs(measurementsRef);
+  const activitiesRef = collection(db, "users", userId, "activities");
+  const [existingEntries, existingActivities] = await Promise.all([
+    getDocs(measurementsRef),
+    getDocs(activitiesRef)
+  ]);
   const batch = writeBatch(db);
   const audit = {
     ownerId: userId,
@@ -105,6 +114,15 @@ export async function saveCloudState(userId, state, actor = {}) {
 
   (state.entries || []).forEach((entry) => {
     batch.set(doc(measurementsRef, entry.id), { ...entry, ...audit }, { merge: true });
+  });
+
+  const currentActivityIds = new Set((state.activities || []).map((activity) => activity.id));
+  existingActivities.docs.forEach((activitySnapshot) => {
+    if (!currentActivityIds.has(activitySnapshot.id)) batch.delete(activitySnapshot.ref);
+  });
+
+  (state.activities || []).forEach((activity) => {
+    batch.set(doc(activitiesRef, activity.id), { ...activity, ...audit }, { merge: true });
   });
 
   await batch.commit();
@@ -151,6 +169,17 @@ export async function saveMeasurementAndProfile(userId, state, entry, actor = {}
 
 export async function deleteMeasurement(userId, entryId) {
   await deleteDoc(doc(db, "users", userId, "measurements", entryId));
+}
+
+export async function saveActivity(userId, activity, actor = {}) {
+  await setDoc(doc(db, "users", userId, "activities", activity.id), {
+    ...activity,
+    ...auditData(userId, actor)
+  }, { merge: true });
+}
+
+export async function deleteActivity(userId, activityId) {
+  await deleteDoc(doc(db, "users", userId, "activities", activityId));
 }
 
 export async function updateOwnDirectoryName(userId, name) {
