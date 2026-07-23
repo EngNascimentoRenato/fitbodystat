@@ -105,17 +105,18 @@ function renderPlanEditor(profile, goalPlan) {
 
 function readProfileForm(form, currentProfile) {
   const data = new FormData(form);
+  const value = (name, fallback) => data.has(name) ? data.get(name) : fallback;
   const nextProfile = {
     ...currentProfile,
     name: data.get("name").trim(),
-    sex: data.get("sex"),
+    sex: value("sex", currentProfile.sex),
     birthDate: data.get("birthDate"),
-    heightCm: toNumber(data.get("heightCm")),
-    startDate: data.get("startDate"),
-    startWeightKg: toNumber(data.get("startWeightKg")),
-    startWaistCm: toNumber(data.get("startWaistCm")),
-    startNeckCm: toNumber(data.get("startNeckCm")),
-    startHipCm: toNumber(data.get("startHipCm")),
+    heightCm: toNumber(value("heightCm", currentProfile.heightCm)),
+    startDate: value("startDate", currentProfile.startDate),
+    startWeightKg: toNumber(value("startWeightKg", currentProfile.startWeightKg)),
+    startWaistCm: toNumber(value("startWaistCm", currentProfile.startWaistCm)),
+    startNeckCm: toNumber(value("startNeckCm", currentProfile.startNeckCm)),
+    startHipCm: toNumber(value("startHipCm", currentProfile.startHipCm)),
     targetBmi: toNumber(data.get("targetBmi")) || 24.9,
     goalWeightKg: toNumber(data.get("goalWeightKg")),
     weeklyChangeGoalKg: toNumber(data.get("weeklyChangeGoalKg")) || 0.5,
@@ -134,6 +135,8 @@ function readProfileForm(form, currentProfile) {
 
 export function renderProfile(state) {
   const p = state.profile;
+  const baselineLocked = p.baselineLocked === true || state.entries.length > 0;
+  const baselineDisabled = baselineLocked ? "disabled" : "";
   const suggestedGoal = getGoalWeight(p);
   const suggestedDeadline = p.goalDeadlineMonths || calculateGoalDeadlineMonths(p);
   const weeklyChange = getWeeklyChangeGoal(p);
@@ -141,6 +144,11 @@ export function renderProfile(state) {
   return `
     <form class="form" id="profile-form">
       <section class="card">
+        ${baselineLocked ? `
+          <p class="form-notice">Os dados da linha de base estão bloqueados porque o acompanhamento já possui medições. Metas, prazo e demais dados do perfil continuam editáveis.</p>
+        ` : `
+          <p class="form-notice">Os dados iniciais poderão ser ajustados até o primeiro registro de acompanhamento.</p>
+        `}
         <div class="form-grid">
           <div class="field">
             <label for="name">Nome completo</label>
@@ -148,7 +156,7 @@ export function renderProfile(state) {
           </div>
           <div class="field">
             <label for="sex">Sexo</label>
-            <select id="sex" name="sex" required>
+            <select id="sex" name="sex" required ${baselineDisabled}>
               <option value="" ${!p.sex ? "selected" : ""}>Selecione</option>
               <option value="male" ${p.sex === "male" ? "selected" : ""}>Masculino</option>
               <option value="female" ${p.sex === "female" ? "selected" : ""}>Feminino</option>
@@ -160,27 +168,27 @@ export function renderProfile(state) {
           </div>
           <div class="field">
             <label for="heightCm">Altura (cm)</label>
-            <input id="heightCm" name="heightCm" inputmode="decimal" required value="${escapeAttribute(p.heightCm ?? "")}" />
+            <input id="heightCm" name="heightCm" inputmode="decimal" required ${baselineDisabled} value="${escapeAttribute(p.heightCm ?? "")}" />
           </div>
           <div class="field">
             <label for="startDate">Data inicial</label>
-            <input id="startDate" name="startDate" type="date" required value="${escapeAttribute(p.startDate || "")}" />
+            <input id="startDate" name="startDate" type="date" required ${baselineDisabled} value="${escapeAttribute(p.startDate || "")}" />
           </div>
           <div class="field">
             <label for="startWeightKg">Peso inicial (kg)</label>
-            <input id="startWeightKg" name="startWeightKg" inputmode="decimal" required value="${escapeAttribute(p.startWeightKg ?? "")}" />
+            <input id="startWeightKg" name="startWeightKg" inputmode="decimal" required ${baselineDisabled} value="${escapeAttribute(p.startWeightKg ?? "")}" />
           </div>
           <div class="field">
             <label for="startWaistCm">Cintura inicial (cm)</label>
-            <input id="startWaistCm" name="startWaistCm" inputmode="decimal" value="${escapeAttribute(p.startWaistCm ?? "")}" />
+            <input id="startWaistCm" name="startWaistCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startWaistCm ?? "")}" />
           </div>
           <div class="field">
             <label for="startNeckCm">Pescoço inicial (cm)</label>
-            <input id="startNeckCm" name="startNeckCm" inputmode="decimal" value="${escapeAttribute(p.startNeckCm ?? "")}" />
+            <input id="startNeckCm" name="startNeckCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startNeckCm ?? "")}" />
           </div>
           <div class="field">
             <label for="startHipCm">Quadril inicial (cm)</label>
-            <input id="startHipCm" name="startHipCm" inputmode="decimal" value="${escapeAttribute(p.startHipCm ?? "")}" />
+            <input id="startHipCm" name="startHipCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startHipCm ?? "")}" />
             <span class="help-text">Necessário para cálculo feminino pelo método da Marinha e opcional para acompanhamento geral.</span>
           </div>
           <div class="field">

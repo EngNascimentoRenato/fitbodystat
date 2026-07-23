@@ -19,8 +19,18 @@ export function bindEntry(state, persist, render) {
   document.getElementById("entry-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const date = data.get("date");
+    if (state.profile.startDate && date <= state.profile.startDate) {
+      showToast("A data deve ser posterior à data inicial do perfil.");
+      return;
+    }
+    if (state.entries.some((item) => item.date === date)) {
+      showToast("Já existe um registro nessa data. Edite-o pelo histórico.");
+      return;
+    }
+
     const entry = createEntry({
-      date: data.get("date"),
+      date,
       weightKg: toNumber(data.get("weightKg")),
       waistCm: toNumber(data.get("waistCm")),
       neckCm: toNumber(data.get("neckCm")),
@@ -29,8 +39,16 @@ export function bindEntry(state, persist, render) {
       bodyFatManual: toNumber(data.get("bodyFatManual")),
       notes: data.get("notes").trim()
     });
-    state.entries = [...state.entries.filter((item) => item.date !== entry.date), entry].sort((a, b) => a.date.localeCompare(b.date));
-    persist({ type: "entry-upsert", entry });
+    state.entries = [...state.entries, entry].sort((a, b) => a.date.localeCompare(b.date));
+    const profileChanged = state.profile.baselineLocked !== true;
+    if (profileChanged) {
+      state.profile = {
+        ...state.profile,
+        baselineLocked: true,
+        baselineLockedAt: new Date().toISOString()
+      };
+    }
+    persist({ type: "entry-upsert", entry, profileChanged });
     showToast("Registro salvo.");
     location.hash = "#/dashboard";
     render();

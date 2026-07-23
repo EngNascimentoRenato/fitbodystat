@@ -20,15 +20,19 @@ export function createBlankState() {
 }
 
 export function normalizeState(parsed = {}) {
+  const entries = (parsed.entries || []).filter((entry) => entry.id !== "profile-initial");
+  const profile = {
+    ...defaultProfile,
+    ...(parsed.profile || {}),
+    weeklyChangeGoalKg: parsed.profile?.weeklyChangeGoalKg ?? parsed.profile?.weeklyLossGoalKg ?? defaultProfile.weeklyChangeGoalKg
+  };
+  profile.baselineLocked = profile.baselineLocked === true || entries.length > 0;
+
   return {
     ...createBlankState(),
     ...parsed,
-    profile: {
-      ...defaultProfile,
-      ...(parsed.profile || {}),
-      weeklyChangeGoalKg: parsed.profile?.weeklyChangeGoalKg ?? parsed.profile?.weeklyLossGoalKg ?? defaultProfile.weeklyChangeGoalKg
-    },
-    entries: parsed.entries || [],
+    profile,
+    entries,
     goalPlan: parsed.goalPlan || parsed.monthlyPlan || defaultMonthlyPlan
   };
 }

@@ -88,8 +88,33 @@ export function generatePlannedSeries(profile, unit = "weight") {
   return points;
 }
 
+export function createBaselineEntry(profile) {
+  if (profile.startWeightKg === null || profile.startWeightKg === undefined || profile.startWeightKg === "") return null;
+  const weightKg = Number(profile.startWeightKg);
+  if (!profile.startDate || !Number.isFinite(weightKg)) return null;
+
+  return {
+    id: "profile-initial",
+    date: profile.startDate,
+    weightKg,
+    waistCm: profile.startWaistCm,
+    neckCm: profile.startNeckCm,
+    hipCm: profile.startHipCm,
+    bodyFatMethod: "navy",
+    bodyFatManual: null,
+    notes: "Registro inicial do perfil",
+    source: "profile",
+    isBaseline: true
+  };
+}
+
 export function enrichEntries(profile, entries) {
-  return [...entries]
+  const baseline = createBaselineEntry(profile);
+  const regularEntries = (entries || []).filter((entry) =>
+    entry.id !== "profile-initial" && (!baseline || entry.date !== baseline.date)
+  );
+
+  return [...(baseline ? [baseline] : []), ...regularEntries]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map((entry, index, sorted) => {
       const previous = sorted[index - 1];

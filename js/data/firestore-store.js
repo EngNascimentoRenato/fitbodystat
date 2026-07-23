@@ -141,6 +141,14 @@ export async function saveMeasurement(userId, entry, actor = {}) {
   }, { merge: true });
 }
 
+export async function saveMeasurementAndProfile(userId, state, entry, actor = {}) {
+  const audit = auditData(userId, actor);
+  const batch = writeBatch(db);
+  batch.set(doc(db, "profiles", userId), { ...state.profile, ...audit }, { merge: true });
+  batch.set(doc(db, "users", userId, "measurements", entry.id), { ...entry, ...audit }, { merge: true });
+  await batch.commit();
+}
+
 export async function deleteMeasurement(userId, entryId) {
   await deleteDoc(doc(db, "users", userId, "measurements", entryId));
 }

@@ -10,6 +10,8 @@ export const defaultProfile = {
   startWaistCm: null,
   startNeckCm: null,
   startHipCm: null,
+  baselineLocked: false,
+  baselineLockedAt: null,
   goalWeightKg: null,
   targetBmi: 24.9,
   weeklyChangeGoalKg: 0.5,

@@ -6,6 +6,7 @@ import {
   loadCloudState,
   saveCloudState,
   saveMeasurement,
+  saveMeasurementAndProfile,
   saveProfileAndPlan,
   saveSettings,
   updateOwnDirectoryName
@@ -58,7 +59,11 @@ function saveChangeToCloud(userId, stateToSave, change) {
   const actor = { uid: authState.user.uid, role: authState.role };
   if (change?.type === "profile-plan") return saveProfileAndPlan(userId, stateToSave, actor);
   if (change?.type === "settings") return saveSettings(userId, stateToSave.settings, actor);
-  if (change?.type === "entry-upsert") return saveMeasurement(userId, change.entry, actor);
+  if (change?.type === "entry-upsert") {
+    return change.profileChanged
+      ? saveMeasurementAndProfile(userId, stateToSave, change.entry, actor)
+      : saveMeasurement(userId, change.entry, actor);
+  }
   if (change?.type === "entry-delete") return deleteMeasurement(userId, change.entryId);
   return saveCloudState(userId, stateToSave, actor);
 }
