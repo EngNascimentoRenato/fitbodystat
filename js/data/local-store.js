@@ -11,6 +11,9 @@ function storageKey(userId = "guest") {
 export function createBlankState() {
   return {
     profile: defaultProfile,
+    contact: {
+      phone: ""
+    },
     entries: [],
     activities: [],
     goalPlan: createDefaultMonthlyPlan(defaultProfile),
@@ -33,6 +36,9 @@ export function normalizeState(parsed = {}) {
     ...createBlankState(),
     ...parsed,
     profile,
+    contact: {
+      phone: parsed.contact?.phone || ""
+    },
     entries,
     activities: parsed.activities || [],
     goalPlan: parsed.goalPlan || parsed.monthlyPlan || defaultMonthlyPlan

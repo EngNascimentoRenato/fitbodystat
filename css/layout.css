@@ -5,6 +5,10 @@
   transition: grid-template-columns 180ms ease;
 }
 
+.menu-backdrop {
+  display: none;
+}
+
 body.menu-collapsed .app-shell {
   grid-template-columns: 76px minmax(0, 1fr);
 }
@@ -318,6 +322,28 @@ body.menu-collapsed .nav-submenu-content {
 }
 
 @media (max-width: 900px) {
+  body.menu-open {
+    overflow: hidden;
+  }
+
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 8;
+    display: block;
+    padding: 0;
+    background: rgba(16, 22, 21, 0.42);
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+
+  body.menu-open .menu-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
   }

@@ -31,8 +31,9 @@ export function weekDates(referenceDate = todayISO()) {
 
 export function weeklyActivitySummary(activities = [], goalDays = 3, referenceDate = todayISO()) {
   const dates = weekDates(referenceDate);
+  const weekActivities = activities.filter((activity) => activity.completed && dates.includes(activity.date));
   const activeDates = new Set(
-    activities.filter((activity) => activity.completed && dates.includes(activity.date)).map((activity) => activity.date)
+    weekActivities.map((activity) => activity.date)
   );
   const completedDays = activeDates.size;
   const goal = Math.min(7, Math.max(1, Number(goalDays) || 3));
@@ -41,6 +42,8 @@ export function weeklyActivitySummary(activities = [], goalDays = 3, referenceDa
     activeDates,
     completedDays,
     goalDays: goal,
+    totalMinutes: weekActivities.reduce((total, activity) => total + (Number(activity.durationMinutes) || 0), 0),
+    durationCount: weekActivities.filter((activity) => Number(activity.durationMinutes) > 0).length,
     progress: Math.min(100, Math.round((completedDays / goal) * 100))
   };
 }
@@ -54,8 +57,36 @@ export function recentWeekTotals(activities = [], numberOfWeeks = 4, referenceDa
     const count = new Set(
       activities.filter((activity) => activity.completed && dates.includes(activity.date)).map((activity) => activity.date)
     ).size;
-    return { start, count };
+    const minutes = activities
+      .filter((activity) => activity.completed && dates.includes(activity.date))
+      .reduce((total, activity) => total + (Number(activity.durationMinutes) || 0), 0);
+    return { start, count, minutes };
   });
+}
+
+export function recentMonthTotals(activities = [], numberOfMonths = 6, referenceDate = todayISO()) {
+  const reference = parseLocalDate(referenceDate);
+  return Array.from({ length: numberOfMonths }, (_, reverseIndex) => {
+    const monthsAgo = numberOfMonths - reverseIndex - 1;
+    const date = new Date(reference.getFullYear(), reference.getMonth() - monthsAgo, 1);
+    const month = localDateISO(date).slice(0, 7);
+    const minutes = activities
+      .filter((activity) => activity.completed && activity.date.startsWith(month))
+      .reduce((total, activity) => total + (Number(activity.durationMinutes) || 0), 0);
+    const label = new Intl.DateTimeFormat("pt-BR", { month: "short", year: "2-digit" })
+      .format(date)
+      .replace(".", "");
+    return { month, label, minutes };
+  });
+}
+
+export function formatActivityMinutes(minutes) {
+  const total = Math.max(0, Math.round(Number(minutes) || 0));
+  const hours = Math.floor(total / 60);
+  const remainder = total % 60;
+  if (!hours) return `${remainder} min`;
+  if (!remainder) return `${hours}h`;
+  return `${hours}h ${remainder}min`;
 }
 
 export function monthCalendar(monthISO, activities = []) {

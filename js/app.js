@@ -7,6 +7,7 @@ import {
   loadCloudState,
   saveCloudState,
   saveActivity,
+  saveContact,
   saveMeasurement,
   saveMeasurementAndProfile,
   saveProfileAndPlan,
@@ -20,7 +21,8 @@ import {
 } from "./services/auth-service.js";
 import { registerServiceWorker } from "./services/pwa-service.js";
 import { renderRoute } from "./router.js";
-import { escapeHtml } from "./utils/html-utils.js";
+import { escapeAttribute, escapeHtml } from "./utils/html-utils.js";
+import { formatPhone } from "./utils/phone-utils.js";
 
 const roleLabels = {
   user: "Usuário",
@@ -59,7 +61,11 @@ function applyTheme() {
 
 function saveChangeToCloud(userId, stateToSave, change) {
   const actor = { uid: authState.user.uid, role: authState.role };
-  if (change?.type === "profile-plan") return saveProfileAndPlan(userId, stateToSave, actor);
+  if (change?.type === "profile-plan") {
+    const requests = [saveProfileAndPlan(userId, stateToSave, actor)];
+    if (actor.uid === userId) requests.push(saveContact(userId, stateToSave.contact, actor));
+    return Promise.all(requests);
+  }
   if (change?.type === "settings") return saveSettings(userId, stateToSave.settings, actor);
   if (change?.type === "entry-upsert") {
     return change.profileChanged
@@ -135,9 +141,12 @@ async function openPatient(patientOrId) {
     uid: patient.uid || patient.id,
     name: patient.name || patient.email || "Paciente",
     email: patient.email || "",
+    phone: patient.phone || "",
     link: patient.link || null
   };
-  state = normalizeState((await loadCloudState(authState.activePatient.uid)) || {});
+  state = normalizeState((await loadCloudState(authState.activePatient.uid, {
+    includeContact: patient.link?.permissions?.sharePhone === true
+  })) || {});
   authState.syncStatus = "Dados do paciente carregados.";
   location.hash = "#/dashboard";
   render();
@@ -165,6 +174,7 @@ function renderPatientContext() {
       <span>Acompanhando</span>
       <strong>${escapeHtml(patient.name)}</strong>
       <small>${escapeHtml(patient.email)}</small>
+      ${patient.phone ? `<a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>` : ""}
     </div>
     <button class="button" id="close-patient" type="button">Encerrar visualização</button>
   ` : "";
@@ -213,6 +223,25 @@ document.getElementById("menu-toggle").addEventListener("click", () => {
     return;
   }
   document.body.classList.toggle("menu-collapsed");
+});
+
+function closeMobileMenu() {
+  if (window.matchMedia("(max-width: 900px)").matches) {
+    document.body.classList.remove("menu-open");
+  }
+}
+
+document.getElementById("menu-backdrop")?.addEventListener("click", closeMobileMenu);
+document.querySelector(".sidebar")?.addEventListener("click", (event) => {
+  if (!window.matchMedia("(max-width: 900px)").matches) return;
+  if (event.target.closest(".nav-link")) {
+    closeMobileMenu();
+    return;
+  }
+  if (event.target.matches(".sidebar, .nav-list, .nav-section")) closeMobileMenu();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeMobileMenu();
 });
 
 window.addEventListener("hashchange", render);

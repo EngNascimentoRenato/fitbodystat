@@ -57,26 +57,30 @@ export async function getUser(userId) {
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
 }
 
-export async function loadCloudState(userId) {
-  const [profileSnapshot, planSnapshot, settingsSnapshot, entriesSnapshot, activitiesSnapshot] = await Promise.all([
+export async function loadCloudState(userId, options = {}) {
+  const includeContact = options.includeContact !== false;
+  const [profileSnapshot, planSnapshot, settingsSnapshot, entriesSnapshot, activitiesSnapshot, contactSnapshot] = await Promise.all([
     getDoc(doc(db, "profiles", userId)),
     getDoc(doc(db, "plans", userId)),
     getDoc(doc(db, "settings", userId)),
     getDocs(collection(db, "users", userId, "measurements")),
-    getDocs(collection(db, "users", userId, "activities"))
+    getDocs(collection(db, "users", userId, "activities")),
+    includeContact ? getDoc(doc(db, "contacts", userId)) : Promise.resolve(null)
   ]);
 
   const hasData = profileSnapshot.exists()
     || planSnapshot.exists()
     || settingsSnapshot.exists()
     || !entriesSnapshot.empty
-    || !activitiesSnapshot.empty;
+    || !activitiesSnapshot.empty
+    || contactSnapshot?.exists();
 
   if (!hasData) return null;
 
   const planData = planSnapshot.exists() ? planSnapshot.data() : {};
   return {
     profile: profileSnapshot.exists() ? withoutMetadata(profileSnapshot.data()) : {},
+    contact: contactSnapshot?.exists() ? withoutMetadata(contactSnapshot.data()) : { phone: "" },
     goalPlan: planData.goalPlan || [],
     settings: settingsSnapshot.exists() ? withoutMetadata(settingsSnapshot.data()) : {},
     entries: entriesSnapshot.docs
@@ -106,6 +110,7 @@ export async function saveCloudState(userId, state, actor = {}) {
   batch.set(doc(db, "profiles", userId), { ...state.profile, ...audit }, { merge: true });
   batch.set(doc(db, "plans", userId), { goalPlan: state.goalPlan || [], ...audit }, { merge: true });
   batch.set(doc(db, "settings", userId), { ...(state.settings || {}), ...audit }, { merge: true });
+  batch.set(doc(db, "contacts", userId), { ...(state.contact || { phone: "" }), ...audit }, { merge: true });
 
   const currentIds = new Set((state.entries || []).map((entry) => entry.id));
   existingEntries.docs.forEach((entrySnapshot) => {
@@ -148,6 +153,13 @@ export async function saveProfileAndPlan(userId, state, actor = {}) {
 export async function saveSettings(userId, settings, actor = {}) {
   await setDoc(doc(db, "settings", userId), {
     ...(settings || {}),
+    ...auditData(userId, actor)
+  }, { merge: true });
+}
+
+export async function saveContact(userId, contact, actor = {}) {
+  await setDoc(doc(db, "contacts", userId), {
+    ...(contact || { phone: "" }),
     ...auditData(userId, actor)
   }, { merge: true });
 }
@@ -254,7 +266,7 @@ export async function listAllCareInvitations() {
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 
-export async function respondToCareInvitation(invitation, user, response) {
+export async function respondToCareInvitation(invitation, user, response, options = {}) {
   if (!['accepted', 'rejected'].includes(response)) throw new Error("Resposta inválida.");
 
   const invitationRef = doc(db, "careInvitations", invitation.id);
@@ -274,7 +286,10 @@ export async function respondToCareInvitation(invitation, user, response) {
       professionalId: invitation.professionalId,
       patientId: user.uid,
       status: "active",
-      permissions: invitation.permissions || { viewData: true, editData: true },
+      permissions: {
+        ...(invitation.permissions || { viewData: true, editData: true }),
+        sharePhone: options.sharePhone === true
+      },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }, { merge: true });
@@ -313,13 +328,17 @@ export async function listCareLinksForUser(patientId) {
 export async function listPatientsForProfessional(professionalId) {
   const links = await listCareLinksForProfessional(professionalId);
   const patients = await Promise.all(links.map(async (link) => {
-    const [user, profileSnapshot] = await Promise.all([
+    const [user, profileSnapshot, contactSnapshot] = await Promise.all([
       getUser(link.patientId),
-      getDoc(doc(db, "profiles", link.patientId))
+      getDoc(doc(db, "profiles", link.patientId)),
+      link.permissions?.sharePhone === true
+        ? getDoc(doc(db, "contacts", link.patientId))
+        : Promise.resolve(null)
     ]);
     if (!user) return null;
     const profile = profileSnapshot.exists() ? withoutMetadata(profileSnapshot.data()) : {};
-    return { ...user, name: profile.name || user.name, link };
+    const contact = contactSnapshot?.exists() ? withoutMetadata(contactSnapshot.data()) : {};
+    return { ...user, name: profile.name || user.name, phone: contact.phone || "", link };
   }));
   return patients.filter(Boolean);
 }
@@ -327,8 +346,12 @@ export async function listPatientsForProfessional(professionalId) {
 export async function listProfessionalsForUser(patientId) {
   const links = await listCareLinksForUser(patientId);
   const professionals = await Promise.all(links.map(async (link) => {
-    const user = await getUser(link.professionalId);
-    return user ? { ...user, link } : null;
+    const [user, contactSnapshot] = await Promise.all([
+      getUser(link.professionalId),
+      getDoc(doc(db, "contacts", link.professionalId))
+    ]);
+    const contact = contactSnapshot.exists() ? withoutMetadata(contactSnapshot.data()) : {};
+    return user ? { ...user, phone: contact.phone || "", link } : null;
   }));
   return professionals.filter(Boolean);
 }
@@ -343,6 +366,16 @@ export async function revokeCareLink(link, actorId) {
     status: "revoked",
     revokedBy: actorId,
     revokedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function updateCareLinkPhoneSharing(link, sharePhone) {
+  await updateDoc(doc(db, "careLinks", link.id), {
+    permissions: {
+      ...(link.permissions || { viewData: true, editData: true }),
+      sharePhone: sharePhone === true
+    },
     updatedAt: serverTimestamp()
   });
 }

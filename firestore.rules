@@ -104,6 +104,24 @@ service cloud.firestore {
       allow create, update, delete: if canEditHealthData(userId);
     }
 
+    match /contacts/{userId} {
+      allow read: if accountIsActive()
+        && (request.auth.uid == userId
+          || isAdmin()
+          || (activeProfessionalLink(userId)
+            && get(professionalLink(userId)).data.permissions.sharePhone == true)
+          || (get(/databases/$(database)/documents/users/$(userId)).data.role == "professional"
+            && activeRelationship(userId)));
+
+      allow create, update: if isAdmin()
+        || (accountIsActive()
+          && request.auth.uid == userId
+          && request.resource.data.ownerId == userId);
+
+      allow delete: if isAdmin()
+        || (accountIsActive() && request.auth.uid == userId);
+    }
+
     match /careInvitations/{invitationId} {
       allow create: if isProfessional()
         && request.resource.data.professionalId == request.auth.uid
@@ -156,6 +174,19 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.professionalId == request.resource.data.professionalId);
 
       allow update: if isAdmin()
+        || (accountIsActive()
+          && resource.data.patientId == request.auth.uid
+          && resource.data.status == "active"
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.professionalId == resource.data.professionalId
+          && request.resource.data.patientId == resource.data.patientId
+          && request.resource.data.invitationId == resource.data.invitationId
+          && request.resource.data.permissions.viewData == resource.data.permissions.viewData
+          && request.resource.data.permissions.editData == resource.data.permissions.editData
+          && request.resource.data.permissions.sharePhone is bool
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "permissions", "updatedAt"
+          ]))
         || (accountIsActive()
           && (resource.data.professionalId == request.auth.uid
             || resource.data.patientId == request.auth.uid)

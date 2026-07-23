@@ -1,5 +1,5 @@
 import { activityLabel } from "../data/activity-catalog.js";
-import { weeklyActivitySummary } from "../services/activity-service.js";
+import { formatActivityMinutes, weeklyActivitySummary } from "../services/activity-service.js";
 import { formatDate, todayISO } from "../utils/date-utils.js";
 import { escapeAttribute } from "../utils/html-utils.js";
 import { progressBar } from "./progress-bar.js";
@@ -14,6 +14,7 @@ function activityNames(activity) {
 
 export function weeklyActivityCard(profile, activities = [], routePrefix = "") {
   const summary = weeklyActivitySummary(activities, profile.weeklyActivityGoalDays);
+  const targetMinutes = summary.goalDays * (Number(profile.averageActivityDurationMinutes) || 0);
   const today = todayISO();
   const activityByDate = new Map(activities.map((activity) => [activity.date, activity]));
 
@@ -27,6 +28,10 @@ export function weeklyActivityCard(profile, activities = [], routePrefix = "") {
         <a class="button" href="#${routePrefix}/atividades">Ver atividades</a>
       </div>
       ${progressBar(summary.progress)}
+      <p class="activity-minutes-summary">
+        <strong>${formatActivityMinutes(summary.totalMinutes)}</strong> registrados nesta semana
+        ${targetMinutes ? ` de ${formatActivityMinutes(targetMinutes)} planejados` : ""}
+      </p>
       <div class="week-strip">
         ${summary.dates.map((date, index) => {
           const activity = activityByDate.get(date);

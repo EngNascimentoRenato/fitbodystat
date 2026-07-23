@@ -2,15 +2,19 @@ import {
   listInvitationsForUser,
   listProfessionalsForUser,
   respondToCareInvitation,
-  revokeCareLink
+  revokeCareLink,
+  updateCareLinkPhoneSharing
 } from "../data/firestore-store.js";
 import { confirmAction } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
-import { escapeHtml } from "../utils/html-utils.js";
+import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+import { formatPhone } from "../utils/phone-utils.js";
 
-export function renderConnections(authState) {
+export function renderConnections(authState, personalState) {
   const pending = (authState.invitations || []).filter((item) => item.status === "pending");
   const professionals = authState.professionals || [];
+  const ownPhone = personalState?.contact?.phone || "";
+  const profilePath = authState.role === "user" ? "#/perfil" : "#/me/perfil";
 
   return `
     <div class="view-stack">
@@ -24,7 +28,7 @@ export function renderConnections(authState) {
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Profissional</th><th>E-mail</th><th>Permissões</th><th></th></tr></thead>
+            <thead><tr><th>Profissional</th><th>E-mail</th><th>Permissões</th><th>Telefone</th><th></th></tr></thead>
             <tbody>
               ${pending.map((invitation) => `
                 <tr>
@@ -32,13 +36,21 @@ export function renderConnections(authState) {
                   <td>${escapeHtml(invitation.professionalEmail || "-")}</td>
                   <td>Visualizar e atualizar acompanhamento</td>
                   <td>
+                    ${ownPhone ? `
+                      <label class="consent-option">
+                        <input type="checkbox" data-share-phone-invitation="${invitation.id}" />
+                        <span>Compartilhar ${escapeHtml(formatPhone(ownPhone))}</span>
+                      </label>
+                    ` : `<span class="muted">Não cadastrado. <a href="${profilePath}">Adicionar no perfil</a></span>`}
+                  </td>
+                  <td>
                     <div class="button-row">
                       <button class="button primary" data-accept-invitation="${invitation.id}" type="button">Aceitar</button>
                       <button class="button" data-reject-invitation="${invitation.id}" type="button">Recusar</button>
                     </div>
                   </td>
                 </tr>
-              `).join("") || `<tr><td colspan="4">Nenhum convite pendente.</td></tr>`}
+              `).join("") || `<tr><td colspan="5">Nenhum convite pendente.</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -48,16 +60,28 @@ export function renderConnections(authState) {
         <h2>Profissionais vinculados</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone profissional</th><th>Meu telefone</th><th>Status</th><th></th></tr></thead>
             <tbody>
               ${professionals.map((professional) => `
                 <tr>
                   <td>${escapeHtml(professional.name || "Profissional")}</td>
                   <td>${escapeHtml(professional.email || "-")}</td>
+                  <td>${professional.phone
+                    ? `<a href="tel:${escapeAttribute(professional.phone)}">${escapeHtml(formatPhone(professional.phone))}</a>`
+                    : "-"}</td>
+                  <td>
+                    ${ownPhone ? `
+                      <label class="consent-option">
+                        <input type="checkbox" data-share-phone-link="${professional.link.id}"
+                          ${professional.link.permissions?.sharePhone === true ? "checked" : ""} />
+                        <span>Compartilhar</span>
+                      </label>
+                    ` : `<a href="${profilePath}">Cadastrar telefone</a>`}
+                  </td>
                   <td><span class="badge">Ativo</span></td>
                   <td><button class="button danger" data-revoke-link="${professional.link.id}" type="button">Remover vínculo</button></td>
                 </tr>
-              `).join("") || `<tr><td colspan="4">Nenhum profissional vinculado.</td></tr>`}
+              `).join("") || `<tr><td colspan="6">Nenhum profissional vinculado.</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -86,8 +110,10 @@ export function bindConnections(context) {
   const respond = async (invitationId, response) => {
     const invitation = (context.authState.invitations || []).find((item) => item.id === invitationId);
     if (!invitation) return;
+    const sharePhone = response === "accepted"
+      && document.querySelector(`[data-share-phone-invitation="${invitationId}"]`)?.checked === true;
     try {
-      await respondToCareInvitation(invitation, context.authState.user, response);
+      await respondToCareInvitation(invitation, context.authState.user, response, { sharePhone });
       showToast(response === "accepted" ? "Vínculo confirmado." : "Convite recusado.");
       await refresh();
     } catch (error) {
@@ -111,6 +137,24 @@ export function bindConnections(context) {
         await refresh();
       } catch (error) {
         showToast(`Não foi possível remover o vínculo: ${error.message}`);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-share-phone-link]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const professional = (context.authState.professionals || [])
+        .find((item) => item.link.id === input.dataset.sharePhoneLink);
+      if (!professional) return;
+      input.disabled = true;
+      try {
+        await updateCareLinkPhoneSharing(professional.link, input.checked);
+        showToast(input.checked ? "Telefone compartilhado com o profissional." : "Compartilhamento do telefone removido.");
+        await refresh();
+      } catch (error) {
+        input.checked = !input.checked;
+        input.disabled = false;
+        showToast(`Não foi possível alterar o compartilhamento: ${error.message}`);
       }
     });
   });

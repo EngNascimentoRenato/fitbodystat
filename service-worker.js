@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbodystat-v11";
+const CACHE_NAME = "fitbodystat-v12";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -59,6 +59,7 @@ const APP_SHELL = [
   "./js/components/modal.js",
   "./js/utils/date-utils.js",
   "./js/utils/number-utils.js",
+  "./js/utils/phone-utils.js",
   "./js/utils/validation-utils.js",
   "./js/utils/html-utils.js"
 ];

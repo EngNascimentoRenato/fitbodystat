@@ -8,6 +8,7 @@ import {
 import { confirmAction } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+import { formatPhone } from "../utils/phone-utils.js";
 
 const invitationLabels = {
   pending: "Pendente",
@@ -35,12 +36,15 @@ export function renderPatients(state, authState) {
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone compartilhado</th><th>Status</th><th></th></tr></thead>
             <tbody>
               ${patients.map((patient) => `
                 <tr>
                   <td>${escapeHtml(patient.name || "Sem nome")}</td>
                   <td>${escapeHtml(patient.email || "-")}</td>
+                  <td>${patient.phone
+                    ? `<a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>`
+                    : "-"}</td>
                   <td><span class="badge">Ativo</span></td>
                   <td>
                     <div class="button-row">
@@ -49,7 +53,7 @@ export function renderPatients(state, authState) {
                     </div>
                   </td>
                 </tr>
-              `).join("") || `<tr><td colspan="4">Nenhum paciente vinculado.</td></tr>`}
+              `).join("") || `<tr><td colspan="5">Nenhum paciente vinculado.</td></tr>`}
             </tbody>
           </table>
         </div>

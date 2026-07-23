@@ -2,6 +2,8 @@ import { activityLabel } from "../data/activity-catalog.js";
 import {
   monthCalendar,
   monthLabel,
+  formatActivityMinutes,
+  recentMonthTotals,
   recentWeekTotals,
   shiftMonth,
   weeklyActivitySummary
@@ -68,12 +70,39 @@ function renderRecentWeeks(activities, goalDays) {
             <article class="mini-stat">
               <span>Semana de ${formatDate(week.start).slice(0, 5)}</span>
               <strong>${week.count} ${week.count === 1 ? "dia" : "dias"}</strong>
+              <small>${formatActivityMinutes(week.minutes)} registrados</small>
               <div class="progress-track" aria-label="${formatDecimal(percentage, 0)}% da meta">
                 <div class="progress-fill" style="width:${percentage}%"></div>
               </div>
             </article>
           `;
         }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderMonthlyMinutes(activities) {
+  const months = recentMonthTotals(activities);
+  const maximum = Math.max(1, ...months.map((item) => item.minutes));
+  return `
+    <section class="card">
+      <div class="chart-header">
+        <div>
+          <h2>Evolução mensal em minutos</h2>
+          <p class="muted">Considera somente registros com duração informada.</p>
+        </div>
+      </div>
+      <div class="monthly-minutes-list">
+        ${months.map((item) => `
+          <div class="monthly-minutes-row">
+            <span>${item.label}</span>
+            <div class="progress-track" aria-label="${item.minutes} minutos em ${item.label}">
+              <div class="progress-fill" style="width:${(item.minutes / maximum) * 100}%"></div>
+            </div>
+            <strong>${formatActivityMinutes(item.minutes)}</strong>
+          </div>
+        `).join("")}
       </div>
     </section>
   `;
@@ -125,13 +154,18 @@ export function renderActivities(state) {
   const activities = state.activities || [];
   const goalDays = state.profile.weeklyActivityGoalDays || 3;
   const summary = weeklyActivitySummary(activities, goalDays);
+  const targetMinutes = goalDays * (Number(state.profile.averageActivityDurationMinutes) || 0);
+  const sortedActivities = [...activities].sort((a, b) => b.date.localeCompare(a.date));
+  const latestActivity = sortedActivities[0];
   return `
     <div class="view-stack">
       <section class="grid three">
         <article class="mini-stat">
           <span>Esta semana</span>
           <strong>${summary.completedDays} de ${summary.goalDays} dias</strong>
-          <small>${summary.progress}% da meta semanal</small>
+          <small>${targetMinutes
+            ? `${formatActivityMinutes(summary.totalMinutes)} de ${formatActivityMinutes(targetMinutes)}`
+            : `${formatActivityMinutes(summary.totalMinutes)} registrados`}</small>
         </article>
         <article class="mini-stat">
           <span>Total registrado</span>
@@ -140,12 +174,13 @@ export function renderActivities(state) {
         </article>
         <article class="mini-stat">
           <span>Última atividade</span>
-          <strong>${activities.length ? formatDate([...activities].sort((a, b) => b.date.localeCompare(a.date))[0].date) : "-"}</strong>
-          <small>${activities.length ? activityNames([...activities].sort((a, b) => b.date.localeCompare(a.date))[0]) : "Sem registros"}</small>
+          <strong>${latestActivity ? formatDate(latestActivity.date) : "-"}</strong>
+          <small>${latestActivity ? activityNames(latestActivity) : "Sem registros"}</small>
         </article>
       </section>
       ${renderCalendar(activities)}
       ${renderRecentWeeks(activities, goalDays)}
+      ${renderMonthlyMinutes(activities)}
       ${renderHistory(activities)}
     </div>
   `;

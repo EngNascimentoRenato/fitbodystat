@@ -12,6 +12,7 @@ import { createDefaultMonthlyPlan, normalizeMonthlyPlan } from "../data/seed-pla
 import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../utils/number-utils.js";
 import { escapeAttribute } from "../utils/html-utils.js";
 import { preferredActivityPicker } from "../components/activity-picker.js";
+import { formatPhone, normalizePhone, phoneIsValid } from "../utils/phone-utils.js";
 
 function renderProfileInsight(profile) {
   const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
@@ -120,9 +121,12 @@ function readProfileForm(form, currentProfile) {
     startHipCm: toNumber(value("startHipCm", currentProfile.startHipCm)),
     targetBmi: toNumber(data.get("targetBmi")) || 24.9,
     goalWeightKg: toNumber(data.get("goalWeightKg")),
+    goalType: data.get("goalType") || "",
+    customGoalLabel: data.get("customGoalLabel")?.trim() || "",
     weeklyChangeGoalKg: toNumber(data.get("weeklyChangeGoalKg")) || 0.5,
     goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
     weeklyActivityGoalDays: Math.min(7, Math.max(1, toNumber(data.get("weeklyActivityGoalDays")) || 3)),
+    averageActivityDurationMinutes: toNumber(data.get("averageActivityDurationMinutes")),
     preferredActivities: data.getAll("preferredActivities")
   };
 
@@ -136,8 +140,9 @@ function readProfileForm(form, currentProfile) {
   return nextProfile;
 }
 
-export function renderProfile(state) {
+export function renderProfile(state, options = {}) {
   const p = state.profile;
+  const canEditContact = options.canEditContact !== false;
   const baselineLocked = p.baselineLocked === true || state.entries.length > 0;
   const baselineDisabled = baselineLocked ? "disabled" : "";
   const suggestedGoal = getGoalWeight(p);
@@ -157,6 +162,14 @@ export function renderProfile(state) {
             <label for="name">Nome completo</label>
             <input id="name" name="name" required minlength="2" autocomplete="name" value="${escapeAttribute(p.name || "")}" />
           </div>
+          ${canEditContact ? `
+            <div class="field">
+              <label for="phone">Telefone</label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel"
+                placeholder="(65) 99999-9999" value="${escapeAttribute(formatPhone(state.contact?.phone || ""))}" />
+              <span class="help-text">O compartilhamento com profissionais é escolhido separadamente em cada vínculo.</span>
+            </div>
+          ` : ""}
           <div class="field">
             <label for="sex">Sexo</label>
             <select id="sex" name="sex" required ${baselineDisabled}>
@@ -195,6 +208,24 @@ export function renderProfile(state) {
             <span class="help-text">Necessário para cálculo feminino pelo método da Marinha e opcional para acompanhamento geral.</span>
           </div>
           <div class="field">
+            <label for="goalType">Objetivo principal</label>
+            <select id="goalType" name="goalType">
+              <option value="" ${!p.goalType ? "selected" : ""}>Selecione</option>
+              <option value="weight-loss" ${p.goalType === "weight-loss" ? "selected" : ""}>Emagrecimento</option>
+              <option value="weight-gain" ${p.goalType === "weight-gain" ? "selected" : ""}>Ganho de peso</option>
+              <option value="muscle-gain" ${p.goalType === "muscle-gain" ? "selected" : ""}>Ganho de massa muscular</option>
+              <option value="maintenance" ${p.goalType === "maintenance" ? "selected" : ""}>Manutenção</option>
+              <option value="recovery" ${p.goalType === "recovery" ? "selected" : ""}>Recuperação de peso</option>
+              <option value="other" ${p.goalType === "other" ? "selected" : ""}>Outro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="customGoalLabel">Descrição personalizada do objetivo</label>
+            <input id="customGoalLabel" name="customGoalLabel" maxlength="80"
+              value="${escapeAttribute(p.customGoalLabel || "")}" />
+            <span class="help-text">Opcional. Usada quando o objetivo precisar de mais contexto.</span>
+          </div>
+          <div class="field">
             <label for="targetBmi">IMC alvo para sugestão</label>
             <input id="targetBmi" name="targetBmi" inputmode="decimal" value="${escapeAttribute(p.targetBmi ?? 24.9)}" />
           </div>
@@ -221,10 +252,18 @@ export function renderProfile(state) {
             <p class="muted">Escolha as modalidades que pratica com frequência para agilizar o registro diário.</p>
           </div>
         </div>
-        <div class="field activity-goal-field">
-          <label for="weeklyActivityGoalDays">Meta semanal de dias ativos</label>
-          <input id="weeklyActivityGoalDays" name="weeklyActivityGoalDays" type="number" min="1" max="7"
-            value="${escapeAttribute(p.weeklyActivityGoalDays ?? 3)}" />
+        <div class="form-grid">
+          <div class="field activity-goal-field">
+            <label for="weeklyActivityGoalDays">Meta semanal de dias ativos</label>
+            <input id="weeklyActivityGoalDays" name="weeklyActivityGoalDays" type="number" min="1" max="7"
+              value="${escapeAttribute(p.weeklyActivityGoalDays ?? 3)}" />
+          </div>
+          <div class="field">
+            <label for="averageActivityDurationMinutes">Duração média pretendida por dia (minutos)</label>
+            <input id="averageActivityDurationMinutes" name="averageActivityDurationMinutes" type="number"
+              min="1" max="1440" value="${escapeAttribute(p.averageActivityDurationMinutes ?? "")}" />
+            <span class="help-text">Opcional. A meta semanal será calculada pelos dias ativos.</span>
+          </div>
         </div>
         <div class="field">
           <label>Atividades preferidas</label>
@@ -253,7 +292,13 @@ export function bindProfile(state, persist, render) {
   document.getElementById("profile-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const phone = data.get("phone");
+    if (phone !== null && !phoneIsValid(phone)) {
+      showToast("Informe um telefone válido, com DDD.");
+      return;
+    }
     state.profile = readProfileForm(event.currentTarget, state.profile);
+    if (phone !== null) state.contact = { ...(state.contact || {}), phone: normalizePhone(phone) };
     state.goalPlan = normalizeMonthlyPlan(state.profile, state.goalPlan).map((item, index) => ({
       label: data.get(`planLabel${index}`)?.trim() || item.label,
       month: toNumber(data.get(`planMonth${index}`)) ?? item.month,

@@ -133,6 +133,15 @@
   margin-bottom: 0;
 }
 
+.activity-minutes-summary {
+  margin: 0;
+  color: var(--muted);
+}
+
+.activity-minutes-summary strong {
+  color: var(--text);
+}
+
 .week-strip {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -246,11 +255,26 @@
 .activity-history-header,
 .activity-history-row {
   display: grid;
-  grid-template-columns: 110px minmax(180px, 1fr) 110px 110px minmax(160px, 1fr) auto;
+  grid-template-columns: 110px minmax(180px, 1fr) 100px 110px minmax(160px, 1fr) 180px;
   gap: 0.8rem;
   align-items: center;
   padding: 0.8rem 0;
   border-bottom: 1px solid var(--border);
+}
+
+.activity-history-header > :nth-child(3),
+.activity-history-header > :nth-child(4),
+.activity-history-row > :nth-child(3),
+.activity-history-row > :nth-child(4) {
+  text-align: center;
+}
+
+.activity-history-header > :last-child {
+  text-align: center;
+}
+
+.activity-history-row .table-actions {
+  justify-content: flex-end;
 }
 
 .activity-history-header {
@@ -275,6 +299,27 @@
 
 .activity-row-main small {
   display: none;
+}
+
+.monthly-minutes-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.monthly-minutes-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 90px;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.monthly-minutes-row span {
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.monthly-minutes-row strong {
+  text-align: right;
 }
 
 @media (max-width: 760px) {
@@ -315,5 +360,11 @@
 
   .activity-row-main small {
     display: block;
+  }
+
+  .monthly-minutes-row {
+    grid-template-columns: 62px minmax(0, 1fr) 70px;
+    gap: 0.5rem;
+    font-size: 0.82rem;
   }
 }
