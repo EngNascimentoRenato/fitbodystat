@@ -14,12 +14,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { db } from "../services/firebase-core.js";
 
-function publicUserData(user, role = "user") {
+function publicUserData(user, role = "user", status = "active") {
   return {
     uid: user.uid,
     name: user.displayName || "",
     email: user.email || "",
     role,
+    status,
     updatedAt: serverTimestamp()
   };
 }
@@ -46,7 +47,8 @@ export async function ensureUserDocument(user) {
   }
 
   const data = snapshot.data();
-  await setDoc(userRef, publicUserData(user, data.role || "user"), { merge: true });
+  if (data.status === "suspended") return data;
+  await setDoc(userRef, publicUserData(user, data.role || "user", data.status || "active"), { merge: true });
   return data;
 }
 
@@ -158,6 +160,13 @@ export async function listUsers() {
 export async function updateUserRole(userId, role) {
   await updateDoc(doc(db, "users", userId), {
     role,
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function updateUserStatus(userId, status) {
+  await updateDoc(doc(db, "users", userId), {
+    status,
     updatedAt: serverTimestamp()
   });
 }

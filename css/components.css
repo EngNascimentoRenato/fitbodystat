@@ -82,6 +82,58 @@
   border-color: var(--danger);
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.button.text-button {
+  color: var(--primary-strong);
+  background: transparent;
+  border-color: transparent;
+}
+
+.google-button {
+  width: 100%;
+}
+
+.login-status {
+  min-height: 1.5rem;
+  margin: 1rem 0 0;
+}
+
+.login-status[data-type="error"] {
+  color: var(--danger);
+}
+
+.login-status[data-type="success"] {
+  color: var(--success);
+}
+
+.access-method-list {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.access-method {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.access-method div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.access-method span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .icon-button {
   width: 42px;
   padding: 0;

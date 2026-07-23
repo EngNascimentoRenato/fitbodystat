@@ -1,7 +1,7 @@
 import { createBlankState, loadState, normalizeState, saveState } from "./data/local-store.js";
 import {
-  ensureUserDocument,
   deleteMeasurement,
+  ensureUserDocument,
   getUser,
   loadCloudState,
   saveCloudState,
@@ -10,16 +10,29 @@ import {
   saveSettings,
   updateOwnDirectoryName
 } from "./data/firestore-store.js";
-import { observeAuth } from "./services/auth-service.js";
+import {
+  observeAuth,
+  signOutUser,
+  updateCurrentUserName
+} from "./services/auth-service.js";
 import { registerServiceWorker } from "./services/pwa-service.js";
 import { renderRoute } from "./router.js";
 import { escapeHtml } from "./utils/html-utils.js";
 
+const roleLabels = {
+  user: "Usuário",
+  professional: "Profissional",
+  admin: "Administrador"
+};
+
 let state = createBlankState();
 let personalState = state;
+let authRedirect = "login.html";
 let authState = {
   user: null,
   role: "user",
+  status: "active",
+  needsName: false,
   syncStatus: "Verificando login...",
   adminUsers: null,
   adminLinks: null,
@@ -32,6 +45,10 @@ let authState = {
 };
 let isApplyingCloudState = false;
 let authReady = false;
+
+function usesGoogle(user) {
+  return user?.providerData?.some((provider) => provider.providerId === "google.com");
+}
 
 function applyTheme() {
   document.documentElement.dataset.theme = personalState.settings?.theme || "light";
@@ -48,40 +65,43 @@ function saveChangeToCloud(userId, stateToSave, change) {
 
 function persist(change) {
   if (!authState.user) return;
-
   if (!authState.activePatient) {
     personalState = state;
     persistPersonal(change);
     return;
   }
 
-  const targetUserId = authState.activePatient.uid;
-  const stateToSave = state;
+  saveChangeToCloud(authState.activePatient.uid, state, change)
+    .then(() => {
+      authState.syncStatus = "Dados do paciente sincronizados.";
+    })
+    .catch((error) => {
+      authState.syncStatus = `Falha ao sincronizar: ${error.message}`;
+    });
+}
+
+function persistPersonal(change) {
+  if (!authState.user) return;
+  const name = String(personalState.profile?.name || "").trim();
+  authState.needsName = !name;
+  saveState(personalState, authState.user.uid);
   applyTheme();
 
+  if (name) {
+    Promise.all([
+      updateOwnDirectoryName(authState.user.uid, name),
+      updateCurrentUserName(name)
+    ]).catch(() => {});
+  }
+
   if (!isApplyingCloudState) {
-    saveChangeToCloud(targetUserId, stateToSave, change)
+    saveChangeToCloud(authState.user.uid, personalState, change)
       .then(() => {
         authState.syncStatus = "Sincronizado com Firestore.";
       })
       .catch((error) => {
         authState.syncStatus = `Falha ao sincronizar: ${error.message}`;
       });
-  }
-}
-
-function persistPersonal(change) {
-  if (!authState.user) return;
-  saveState(personalState, authState.user.uid);
-  updateOwnDirectoryName(authState.user.uid, personalState.profile?.name).catch(() => {});
-  applyTheme();
-
-  if (!isApplyingCloudState) {
-    saveChangeToCloud(authState.user.uid, personalState, change).then(() => {
-      authState.syncStatus = "Sincronizado com Firestore.";
-    }).catch((error) => {
-      authState.syncStatus = `Falha ao sincronizar: ${error.message}`;
-    });
   }
 }
 
@@ -96,7 +116,7 @@ function replacePersonalState(nextState) {
 }
 
 async function openPatient(patientOrId) {
-  if (!authState.user || !["professional", "admin"].includes(authState.role)) return;
+  if (!authState.user || authState.role !== "professional") return;
   const patient = typeof patientOrId === "string" ? await getUser(patientOrId) : patientOrId;
   if (!patient) throw new Error("Usuário não encontrado.");
 
@@ -108,18 +128,22 @@ async function openPatient(patientOrId) {
     email: patient.email || "",
     link: patient.link || null
   };
-  const cloudState = await loadCloudState(authState.activePatient.uid);
-  state = normalizeState(cloudState || {});
+  state = normalizeState((await loadCloudState(authState.activePatient.uid)) || {});
   authState.syncStatus = "Dados do paciente carregados.";
   location.hash = "#/dashboard";
   render();
 }
 
-function closePatient() {
+function leavePatientContext() {
+  if (!authState.activePatient) return;
   authState.activePatient = null;
   state = personalState;
   authState.syncStatus = "Você voltou aos seus próprios dados.";
-  location.hash = authState.role === "admin" ? "#/admin" : "#/pacientes";
+}
+
+function closePatient() {
+  leavePatientContext();
+  location.hash = "#/pacientes";
   render();
 }
 
@@ -138,9 +162,26 @@ function renderPatientContext() {
   document.getElementById("close-patient")?.addEventListener("click", closePatient);
 }
 
+function renderSidebarUser() {
+  const container = document.getElementById("sidebar-user");
+  const name = personalState.profile?.name || authState.user?.displayName || authState.user?.email || "Usuário";
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+  container.innerHTML = `
+    <span class="user-avatar" aria-hidden="true">${escapeHtml(initials || "U")}</span>
+    <span class="sidebar-user-text">
+      <strong>${escapeHtml(name)}</strong>
+      <small>${roleLabels[authState.role] || "Usuário"}</small>
+    </span>
+  `;
+  container.title = `${name} · ${roleLabels[authState.role] || "Usuário"}`;
+  document.getElementById("brand-home").href = authState.role === "professional"
+    ? "#/pacientes"
+    : authState.role === "admin" ? "#/admin" : "#/dashboard";
+}
+
 function render() {
   applyTheme();
-  renderPatientContext();
+  renderSidebarUser();
   renderRoute({
     state,
     personalState,
@@ -151,8 +192,10 @@ function render() {
     replaceState,
     replacePersonalState,
     openPatient,
-    closePatient
+    closePatient,
+    leavePatientContext
   });
+  renderPatientContext();
 }
 
 document.getElementById("menu-toggle").addEventListener("click", () => {
@@ -168,9 +211,14 @@ registerServiceWorker();
 
 observeAuth(async (user) => {
   authState.user = user;
-
   if (!user) {
-    location.replace("login.html");
+    location.replace(authRedirect);
+    return;
+  }
+
+  if (!user.emailVerified && !usesGoogle(user)) {
+    authRedirect = "login.html?status=verify-email";
+    await signOutUser();
     return;
   }
 
@@ -181,6 +229,13 @@ observeAuth(async (user) => {
 
     const userDoc = await ensureUserDocument(user);
     authState.role = userDoc.role || "user";
+    authState.status = userDoc.status || "active";
+    if (authState.status === "suspended") {
+      authRedirect = "login.html?status=suspended";
+      await signOutUser();
+      return;
+    }
+
     authState.adminUsers = null;
     authState.adminLinks = null;
     authState.adminInvitations = null;
@@ -189,8 +244,8 @@ observeAuth(async (user) => {
     authState.invitations = null;
     authState.professionals = null;
     authState.activePatient = null;
-    const cloudState = await loadCloudState(user.uid);
 
+    const cloudState = await loadCloudState(user.uid);
     isApplyingCloudState = true;
     if (cloudState?.profile) {
       state = normalizeState(cloudState);
@@ -200,10 +255,25 @@ observeAuth(async (user) => {
     } else {
       state = loadState(user.uid);
       personalState = state;
-      await saveCloudState(user.uid, state, { uid: user.uid, role: authState.role });
       authState.syncStatus = "Conta nova pronta. Preencha seu perfil.";
     }
+
+    const accountName = user.displayName || userDoc.name || "";
+    if (!personalState.profile.name && accountName) personalState.profile.name = accountName;
+    authState.needsName = !String(personalState.profile.name || "").trim();
+    if (!authState.needsName && user.displayName !== personalState.profile.name) {
+      await updateCurrentUserName(personalState.profile.name);
+      await updateOwnDirectoryName(user.uid, personalState.profile.name);
+    }
+    await saveCloudState(user.uid, personalState, { uid: user.uid, role: authState.role });
     isApplyingCloudState = false;
+
+    if (!location.hash) {
+      location.hash = authState.needsName
+        ? "#/perfil"
+        : authState.role === "professional" ? "#/pacientes"
+          : authState.role === "admin" ? "#/admin" : "#/dashboard";
+    }
   } catch (error) {
     isApplyingCloudState = false;
     authState.syncStatus = `Falha no Firebase: ${error.message}`;
@@ -212,6 +282,4 @@ observeAuth(async (user) => {
   render();
 });
 
-if (!authReady) {
-  render();
-}
+if (!authReady) render();

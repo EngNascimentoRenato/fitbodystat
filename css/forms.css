@@ -42,6 +42,28 @@
   font-size: 0.82rem;
 }
 
+.form-separator {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.form-separator::before,
+.form-separator::after {
+  height: 1px;
+  background: var(--border);
+  content: "";
+}
+
+.inline-security-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
 .radio-row {
   display: flex;
   flex-wrap: wrap;

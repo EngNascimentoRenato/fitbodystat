@@ -18,29 +18,32 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Menu principal">
-        <a class="brand" href="#/dashboard" aria-label="Ir para o painel">
+        <a class="brand" id="brand-home" href="#/dashboard" aria-label="Ir para a página inicial">
           <span class="brand-mark" aria-hidden="true">FBS</span>
           <span>
             <strong>FitBodyStat</strong>
             <small>peso, medidas e composição</small>
           </span>
         </a>
+        <div class="sidebar-user" id="sidebar-user"></div>
         <nav class="nav-list" id="main-menu"></nav>
       </aside>
 
       <div class="main-shell">
-        <header class="topbar">
-          <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Alternar menu">
-            <span aria-hidden="true">☰</span>
-          </button>
-          <div>
-            <p class="eyebrow" id="route-eyebrow">Acompanhamento pessoal</p>
-            <h1 id="route-title">Dashboard</h1>
-          </div>
-          <a class="button primary topbar-action" href="#/registro">Novo registro</a>
-        </header>
+        <div class="sticky-header">
+          <header class="topbar">
+            <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Alternar menu">
+              <span aria-hidden="true">☰</span>
+            </button>
+            <div class="topbar-title">
+              <p class="eyebrow" id="route-eyebrow">Acompanhamento pessoal</p>
+              <h1 id="route-title">Dashboard</h1>
+            </div>
+            <a class="button primary topbar-action" id="topbar-action" href="#/registro">Novo registro</a>
+          </header>
+          <div class="patient-context" id="patient-context" hidden></div>
+        </div>
 
-        <div class="patient-context" id="patient-context" hidden></div>
         <main class="content" id="app" tabindex="-1"></main>
       </div>
     </div>

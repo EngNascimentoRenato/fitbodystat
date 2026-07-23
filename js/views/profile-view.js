@@ -143,8 +143,8 @@ export function renderProfile(state) {
       <section class="card">
         <div class="form-grid">
           <div class="field">
-            <label for="name">Nome opcional</label>
-            <input id="name" name="name" value="${escapeAttribute(p.name || "")}" />
+            <label for="name">Nome completo</label>
+            <input id="name" name="name" required minlength="2" autocomplete="name" value="${escapeAttribute(p.name || "")}" />
           </div>
           <div class="field">
             <label for="sex">Sexo</label>

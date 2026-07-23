@@ -10,12 +10,17 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
+    function accountIsActive() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status != "suspended";
+    }
+
     function isAdmin() {
-      return signedIn() && currentRole() == "admin";
+      return accountIsActive() && currentRole() == "admin";
     }
 
     function isProfessional() {
-      return signedIn() && currentRole() == "professional";
+      return accountIsActive() && currentRole() == "professional";
     }
 
     function professionalLink(patientId) {
@@ -31,22 +36,21 @@ service cloud.firestore {
     function activeRelationship(otherUserId) {
       let firstLink = /databases/$(database)/documents/careLinks/$(request.auth.uid + "_" + otherUserId);
       let secondLink = /databases/$(database)/documents/careLinks/$(otherUserId + "_" + request.auth.uid);
-      return (exists(firstLink) && get(firstLink).data.status == "active")
-        || (exists(secondLink) && get(secondLink).data.status == "active");
+      return accountIsActive()
+        && ((exists(firstLink) && get(firstLink).data.status == "active")
+        || (exists(secondLink) && get(secondLink).data.status == "active"));
     }
 
     function canReadHealthData(ownerId) {
-      return signedIn()
+      return accountIsActive()
         && (request.auth.uid == ownerId
-          || isAdmin()
           || (activeProfessionalLink(ownerId)
             && get(professionalLink(ownerId)).data.permissions.viewData == true));
     }
 
     function canEditHealthData(ownerId) {
-      return signedIn()
+      return accountIsActive()
         && (request.auth.uid == ownerId
-          || isAdmin()
           || (activeProfessionalLink(ownerId)
             && get(professionalLink(ownerId)).data.permissions.editData == true));
     }
@@ -55,7 +59,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == userId
-        && request.resource.data.role == "user";
+        && request.resource.data.role == "user"
+        && request.resource.data.status == "active";
 
       allow get: if signedIn()
         && (request.auth.uid == userId || isAdmin() || activeRelationship(userId));
@@ -63,11 +68,13 @@ service cloud.firestore {
       allow list: if isAdmin();
 
       allow update: if isAdmin()
-        || (signedIn()
+        || (accountIsActive()
           && request.auth.uid == userId
           && request.resource.data.uid == resource.data.uid
           && request.resource.data.email == resource.data.email
-          && request.resource.data.role == resource.data.role);
+          && request.resource.data.role == resource.data.role
+          && (request.resource.data.status == resource.data.status
+            || (!("status" in resource.data) && request.resource.data.status == "active")));
 
       allow delete: if isAdmin();
 
@@ -101,8 +108,8 @@ service cloud.firestore {
         && request.resource.data.status == "pending";
 
       allow read: if isAdmin()
-        || (signedIn() && resource.data.professionalId == request.auth.uid)
-        || (signedIn()
+        || (accountIsActive() && resource.data.professionalId == request.auth.uid)
+        || (accountIsActive()
           && request.auth.token.email != null
           && resource.data.patientEmailLower == request.auth.token.email.lower());
 
@@ -112,7 +119,7 @@ service cloud.firestore {
           && resource.data.status == "pending"
           && request.resource.data.status == "cancelled"
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"]))
-        || (signedIn()
+        || (accountIsActive()
           && request.auth.token.email != null
           && resource.data.patientEmailLower == request.auth.token.email.lower()
           && resource.data.status == "pending"
@@ -130,12 +137,12 @@ service cloud.firestore {
 
     match /careLinks/{linkId} {
       allow read: if isAdmin()
-        || (signedIn()
+        || (accountIsActive()
           && (resource.data.professionalId == request.auth.uid
             || resource.data.patientId == request.auth.uid));
 
       allow create: if isAdmin()
-        || (signedIn()
+        || (accountIsActive()
           && request.resource.data.patientId == request.auth.uid
           && linkId == request.resource.data.professionalId + "_" + request.auth.uid
           && request.resource.data.status == "active"
@@ -144,7 +151,7 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.professionalId == request.resource.data.professionalId);
 
       allow update: if isAdmin()
-        || (signedIn()
+        || (accountIsActive()
           && (resource.data.professionalId == request.auth.uid
             || resource.data.patientId == request.auth.uid)
           && resource.data.status == "active"
