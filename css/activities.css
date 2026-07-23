@@ -301,25 +301,25 @@
   display: none;
 }
 
-.monthly-minutes-list {
+.weekly-progress-stack {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
 }
 
-.monthly-minutes-row {
+.weekly-progress-line {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 90px;
-  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.6rem;
   align-items: center;
 }
 
-.monthly-minutes-row span {
-  color: var(--muted);
-  text-transform: capitalize;
+.weekly-progress-line .progress-track {
+  grid-column: 1 / -1;
 }
 
-.monthly-minutes-row strong {
-  text-align: right;
+.weekly-progress-line.duration .progress-fill {
+  background: var(--accent);
 }
 
 @media (max-width: 760px) {
@@ -362,9 +362,4 @@
     display: block;
   }
 
-  .monthly-minutes-row {
-    grid-template-columns: 62px minmax(0, 1fr) 70px;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-  }
 }

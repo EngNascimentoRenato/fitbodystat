@@ -28,10 +28,12 @@ export function weeklyActivityCard(profile, activities = [], routePrefix = "") {
         <a class="button" href="#${routePrefix}/atividades">Ver atividades</a>
       </div>
       ${progressBar(summary.progress)}
-      <p class="activity-minutes-summary">
-        <strong>${formatActivityMinutes(summary.totalMinutes)}</strong> registrados nesta semana
-        ${targetMinutes ? ` de ${formatActivityMinutes(targetMinutes)} planejados` : ""}
-      </p>
+      ${targetMinutes ? `
+        <p class="activity-minutes-summary">
+          <strong>${formatActivityMinutes(summary.totalMinutes)}</strong> de
+          ${formatActivityMinutes(targetMinutes)} planejados nesta semana
+        </p>
+      ` : ""}
       <div class="week-strip">
         ${summary.dates.map((date, index) => {
           const activity = activityByDate.get(date);

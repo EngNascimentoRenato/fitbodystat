@@ -3,7 +3,6 @@ import {
   monthCalendar,
   monthLabel,
   formatActivityMinutes,
-  recentMonthTotals,
   recentWeekTotals,
   shiftMonth,
   weeklyActivitySummary
@@ -58,51 +57,42 @@ function renderCalendar(activities) {
   `;
 }
 
-function renderRecentWeeks(activities, goalDays) {
+function renderRecentWeeks(activities, goalDays, targetMinutes) {
   const weeks = recentWeekTotals(activities);
   return `
     <section class="card">
       <h2>Últimas quatro semanas</h2>
       <div class="grid four">
         ${weeks.map((week) => {
-          const percentage = Math.min(100, (week.count / Math.max(1, goalDays)) * 100);
+          const dayPercentage = Math.min(100, (week.count / Math.max(1, goalDays)) * 100);
+          const minutePercentage = targetMinutes
+            ? Math.min(100, (week.minutes / targetMinutes) * 100)
+            : 0;
           return `
             <article class="mini-stat">
               <span>Semana de ${formatDate(week.start).slice(0, 5)}</span>
               <strong>${week.count} ${week.count === 1 ? "dia" : "dias"}</strong>
-              <small>${formatActivityMinutes(week.minutes)} registrados</small>
-              <div class="progress-track" aria-label="${formatDecimal(percentage, 0)}% da meta">
-                <div class="progress-fill" style="width:${percentage}%"></div>
+              <div class="weekly-progress-stack">
+                <div class="weekly-progress-line">
+                  <small>Dias</small>
+                  <small>${formatDecimal(dayPercentage, 0)}%</small>
+                  <div class="progress-track" aria-label="${formatDecimal(dayPercentage, 0)}% da meta de dias">
+                    <div class="progress-fill" style="width:${dayPercentage}%"></div>
+                  </div>
+                </div>
+                ${targetMinutes ? `
+                  <div class="weekly-progress-line duration">
+                    <small>Tempo</small>
+                    <small>${formatActivityMinutes(week.minutes)} de ${formatActivityMinutes(targetMinutes)}</small>
+                    <div class="progress-track" aria-label="${formatDecimal(minutePercentage, 0)}% da meta de duração">
+                      <div class="progress-fill" style="width:${minutePercentage}%"></div>
+                    </div>
+                  </div>
+                ` : ""}
               </div>
             </article>
           `;
         }).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderMonthlyMinutes(activities) {
-  const months = recentMonthTotals(activities);
-  const maximum = Math.max(1, ...months.map((item) => item.minutes));
-  return `
-    <section class="card">
-      <div class="chart-header">
-        <div>
-          <h2>Evolução mensal em minutos</h2>
-          <p class="muted">Considera somente registros com duração informada.</p>
-        </div>
-      </div>
-      <div class="monthly-minutes-list">
-        ${months.map((item) => `
-          <div class="monthly-minutes-row">
-            <span>${item.label}</span>
-            <div class="progress-track" aria-label="${item.minutes} minutos em ${item.label}">
-              <div class="progress-fill" style="width:${(item.minutes / maximum) * 100}%"></div>
-            </div>
-            <strong>${formatActivityMinutes(item.minutes)}</strong>
-          </div>
-        `).join("")}
       </div>
     </section>
   `;
@@ -165,7 +155,7 @@ export function renderActivities(state) {
           <strong>${summary.completedDays} de ${summary.goalDays} dias</strong>
           <small>${targetMinutes
             ? `${formatActivityMinutes(summary.totalMinutes)} de ${formatActivityMinutes(targetMinutes)}`
-            : `${formatActivityMinutes(summary.totalMinutes)} registrados`}</small>
+            : `${summary.progress}% da meta semanal`}</small>
         </article>
         <article class="mini-stat">
           <span>Total registrado</span>
@@ -179,8 +169,7 @@ export function renderActivities(state) {
         </article>
       </section>
       ${renderCalendar(activities)}
-      ${renderRecentWeeks(activities, goalDays)}
-      ${renderMonthlyMinutes(activities)}
+      ${renderRecentWeeks(activities, goalDays, targetMinutes)}
       ${renderHistory(activities)}
     </div>
   `;
