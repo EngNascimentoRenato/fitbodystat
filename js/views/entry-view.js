@@ -30,7 +30,7 @@ export function bindEntry(state, persist, render) {
       notes: data.get("notes").trim()
     });
     state.entries = [...state.entries.filter((item) => item.date !== entry.date), entry].sort((a, b) => a.date.localeCompare(b.date));
-    persist();
+    persist({ type: "entry-upsert", entry });
     showToast("Registro salvo.");
     location.hash = "#/dashboard";
     render();

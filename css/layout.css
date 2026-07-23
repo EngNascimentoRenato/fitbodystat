@@ -118,6 +118,40 @@ body.menu-collapsed .nav-link {
   padding: clamp(1rem, 4vw, 2rem);
 }
 
+.patient-context {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem clamp(1rem, 4vw, 2rem);
+  color: var(--text);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.patient-context[hidden] {
+  display: none;
+}
+
+.patient-context div {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.patient-context span,
+.patient-context small {
+  color: var(--muted);
+}
+
+.patient-context strong,
+.patient-context small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .view-stack {
   display: grid;
   gap: 1rem;
@@ -207,6 +241,12 @@ body.menu-collapsed .nav-link {
 
   .topbar-action {
     width: 100%;
+  }
+
+  .patient-context,
+  .patient-context div {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

@@ -10,6 +10,7 @@ import {
 } from "../services/progress-service.js";
 import { createDefaultMonthlyPlan, normalizeMonthlyPlan } from "../data/seed-plan.js";
 import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../utils/number-utils.js";
+import { escapeAttribute } from "../utils/html-utils.js";
 
 function renderProfileInsight(profile) {
   const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
@@ -81,17 +82,17 @@ function renderPlanEditor(profile, goalPlan) {
             ${rows.map((item, index) => `
               <tr>
                 <td>
-                  <input type="hidden" name="planMonth${index}" value="${item.month}" />
-                  <input class="table-input" name="planLabel${index}" value="${item.label}" aria-label="Prazo ${index + 1}" />
+                  <input type="hidden" name="planMonth${index}" value="${escapeAttribute(item.month)}" />
+                  <input class="table-input" name="planLabel${index}" value="${escapeAttribute(item.label)}" aria-label="Prazo ${index + 1}" />
                 </td>
                 <td class="number">
-                  <input class="table-input number" name="planWeight${index}" inputmode="decimal" value="${item.weightKg ?? ""}" aria-label="Peso ${item.label}" />
+                  <input class="table-input number" name="planWeight${index}" inputmode="decimal" value="${escapeAttribute(item.weightKg ?? "")}" aria-label="Peso ${escapeAttribute(item.label)}" />
                 </td>
                 <td class="number">
-                  <input class="table-input number" name="planWaist${index}" inputmode="decimal" value="${item.waistCm ?? ""}" aria-label="Cintura ${item.label}" />
+                  <input class="table-input number" name="planWaist${index}" inputmode="decimal" value="${escapeAttribute(item.waistCm ?? "")}" aria-label="Cintura ${escapeAttribute(item.label)}" />
                 </td>
                 <td>
-                  <input class="table-input" name="planStatus${index}" value="${item.status}" aria-label="Classificação ${item.label}" />
+                  <input class="table-input" name="planStatus${index}" value="${escapeAttribute(item.status)}" aria-label="Classificação ${escapeAttribute(item.label)}" />
                 </td>
               </tr>
             `).join("")}
@@ -143,7 +144,7 @@ export function renderProfile(state) {
         <div class="form-grid">
           <div class="field">
             <label for="name">Nome opcional</label>
-            <input id="name" name="name" value="${p.name || ""}" />
+            <input id="name" name="name" value="${escapeAttribute(p.name || "")}" />
           </div>
           <div class="field">
             <label for="sex">Sexo</label>
@@ -155,49 +156,49 @@ export function renderProfile(state) {
           </div>
           <div class="field">
             <label for="birthDate">Data de nascimento</label>
-            <input id="birthDate" name="birthDate" type="date" value="${p.birthDate || ""}" />
+            <input id="birthDate" name="birthDate" type="date" value="${escapeAttribute(p.birthDate || "")}" />
           </div>
           <div class="field">
             <label for="heightCm">Altura (cm)</label>
-            <input id="heightCm" name="heightCm" inputmode="decimal" required value="${p.heightCm ?? ""}" />
+            <input id="heightCm" name="heightCm" inputmode="decimal" required value="${escapeAttribute(p.heightCm ?? "")}" />
           </div>
           <div class="field">
             <label for="startDate">Data inicial</label>
-            <input id="startDate" name="startDate" type="date" required value="${p.startDate || ""}" />
+            <input id="startDate" name="startDate" type="date" required value="${escapeAttribute(p.startDate || "")}" />
           </div>
           <div class="field">
             <label for="startWeightKg">Peso inicial (kg)</label>
-            <input id="startWeightKg" name="startWeightKg" inputmode="decimal" required value="${p.startWeightKg ?? ""}" />
+            <input id="startWeightKg" name="startWeightKg" inputmode="decimal" required value="${escapeAttribute(p.startWeightKg ?? "")}" />
           </div>
           <div class="field">
             <label for="startWaistCm">Cintura inicial (cm)</label>
-            <input id="startWaistCm" name="startWaistCm" inputmode="decimal" value="${p.startWaistCm ?? ""}" />
+            <input id="startWaistCm" name="startWaistCm" inputmode="decimal" value="${escapeAttribute(p.startWaistCm ?? "")}" />
           </div>
           <div class="field">
             <label for="startNeckCm">Pescoço inicial (cm)</label>
-            <input id="startNeckCm" name="startNeckCm" inputmode="decimal" value="${p.startNeckCm ?? ""}" />
+            <input id="startNeckCm" name="startNeckCm" inputmode="decimal" value="${escapeAttribute(p.startNeckCm ?? "")}" />
           </div>
           <div class="field">
             <label for="startHipCm">Quadril inicial (cm)</label>
-            <input id="startHipCm" name="startHipCm" inputmode="decimal" value="${p.startHipCm ?? ""}" />
+            <input id="startHipCm" name="startHipCm" inputmode="decimal" value="${escapeAttribute(p.startHipCm ?? "")}" />
             <span class="help-text">Necessário para cálculo feminino pelo método da Marinha e opcional para acompanhamento geral.</span>
           </div>
           <div class="field">
             <label for="targetBmi">IMC alvo para sugestão</label>
-            <input id="targetBmi" name="targetBmi" inputmode="decimal" value="${p.targetBmi ?? 24.9}" />
+            <input id="targetBmi" name="targetBmi" inputmode="decimal" value="${escapeAttribute(p.targetBmi ?? 24.9)}" />
           </div>
           <div class="field">
             <label for="goalWeightKg">Meta de peso (kg)</label>
-            <input id="goalWeightKg" name="goalWeightKg" inputmode="decimal" value="${p.goalWeightKg ?? suggestedGoal ?? ""}" />
+            <input id="goalWeightKg" name="goalWeightKg" inputmode="decimal" value="${escapeAttribute(p.goalWeightKg ?? suggestedGoal ?? "")}" />
             <span class="help-text">Sugerida pelo IMC alvo, mas livre para ajuste.</span>
           </div>
           <div class="field">
             <label for="weeklyChangeGoalKg">Mudança semanal desejada (kg)</label>
-            <input id="weeklyChangeGoalKg" name="weeklyChangeGoalKg" inputmode="decimal" value="${weeklyChange}" />
+            <input id="weeklyChangeGoalKg" name="weeklyChangeGoalKg" inputmode="decimal" value="${escapeAttribute(weeklyChange)}" />
           </div>
           <div class="field">
             <label for="goalDeadlineMonths">Prazo da meta (meses)</label>
-            <input id="goalDeadlineMonths" name="goalDeadlineMonths" inputmode="decimal" value="${suggestedDeadline ?? ""}" />
+            <input id="goalDeadlineMonths" name="goalDeadlineMonths" inputmode="decimal" value="${escapeAttribute(suggestedDeadline ?? "")}" />
             <span class="help-text">Se alterado, o app recalcula a mudança semanal necessária.</span>
           </div>
         </div>
@@ -216,7 +217,7 @@ export function bindProfile(state, persist, render) {
     const form = document.getElementById("profile-form");
     state.profile = readProfileForm(form, state.profile);
     state.goalPlan = createDefaultMonthlyPlan(state.profile);
-    persist();
+    persist({ type: "profile-plan" });
     showToast("Planejamento padrão recalculado.");
     render();
   });
@@ -232,7 +233,7 @@ export function bindProfile(state, persist, render) {
       waistCm: toNumber(data.get(`planWaist${index}`)) ?? item.waistCm,
       status: data.get(`planStatus${index}`)?.trim() || item.status
     }));
-    persist();
+    persist({ type: "profile-plan" });
     showToast("Perfil salvo.");
     render();
   });

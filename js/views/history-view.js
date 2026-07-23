@@ -3,6 +3,7 @@ import { formatDate } from "../utils/date-utils.js";
 import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
 import { confirmAction } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
+import { escapeHtml } from "../utils/html-utils.js";
 
 export function renderHistory(state) {
   const rows = enrichEntries(state.profile, state.entries).reverse();
@@ -45,7 +46,7 @@ export function renderHistory(state) {
                 <td class="number">${formatDecimal(entry.bmi, 1)}</td>
                 <td class="number">${formatPercent(entry.bodyFat)}</td>
                 <td class="number">${formatKg(entry.weekDiff)}</td>
-                <td>${entry.notes || "-"}</td>
+                <td>${escapeHtml(entry.notes || "-")}</td>
                 <td><button class="button" data-delete-entry="${entry.id}" type="button">Excluir</button></td>
               </tr>
             `).join("")}
@@ -60,8 +61,9 @@ export function bindHistory(state, persist, render) {
   document.querySelectorAll("[data-delete-entry]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!confirmAction("Excluir este registro?")) return;
-      state.entries = state.entries.filter((entry) => entry.id !== button.dataset.deleteEntry);
-      persist();
+      const entryId = button.dataset.deleteEntry;
+      state.entries = state.entries.filter((entry) => entry.id !== entryId);
+      persist({ type: "entry-delete", entryId });
       showToast("Registro excluído.");
       render();
     });

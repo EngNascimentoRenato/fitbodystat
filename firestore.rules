@@ -18,55 +18,146 @@ service cloud.firestore {
       return signedIn() && currentRole() == "professional";
     }
 
-    function hasCareLink(patientId) {
+    function professionalLink(patientId) {
+      return /databases/$(database)/documents/careLinks/$(request.auth.uid + "_" + patientId);
+    }
+
+    function activeProfessionalLink(patientId) {
+      return isProfessional()
+        && exists(professionalLink(patientId))
+        && get(professionalLink(patientId)).data.status == "active";
+    }
+
+    function activeRelationship(otherUserId) {
+      let firstLink = /databases/$(database)/documents/careLinks/$(request.auth.uid + "_" + otherUserId);
+      let secondLink = /databases/$(database)/documents/careLinks/$(otherUserId + "_" + request.auth.uid);
+      return (exists(firstLink) && get(firstLink).data.status == "active")
+        || (exists(secondLink) && get(secondLink).data.status == "active");
+    }
+
+    function canReadHealthData(ownerId) {
       return signedIn()
-        && exists(/databases/$(database)/documents/careLinks/$(request.auth.uid + "_" + patientId));
+        && (request.auth.uid == ownerId
+          || isAdmin()
+          || (activeProfessionalLink(ownerId)
+            && get(professionalLink(ownerId)).data.permissions.viewData == true));
+    }
+
+    function canEditHealthData(ownerId) {
+      return signedIn()
+        && (request.auth.uid == ownerId
+          || isAdmin()
+          || (activeProfessionalLink(ownerId)
+            && get(professionalLink(ownerId)).data.permissions.editData == true));
     }
 
     match /users/{userId} {
       allow create: if signedIn()
         && request.auth.uid == userId
+        && request.resource.data.uid == userId
         && request.resource.data.role == "user";
 
       allow get: if signedIn()
-        && (request.auth.uid == userId || isAdmin() || (isProfessional() && hasCareLink(userId)));
+        && (request.auth.uid == userId || isAdmin() || activeRelationship(userId));
 
-      // A consulta limitada permite que o profissional encontre um paciente pelo e-mail.
-      allow list: if isAdmin()
-        || (isProfessional() && request.query.limit != null && request.query.limit <= 1);
+      allow list: if isAdmin();
 
-      allow update: if signedIn()
-        && (isAdmin()
-          || (request.auth.uid == userId
-            && request.resource.data.role == resource.data.role));
+      allow update: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role);
 
       allow delete: if isAdmin();
 
-      match /app/{documentId} {
-        allow read, write: if signedIn() && request.auth.uid == userId;
+      match /measurements/{measurementId} {
+        allow read: if canReadHealthData(userId);
+        allow create, update, delete: if canEditHealthData(userId);
       }
     }
 
+    match /profiles/{userId} {
+      allow read: if canReadHealthData(userId);
+      allow create, update, delete: if canEditHealthData(userId);
+    }
+
+    match /plans/{userId} {
+      allow read: if canReadHealthData(userId);
+      allow create, update, delete: if canEditHealthData(userId);
+    }
+
+    match /settings/{userId} {
+      allow read: if canReadHealthData(userId);
+      allow create, update, delete: if canEditHealthData(userId);
+    }
+
+    match /careInvitations/{invitationId} {
+      allow create: if isProfessional()
+        && request.resource.data.professionalId == request.auth.uid
+        && request.resource.data.patientEmailLower is string
+        && request.resource.data.patientEmailLower != request.auth.token.email.lower()
+        && request.resource.data.patientId == null
+        && request.resource.data.status == "pending";
+
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.professionalId == request.auth.uid)
+        || (signedIn()
+          && request.auth.token.email != null
+          && resource.data.patientEmailLower == request.auth.token.email.lower());
+
+      allow update: if isAdmin()
+        || (isProfessional()
+          && resource.data.professionalId == request.auth.uid
+          && resource.data.status == "pending"
+          && request.resource.data.status == "cancelled"
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "updatedAt"]))
+        || (signedIn()
+          && request.auth.token.email != null
+          && resource.data.patientEmailLower == request.auth.token.email.lower()
+          && resource.data.status == "pending"
+          && request.resource.data.status in ["accepted", "rejected"]
+          && request.resource.data.patientId == request.auth.uid
+          && request.resource.data.professionalId == resource.data.professionalId
+          && request.resource.data.patientEmailLower == resource.data.patientEmailLower
+          && request.resource.data.permissions == resource.data.permissions
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "patientId", "patientName", "respondedAt", "updatedAt"
+          ]));
+
+      allow delete: if isAdmin();
+    }
+
     match /careLinks/{linkId} {
-      allow read: if signedIn()
-        && (isAdmin()
-          || resource.data.professionalId == request.auth.uid
-          || resource.data.patientId == request.auth.uid);
+      allow read: if isAdmin()
+        || (signedIn()
+          && (resource.data.professionalId == request.auth.uid
+            || resource.data.patientId == request.auth.uid));
 
-      allow create: if signedIn()
-        && (isAdmin()
-          || (isProfessional()
-            && request.resource.data.professionalId == request.auth.uid));
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.resource.data.patientId == request.auth.uid
+          && linkId == request.resource.data.professionalId + "_" + request.auth.uid
+          && request.resource.data.status == "active"
+          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.status == "accepted"
+          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.patientId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.professionalId == request.resource.data.professionalId);
 
-      allow update: if signedIn()
-        && (isAdmin()
-          || (isProfessional()
-            && resource.data.professionalId == request.auth.uid
-            && request.resource.data.professionalId == resource.data.professionalId
-            && request.resource.data.patientId == resource.data.patientId));
+      allow update: if isAdmin()
+        || (signedIn()
+          && (resource.data.professionalId == request.auth.uid
+            || resource.data.patientId == request.auth.uid)
+          && resource.data.status == "active"
+          && request.resource.data.status == "revoked"
+          && request.resource.data.professionalId == resource.data.professionalId
+          && request.resource.data.patientId == resource.data.patientId
+          && request.resource.data.invitationId == resource.data.invitationId
+          && request.resource.data.permissions == resource.data.permissions
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "revokedBy", "revokedAt", "updatedAt"
+          ]));
 
-      allow delete: if isAdmin()
-        || (isProfessional() && resource.data.professionalId == request.auth.uid);
+      allow delete: if isAdmin();
     }
   }
 }

@@ -8,6 +8,7 @@ import { renderSettings, bindSettings } from "./views/settings-view.js";
 import { renderAccount, bindAccount } from "./views/account-view.js";
 import { renderAdmin, bindAdmin } from "./views/admin-view.js";
 import { renderPatients, bindPatients } from "./views/patients-view.js";
+import { renderConnections, bindConnections } from "./views/connections-view.js";
 
 export function currentPath() {
   return location.hash.replace("#", "") || "/dashboard";
@@ -28,10 +29,11 @@ export function renderRoute(context) {
     "/registro": () => renderEntry(context.state),
     "/historico": () => renderHistory(context.state),
     "/metas": () => renderGoals(context.state),
+    "/vinculos": () => renderConnections(context.authState),
     "/pacientes": () => renderPatients(context.state, context.authState),
     "/admin": () => renderAdmin(context.state, context.authState),
     "/conta": () => renderAccount(context.state, context.authState),
-    "/configuracoes": () => renderSettings(context.state, context.authState)
+    "/configuracoes": () => renderSettings(context.personalState, context.authState)
   };
 
   app.innerHTML = (viewMap[activeRoute.path] || viewMap["/dashboard"])();
@@ -39,10 +41,11 @@ export function renderRoute(context) {
   if (activeRoute.path === "/perfil") bindProfile(context.state, context.persist, context.render);
   if (activeRoute.path === "/registro") bindEntry(context.state, context.persist, context.render);
   if (activeRoute.path === "/historico") bindHistory(context.state, context.persist, context.render);
+  if (activeRoute.path === "/vinculos") bindConnections(context);
   if (activeRoute.path === "/pacientes") bindPatients(context);
   if (activeRoute.path === "/admin") bindAdmin(context);
   if (activeRoute.path === "/conta") bindAccount(context);
-  if (activeRoute.path === "/configuracoes") bindSettings(context.state, context.persist, context.render, context.replaceState, context.authState);
+  if (activeRoute.path === "/configuracoes") bindSettings(context.personalState, context.persistPersonal, context.render, context.replacePersonalState, context.authState);
 
   document.body.classList.remove("menu-open");
 }

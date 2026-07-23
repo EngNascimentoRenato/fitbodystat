@@ -1,30 +1,62 @@
 # FitBodyStat
 
-Um Progressive Web App (PWA) para acompanhamento pessoal de peso corporal, IMC, medidas corporais, percentual de gordura estimado e metas de composição corporal.
-
-O **FitBodyStat** ajuda a registrar métricas, calcular indicadores, planejar metas de perda ou ganho de peso e visualizar tendências ao longo do tempo.
+Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percentual de gordura e metas de composição corporal.
 
 ## Funcionalidades
 
-- **Registro de métricas:** peso, cintura, pescoço, quadril, observações e método de gordura corporal.
-- **Cálculo automático:** IMC, classificação por IMC e percentual de gordura estimado pelo método da Marinha dos EUA.
-- **Metas personalizadas:** peso alvo, mudança semanal desejada, prazo estimado e planejamento mensal.
-- **Análise visual:** gráficos de peso e cintura reais vs planejados.
-- **PWA:** instalável no smartphone ou desktop, com cache offline básico.
-- **Dados locais:** armazenamento no navegador com exportação em CSV e JSON.
+- Registro de peso, cintura, pescoço, quadril e percentual de gordura.
+- Cálculo de IMC e estimativa de gordura pelo método da Marinha dos EUA.
+- Metas de perda ou ganho de peso, prazo e planejamento mensal.
+- Gráficos de evolução real e planejada.
+- Login por e-mail/senha ou Google.
+- Perfis de acesso para usuário, profissional e administrador.
+- Convites de acompanhamento com aceite do paciente.
+- Dashboard do paciente acessível ao profissional vinculado.
+- PWA instalável com cache offline básico.
 
-## Tecnologias utilizadas
+## Perfis de acesso
 
-- HTML5
-- CSS3
-- JavaScript Vanilla com ES Modules
-- LocalStorage
-- Service Worker
-- Web App Manifest
+- `user`: acessa e edita apenas os próprios dados, além de aceitar ou remover vínculos.
+- `professional`: convida pacientes por e-mail e acessa os dados dos vínculos ativos.
+- `admin`: gerencia contas, vínculos e pode abrir qualquer acompanhamento.
 
-## Como rodar localmente
+Novas contas são sempre criadas como `user`. A promoção para `professional` ou `admin` é feita por um administrador.
 
-1. Clone este repositório:
+## Estrutura no Firestore
 
-```bash
-git clone https://github.com/EngNascimentoRenato/fitbodystat.git
+```text
+users/{uid}
+users/{uid}/measurements/{measurementId}
+profiles/{uid}
+plans/{uid}
+settings/{uid}
+careInvitations/{invitationId}
+careLinks/{professionalId_patientId}
+```
+
+Os arquivos corporais são separados por entidade para evitar que uma atualização substitua todo o histórico do usuário.
+
+## Executar localmente
+
+```powershell
+node dev-server.mjs
+```
+
+Abra `http://127.0.0.1:4173`.
+
+## Publicar regras do Firestore
+
+Copie o conteúdo de `firestore.rules` para **Firebase Console > Firestore Database > Regras** e clique em **Publicar**.
+
+Com a Firebase CLI instalada, também é possível executar:
+
+```powershell
+firebase deploy --only firestore:rules
+```
+
+## Tecnologias
+
+- HTML5, CSS3 e JavaScript Vanilla com ES Modules
+- Firebase Authentication e Cloud Firestore
+- LocalStorage como cache local por usuário
+- Service Worker e Web App Manifest

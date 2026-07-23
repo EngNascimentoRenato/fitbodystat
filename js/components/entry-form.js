@@ -1,6 +1,7 @@
 import { bodyFatMethods } from "../models/goal-model.js";
 import { todayISO } from "../utils/date-utils.js";
 import { measurementFields } from "./measurement-form.js";
+import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 
 export function entryForm(profile, entry = {}) {
   return `
@@ -8,11 +9,11 @@ export function entryForm(profile, entry = {}) {
       <div class="form-grid">
         <div class="field">
           <label for="date">Data</label>
-          <input id="date" name="date" type="date" required value="${entry.date || todayISO()}" />
+          <input id="date" name="date" type="date" required value="${escapeAttribute(entry.date || todayISO())}" />
         </div>
         <div class="field">
           <label for="weightKg">Peso (kg)</label>
-          <input id="weightKg" name="weightKg" inputmode="decimal" required value="${entry.weightKg ?? ""}" />
+          <input id="weightKg" name="weightKg" inputmode="decimal" required value="${escapeAttribute(entry.weightKg ?? "")}" />
         </div>
         ${measurementFields(profile, entry)}
         <div class="field">
@@ -23,13 +24,13 @@ export function entryForm(profile, entry = {}) {
         </div>
         <div class="field">
           <label for="bodyFatManual">Gordura informada pelo medidor (%)</label>
-          <input id="bodyFatManual" name="bodyFatManual" inputmode="decimal" value="${entry.bodyFatManual ?? ""}" />
+          <input id="bodyFatManual" name="bodyFatManual" inputmode="decimal" value="${escapeAttribute(entry.bodyFatManual ?? "")}" />
           <span class="help-text">Opcional. Se preencher, o app usa este valor.</span>
         </div>
       </div>
       <div class="field">
         <label for="notes">Observações</label>
-        <textarea id="notes" name="notes">${entry.notes || ""}</textarea>
+        <textarea id="notes" name="notes">${escapeHtml(entry.notes || "")}</textarea>
       </div>
       <div class="button-row">
         <button class="button primary" type="submit">Salvar registro</button>

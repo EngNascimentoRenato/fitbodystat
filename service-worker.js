@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbodystat-v7";
+const CACHE_NAME = "fitbodystat-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -40,6 +40,7 @@ const APP_SHELL = [
   "./js/views/account-view.js",
   "./js/views/admin-view.js",
   "./js/views/patients-view.js",
+  "./js/views/connections-view.js",
   "./js/components/stat-card.js",
   "./js/components/progress-ring.js",
   "./js/components/progress-bar.js",
@@ -51,7 +52,8 @@ const APP_SHELL = [
   "./js/components/modal.js",
   "./js/utils/date-utils.js",
   "./js/utils/number-utils.js",
-  "./js/utils/validation-utils.js"
+  "./js/utils/validation-utils.js",
+  "./js/utils/html-utils.js"
 ];
 
 self.addEventListener("install", (event) => {

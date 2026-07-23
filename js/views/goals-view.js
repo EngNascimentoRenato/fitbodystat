@@ -2,6 +2,7 @@ import { normalizeMonthlyPlan } from "../data/seed-plan.js";
 import { getGoalDeadlineMonths, getLatestEntry, getMilestones, getWeeklyChangeGoal } from "../services/progress-service.js";
 import { milestoneList } from "../components/milestone-list.js";
 import { formatCm, formatDecimal, formatKg } from "../utils/number-utils.js";
+import { escapeHtml } from "../utils/html-utils.js";
 
 export function renderGoals(state) {
   const latest = getLatestEntry(state.profile, state.entries);
@@ -37,12 +38,12 @@ export function renderGoals(state) {
             <tbody>
               ${monthlyPlan.map((item) => `
                 <tr>
-                  <td>${item.label}</td>
+                  <td>${escapeHtml(item.label)}</td>
                   <td class="number">${formatKg(item.weightKg)}</td>
                   <td class="number">${formatKg(item.lossKg)}</td>
                   <td class="number">${formatDecimal(item.bmi, 1)}</td>
                   <td class="number">${formatCm(item.waistCm)}</td>
-                  <td>${item.status}</td>
+                  <td>${escapeHtml(item.status)}</td>
                 </tr>
               `).join("")}
             </tbody>

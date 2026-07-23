@@ -2,13 +2,14 @@ import { exportCsv, downloadText } from "../services/export-service.js";
 import { resetState } from "../data/local-store.js";
 import { showToast } from "../components/toast.js";
 import { confirmAction } from "../components/modal.js";
+import { escapeHtml } from "../utils/html-utils.js";
 
 export function renderSettings(state, authState = {}) {
   return `
     <div class="view-stack">
       <section class="card">
         <h2>Conta e nuvem</h2>
-        <p class="muted">${authState.user ? `Conectado como ${authState.user.email}. ${authState.syncStatus}` : "Entre com Google na tela Conta para sincronizar seus dados com Firestore."}</p>
+        <p class="muted">${authState.user ? `Conectado como ${escapeHtml(authState.user.email)}. ${escapeHtml(authState.syncStatus)}` : "Entre com Google na tela Conta para sincronizar seus dados com Firestore."}</p>
         <div class="button-row">
           <a class="button primary" href="#/conta">Abrir conta</a>
         </div>
@@ -26,7 +27,7 @@ export function renderSettings(state, authState = {}) {
         <div class="button-row">
           <button class="button primary" id="export-csv" type="button">Exportar CSV</button>
           <button class="button" id="export-json" type="button">Exportar JSON</button>
-          <button class="button danger" id="reset-data" type="button">Restaurar exemplo</button>
+          <button class="button danger" id="reset-data" type="button">Apagar meus dados</button>
         </div>
       </section>
       <section class="card">
@@ -37,11 +38,11 @@ export function renderSettings(state, authState = {}) {
   `;
 }
 
-export function bindSettings(state, persist, render, replaceState) {
+export function bindSettings(state, persist, render, replaceState, authState) {
   document.getElementById("theme-toggle").addEventListener("click", () => {
     state.settings = state.settings || {};
     state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";
-    persist();
+    persist({ type: "settings" });
     showToast("Tema atualizado.");
     render();
   });
@@ -55,10 +56,10 @@ export function bindSettings(state, persist, render, replaceState) {
   });
 
   document.getElementById("reset-data").addEventListener("click", () => {
-    if (!confirmAction("Restaurar os dados de exemplo?")) return;
-    replaceState(resetState());
+    if (!confirmAction("Apagar perfil, metas e registros desta conta?")) return;
+    replaceState(resetState(authState?.user?.uid));
     persist();
-    showToast("Dados restaurados.");
+    showToast("Dados apagados.");
     render();
   });
 }

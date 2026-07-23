@@ -1,5 +1,6 @@
 import { signOutUser } from "../services/auth-service.js";
 import { showToast } from "../components/toast.js";
+import { escapeHtml } from "../utils/html-utils.js";
 
 function userLabel(authState) {
   if (!authState?.user) return "Não conectado";
@@ -17,8 +18,8 @@ export function renderAccount(state, authState) {
         <div class="grid two">
           <article class="mini-stat">
             <span>Usuário</span>
-            <strong>${userLabel(authState)}</strong>
-            <small>${user?.email || "Login necessário"}</small>
+            <strong>${escapeHtml(userLabel(authState))}</strong>
+            <small>${escapeHtml(user?.email || "Login necessário")}</small>
           </article>
           <article class="mini-stat">
             <span>Tipo</span>

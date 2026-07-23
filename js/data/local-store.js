@@ -2,7 +2,7 @@ import { defaultProfile } from "../models/profile-model.js";
 import { createDefaultMonthlyPlan, defaultMonthlyPlan } from "./seed-plan.js";
 
 const LEGACY_STORAGE_KEY = "minha-evolucao-state-v1";
-const STORAGE_PREFIX = "fitbodystat-state";
+const STORAGE_PREFIX = "fitbodystat-state-v2";
 
 function storageKey(userId = "guest") {
   return `${STORAGE_PREFIX}-${userId}`;
@@ -19,7 +19,7 @@ export function createBlankState() {
   };
 }
 
-function normalizeState(parsed) {
+export function normalizeState(parsed = {}) {
   return {
     ...createBlankState(),
     ...parsed,
