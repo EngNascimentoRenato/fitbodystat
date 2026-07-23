@@ -1,4 +1,32 @@
 import { todayISO } from "../utils/date-utils.js";
+import { toNumber } from "../utils/number-utils.js";
+
+export function mergeDailyActivity(existingActivity, newActivity) {
+  const existingDuration = toNumber(existingActivity.durationMinutes);
+  const newDuration = toNumber(newActivity.durationMinutes);
+  const customNames = [existingActivity.customActivityName, newActivity.customActivityName]
+    .map((value) => String(value || "").trim())
+    .filter((value, index, values) => value && values.indexOf(value) === index);
+  const notes = [existingActivity.notes, newActivity.notes]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  return {
+    ...existingActivity,
+    ...newActivity,
+    id: existingActivity.id,
+    activityTypeIds: [...new Set([
+      ...(existingActivity.activityTypeIds || []),
+      ...(newActivity.activityTypeIds || [])
+    ])],
+    customActivityName: customNames.join(" / "),
+    durationMinutes: existingDuration === null && newDuration === null
+      ? null
+      : (existingDuration || 0) + (newDuration || 0),
+    intensity: newActivity.intensity || existingActivity.intensity || "",
+    notes: notes.join("\n")
+  };
+}
 
 export function parseLocalDate(dateISO) {
   return new Date(`${dateISO}T00:00:00`);

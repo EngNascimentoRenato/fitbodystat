@@ -50,10 +50,6 @@ export function renderGoals(state) {
     <div class="view-stack">
       <section class="grid two">
         <article class="card">
-          <h2>Marcos importantes</h2>
-          ${milestoneList(getMilestones(state.profile, latest))}
-        </article>
-        <article class="card">
           <h2>Ritmo sustentável</h2>
           <dl class="goal-summary-list">
             <div><dt>Objetivo</dt><dd>${escapeHtml(goalLabel(state.profile))}</dd></div>
@@ -68,9 +64,13 @@ export function renderGoals(state) {
               : ""}</dd></div>
           </dl>
         </article>
+        <article class="card">
+          <h2>Marcos importantes</h2>
+          ${milestoneList(getMilestones(state.profile, latest))}
+        </article>
       </section>
 
-      <section class="card">
+      <section class="card goals-plan-card">
         <h2>Planejamento mensal</h2>
         <div class="table-wrap">
           <table>

@@ -246,6 +246,7 @@ body.menu-collapsed .nav-submenu-content {
 
 .content {
   width: min(1180px, 100%);
+  min-width: 0;
   margin: 0 auto;
   padding: clamp(1rem, 4vw, 2rem);
 }
@@ -286,7 +287,13 @@ body.menu-collapsed .nav-submenu-content {
 
 .view-stack {
   display: grid;
+  min-width: 0;
   gap: 1rem;
+}
+
+.view-stack > *,
+.grid > * {
+  min-width: 0;
 }
 
 .grid {
@@ -310,6 +317,22 @@ body.menu-collapsed .nav-submenu-content {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
   gap: 1rem;
+}
+
+.goals-plan-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.goals-plan-card .table-wrap {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 760px) {
+  .goals-plan-card table {
+    min-width: 720px;
+  }
 }
 
 .menu-toggle {

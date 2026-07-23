@@ -6,15 +6,18 @@ import { todayISO } from "../utils/date-utils.js";
 import { toNumber } from "../utils/number-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { showToast } from "../components/toast.js";
+import { mergeDailyActivity } from "../services/activity-service.js";
 
 let activeEntryMode = "measurement";
 let selectedActivityDate = todayISO();
+let editingActivityDate = null;
 
 function consumeActivityEditRequest() {
   const editDate = sessionStorage.getItem("fitbodystat-edit-activity-date");
   if (!editDate) return;
   activeEntryMode = "activity";
   selectedActivityDate = editDate;
+  editingActivityDate = editDate;
   sessionStorage.removeItem("fitbodystat-edit-activity-date");
 }
 
@@ -30,8 +33,9 @@ function renderModeSelector() {
 }
 
 function renderActivityForm(state) {
-  const activity = state.activities.find((item) => item.date === selectedActivityDate) || {};
-  const isEditing = Boolean(activity.id);
+  const existingActivity = state.activities.find((item) => item.date === selectedActivityDate);
+  const isEditing = editingActivityDate === selectedActivityDate && Boolean(existingActivity);
+  const activity = isEditing ? existingActivity : {};
   return `
     <form class="form card" id="activity-form">
       <div class="chart-header">
@@ -40,6 +44,9 @@ function renderActivityForm(state) {
           <p class="muted">Marque as modalidades realizadas. Os demais detalhes são opcionais.</p>
         </div>
       </div>
+      ${existingActivity && !isEditing
+        ? `<p class="form-notice">Já existe atividade nesta data. Este novo preenchimento será acrescentado ao registro do dia.</p>`
+        : ""}
       <div class="form-grid">
         <div class="field">
           <label for="activityDate">Data</label>
@@ -136,6 +143,7 @@ function bindMeasurementForm(state, persist, render) {
 function bindActivityForm(state, persist, render) {
   document.getElementById("activityDate")?.addEventListener("change", (event) => {
     selectedActivityDate = event.currentTarget.value || todayISO();
+    editingActivityDate = null;
     render();
   });
 
@@ -160,7 +168,7 @@ function bindActivityForm(state, persist, render) {
       return;
     }
 
-    const activity = createActivity({
+    const newActivity = createActivity({
       date,
       activityTypeIds,
       customActivityName,
@@ -168,12 +176,20 @@ function bindActivityForm(state, persist, render) {
       intensity: data.get("intensity"),
       notes: data.get("notes").trim()
     });
+    const existingActivity = state.activities.find((item) => item.date === date);
+    const isEditing = editingActivityDate === date && Boolean(existingActivity);
+    const activity = !existingActivity || isEditing
+      ? newActivity
+      : mergeDailyActivity(existingActivity, newActivity);
     state.activities = [
       ...state.activities.filter((item) => item.id !== activity.id),
       activity
     ].sort((a, b) => a.date.localeCompare(b.date));
     persist({ type: "activity-upsert", activity });
-    showToast("Atividade registrada.");
+    editingActivityDate = null;
+    showToast(isEditing
+      ? "Atividade atualizada."
+      : existingActivity ? "Atividade acrescentada ao registro do dia." : "Atividade registrada.");
     location.hash = location.hash.includes("/me/") ? "#/me/atividades" : "#/atividades";
     render();
   });
@@ -183,7 +199,10 @@ export function bindEntry(state, persist, render) {
   document.querySelectorAll("[data-entry-mode]").forEach((button) => {
     button.addEventListener("click", () => {
       activeEntryMode = button.dataset.entryMode;
-      if (activeEntryMode === "activity") selectedActivityDate = todayISO();
+      if (activeEntryMode === "activity") {
+        selectedActivityDate = todayISO();
+        editingActivityDate = null;
+      }
       render();
     });
   });

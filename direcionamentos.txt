@@ -1,0 +1,118 @@
+Etapa 1 — Correções e refinamentos
+Padronização visual dos campos do Perfil  
+Inclusão de Futvôlei no catálogo de atividades  
+Responsividade do Planejamento Mensal em dispositivos móveis  
+Reorganização dos cards da página Metas  
+Suporte a múltiplas atividades no mesmo dia
+Etapa 2 — Experiência e orientação
+Fluxo de primeiro acesso e conclusão do cadastro  
+Cadastro inicial específico para profissionais  
+Guia detalhado de como realizar medidas corporais  
+Área de métodos, cálculos, limitações e referências  
+Modo de apresentação e privacidade do Dashboard
+Etapa 3 — Estrutura profissional
+Perfil profissional público  
+Áreas de atuação, regiões e locais de atendimento  
+Estados do vínculo profissional–paciente  
+Pausa e retomada do acompanhamento  
+Consentimentos e permissões granulares por vínculo
+Etapa 4 — Descoberta e relacionamento
+Busca e localização de profissionais  
+Filtros por especialidade, região e atendimento  
+Solicitação voluntária de contato profissional  
+Conversão de usuário livre em paciente vinculado
+Etapa 5 — Agenda profissional
+Agenda e disponibilidade do profissional  
+Cadastro de locais de atendimento  
+Bloqueio de horários indisponíveis  
+Solicitação de pré-agendamento  
+Confirmação e sugestão de horários alternativos  
+Compartilhamento de dados associado ao agendamento  
+Criação opcional de vínculo após o agendamento
+Etapa 6 — Acesso e monetização
+Modelo de direito de acesso ao aplicativo  
+Trial para usuários livres  
+Assinatura individual do usuário  
+Assinatura mensal do profissional  
+Benefício de acesso patrocinado pelo profissional  
+Limites de pacientes por plano profissional  
+Período de carência após encerramento do vínculo  
+Modo somente leitura após término do acesso  
+Exportação e exclusão permanente dos dados  
+Cobrança, renovação e controle de assinaturas
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Correções:
+
+1 - Em perfil, ajustar melhor espaçamento, alinhamento e altura (manter uma padrão) das caixas de texto. Mas em um contexto geral, estão muito bons. 
+	Não fazer muitas alterações, apenas esses pequenos alinhamentos agradarão mais à vista.
+
+2- Em perfil, incluir Futvôlei. Não alterar a estética dessa parte. Está muito boa!
+
+3- Em novo registro de atividade física, ao abrir esse menu, em um dia que já tenha sido preenchida atividade para essa data, os campos "herdam" os dados já registrados,
+   quando deveriam aparecer limpos, uma vez que entraremos com novas informações.
+
+
+4- Planejamentos futuros:
+
+	4.1- Para o caso de no futuro eu criar cobrança para a utilização do site/app.
+		4.1.1 - O profissional será cobrado mensalidade e poderá vincular pacientes à sua conta (ex. Personal trainer ou nutricionista). 
+		Os pacientes não pagarão mensalidade por utilizarem o app vinculado a um profissional;
+	
+		4.1.2 - Para os casos de o profissional desfazer o vínculo com o paciente, ou vice e versa, o paciente será avisado que ou ele passe a pagar por conta própria a
+		 	mensalidade, ou se vincule ao mesmo ou a outro profissional, dentro de um tempo estipulado, ele perderá acesso à movimentação do app (seus dados e conta serão
+			mantidas, só não poderá editar, mas sempre poderá acessar e baixar o histórico etc. Fica critério dele excluir permanentemente os dados ou não). Essa será uma
+			boa maneira de o profissional reter o cliente (benefício do app gratuito) e um incentivo ao profissional contratar o app, por se tratar de um diferencial a 
+			oferecer ao cliente. Seria um ganha/ganha/ganha.
+			Para profissionais, no menu de meus pacientes, o status ativo poderá ser convertido pelo profissional para standby (inadimplência ou algo do tipo)
+			Somente ele e admin vêem, mas isso faz com que os agendamentos futuros desse paciente mudem a forma de serem exibidos na agenda do profissional(agenda será detalhada
+			mais à frente). Além de que para o user, caso tenha outro profissional vinculado ou assine o app por conta própria, nada muda com relação ao acesso ao app.
+			Na relação de user aquele profissional que o suspendeu será exibido uma interjeição, ex. Requer atenção. (Me dê idéias melhoras desse tipo de interação)
+		
+	4.2- Criar um campo no perfil do usuário "Localizar profissionais", onde serão exibidos os dados dos profissionais cadastrados no app (filtro por área de atuação,
+		região,	etc. Essa é uma forma de usuários livres localizarem profissionais para os orientarem (o user livre terá um trial, nesse tempo podem passar a ser cliente
+		de algum profissional e por isso, evitar de pagar mensalidade, isso incentiva inclusive de usuários livres trazerem profissionais para a plataforma)e também de agregar
+		valor aos profissionais assinantes (acesso à rede de usuários). 
+
+	4.3 - Para a área do profissional. Criar agenda de atendimento (Terá de incluir mais dados, como local, pois existem profissionais que atendem in loco (nutri) ou em 
+		vários locais (personal em academias).
+		4.3.1 - Ele poderá habilitar ou não a agenda para seus clientes cadastrados, ou para usuários que o descobriram através de busca no app. Se decidir habilitar a exibição
+		para users, ele poderá antes reservar horários de indisponibilidade além dos atendimentos já marcados. O user cliente vê os dias e horários disponíveis daquele
+		profissional e, possivelmente, já faz um pré-agendamento (status possíveis: aguardando confirmação, confirmado, alternativas de datas sugeridas, etc), 	que necessitará
+		do aceite do profissional (pois envolverá acordo comercial entre as partes, real disponibilidade do profissional, etc.). Caso o user agende atendimento com um profissional
+		que ainda não possui vínculo, deve ser exibida a confirmação de que seus dados e históricos serão compartilhados com aquele profissional ,ele deve permitir.
+		Caso o profissional aceite o agendamento, o vínculo será criado. (Me ajude com ideias de ajuste de vinculo) 
+
+	4.4 - Criar informativo indicando como os cálculos são feitos (imc, % de bodyfat, etc), indicando também o que é estimativa ou imprecisão e fontes dos métodos utilizados.
+
+    4.5 - melhorar informações em "Como medir": 
+		- Para consistência, registre pela manhã, em jejum, depois de ir ao banheiro. 
+	 	- No método de % de gordura por medidas, mantenha a fita nivelada e sem apertar a pele:
+			cintura:xxx;
+			quadril:xxx;
+			pescoço:xxx
+	4.5 - Em dashboard do user, criar um "olho" para exibir ou ocultar os dados de peso atual, imc, cintura, gordura corporal. O intuito é, principalmente para o público feminino,
+		não se sentir desencorajada ou envergonhada a exibir seu dashboard a outras pessoas, para mostrar seu desempenho (melhorias). Para o caso de acesso do profissional, 
+		não há essa opção, por não haver essa necessidade ao abrir o perfil de seus pacientes.
+	
+	4.6 - Em menu de Metas, inverter a posição dos cards de Marcos importantes com Ritmo sustentável. Outro ponto é que em mobile, o conteúdo "estoura" horizontalmente. saindo da tela.
+		Muito provavelmente pelo campo de Planejamento mensal estar muito extenso horizontalmente. Caso não seja possível resolver sem quebrar,
+		 talvez seja melhor remover em mobiles somente, o Planejamento mensal dessa área, já que temos também em perfil.
+	
+	4.7 - Quanto um novo user se cadastra e loga pela primeira vez, ele abre automaticamene o dashboard, o que faz mais sentido para usuários padrão. O ideal seria ocultar 
+	todos os acessos de menus, habilitando somente perfil, pedindo para concluir o cadastro. (Nem tudo é de preenchimento obrigatório no início, mas o básico). Menu de conta,
+	e configs pode ser acessível tb. Talvez no perfil, um ícone de "i" circulado, que dê acesso á um card com informações básicas de configs e funcionalidades do app, ajudará
+	nesse preenchimento e uso. Isso também se aplica à profissionais, após serem ajustados com esse status pelo adm. 

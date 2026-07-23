@@ -18,6 +18,7 @@ export const activityCatalog = [
   { id: "volleyball", label: "Vôlei", category: "sport" },
   { id: "tennis", label: "Tênis", category: "sport" },
   { id: "beach-tennis", label: "Beach tennis", category: "sport" },
+  { id: "footvolley", label: "Futvôlei", category: "sport" },
   { id: "water-sports", label: "Esportes aquáticos", category: "sport" },
   { id: "stretching", label: "Alongamento", category: "recovery" },
   { id: "mobility", label: "Mobilidade", category: "recovery" },

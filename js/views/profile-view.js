@@ -150,7 +150,7 @@ export function renderProfile(state, options = {}) {
   const weeklyChange = getWeeklyChangeGoal(p);
 
   return `
-    <form class="form" id="profile-form">
+    <form class="form profile-form" id="profile-form">
       <section class="card">
         ${baselineLocked ? `
           <p class="form-notice">Os dados da linha de base estão bloqueados porque o acompanhamento já possui medições. Metas, prazo e demais dados do perfil continuam editáveis.</p>

@@ -69,6 +69,20 @@
   resize: vertical;
 }
 
+.profile-form .form-grid {
+  align-items: start;
+}
+
+.profile-form .field {
+  align-content: start;
+}
+
+.profile-form .field > input:not([type="checkbox"], [type="radio"]),
+.profile-form .field > select {
+  height: 42px;
+  min-height: 42px;
+}
+
 .help-text {
   color: var(--muted);
   font-size: 0.82rem;
@@ -161,6 +175,14 @@ th.number {
 
 tr:last-child td {
   border-bottom: 0;
+}
+
+@media (min-width: 721px) {
+  .profile-form .form-grid > .field > label {
+    display: flex;
+    min-height: 2.4em;
+    align-items: end;
+  }
 }
 
 @media (max-width: 720px) {
