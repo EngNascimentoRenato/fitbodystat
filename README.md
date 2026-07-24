@@ -26,7 +26,7 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - `professional`: acessa somente pacientes com vínculo ativo e mantém seus dados pessoais em `Meu espaço`.
 - `admin`: administra cadastros e relações, sem acesso a dados corporais de terceiros.
 
-Novas contas são criadas como `user`. O administrador pode pré-autorizar um e-mail profissional. No primeiro acesso verificado, uma Cloud Function associa o `uid`, atualiza o documento da conta e grava a custom claim `professional`. Alterações posteriores de nível também passam pelo backend.
+Novas contas são criadas como `user`. O administrador pode pré-autorizar um e-mail profissional. No primeiro acesso verificado, uma transação atômica associa o `uid` e solicita a promoção para `professional`. As regras do Firestore conferem o e-mail, a verificação da conta e o pré-cadastro antes de aceitar a alteração.
 
 ## Estrutura no Firestore
 
@@ -38,7 +38,7 @@ plans/{uid}
 settings/{uid}
 contacts/{uid}
 professionalProfiles/{uid}
-professionalRegistrations/{emailHash}
+professionalRegistrations/{emailNormalizado}
 users/{uid}/activities/{activityId}
 careInvitations/{invitationId}
 careLinks/{professionalId_patientId}
@@ -64,27 +64,9 @@ Com a Firebase CLI instalada:
 firebase deploy --only firestore:rules
 ```
 
-## Publicar o backend de acesso
-
-Instale as dependências uma vez:
-
-```powershell
-cd functions
-npm install
-cd ..
-```
-
-Publique Functions e regras em conjunto:
-
-```powershell
-firebase deploy --only functions,firestore:rules
-```
-
-As funções `registerProfessional`, `activateProfessionalAccess`, `setUserRole` e `cancelProfessionalRegistration` impedem que o navegador atribua papéis privilegiados diretamente.
-
 ## Tecnologias
 
 - HTML5, CSS3 e JavaScript Vanilla com ES Modules
-- Firebase Authentication, Cloud Firestore e Cloud Functions
+- Firebase Authentication e Cloud Firestore
 - LocalStorage como cache local por usuário
 - Service Worker e Web App Manifest

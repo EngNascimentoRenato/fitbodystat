@@ -23,6 +23,30 @@ service cloud.firestore {
       return accountIsActive() && currentRole() == "professional";
     }
 
+    function hasVerifiedEmail() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function ownProfessionalRegistration() {
+      return /databases/$(database)/documents/professionalRegistrations/$(request.auth.token.email.lower());
+    }
+
+    function activatesPreauthorizedProfessional(userId) {
+      return accountIsActive()
+        && request.auth.uid == userId
+        && hasVerifiedEmail()
+        && resource.data.role == "user"
+        && request.resource.data.role == "professional"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["role", "updatedAt"])
+        && exists(ownProfessionalRegistration())
+        && get(ownProfessionalRegistration()).data.status in ["awaiting_registration", "awaiting_validation"]
+        && get(ownProfessionalRegistration()).data.emailLower == request.auth.token.email.lower()
+        && getAfter(ownProfessionalRegistration()).data.status == "active"
+        && getAfter(ownProfessionalRegistration()).data.userId == request.auth.uid;
+    }
+
     function professionalLink(patientId) {
       return /databases/$(database)/documents/careLinks/$(request.auth.uid + "_" + patientId);
     }
@@ -68,6 +92,7 @@ service cloud.firestore {
       allow list: if isAdmin();
 
       allow update: if isAdmin()
+        || activatesPreauthorizedProfessional(userId)
         || (accountIsActive()
           && request.auth.uid == userId
           && request.resource.data.uid == resource.data.uid
@@ -135,8 +160,25 @@ service cloud.firestore {
     }
 
     match /professionalRegistrations/{registrationId} {
-      allow read: if isAdmin();
-      allow create, update, delete: if false;
+      allow read: if isAdmin()
+        || (hasVerifiedEmail()
+          && registrationId == request.auth.token.email.lower());
+
+      allow create: if isAdmin();
+
+      allow update: if isAdmin()
+        || (hasVerifiedEmail()
+          && registrationId == request.auth.token.email.lower()
+          && resource.data.emailLower == request.auth.token.email.lower()
+          && resource.data.status in ["awaiting_registration", "awaiting_validation"]
+          && request.resource.data.status == "active"
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.emailLower == resource.data.emailLower
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "status", "userId", "activatedAt", "updatedAt"
+          ]));
+
+      allow delete: if false;
     }
 
     match /careInvitations/{invitationId} {
