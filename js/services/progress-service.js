@@ -5,13 +5,35 @@ export function getWeeklyChangeGoal(profile) {
   return Math.abs(Number(profile.weeklyChangeGoalKg ?? profile.weeklyLossGoalKg ?? 0.5)) || 0.5;
 }
 
+export function getSuggestedGoalWeight(profile) {
+  const start = finiteNumber(profile.startWeightKg);
+  const height = finiteNumber(profile.heightCm);
+  if (start === null || height === null) return null;
+
+  const bmi = calculateBmi(start, height);
+  if (profile.goalType === "maintenance") return start;
+  if (profile.goalType === "weight-loss") {
+    if (!bmi || bmi < 25) return null;
+    const target = finiteNumber(profile.targetBmi) ?? 24.9;
+    const calculated = weightForBmi(height, Math.min(target, 24.9));
+    return calculated ? Number(calculated.toFixed(1)) : null;
+  }
+  if (["weight-gain", "muscle-gain", "recovery"].includes(profile.goalType)) {
+    if (!bmi || bmi >= 18.5) return null;
+    const calculated = weightForBmi(height, 18.5);
+    return calculated ? Number(calculated.toFixed(1)) : null;
+  }
+
+  const target = finiteNumber(profile.targetBmi) ?? 24.9;
+  const calculated = weightForBmi(height, target);
+  return calculated ? Number(calculated.toFixed(1)) : start;
+}
+
 export function getGoalWeight(profile) {
   if (profile.goalWeightKg !== null && profile.goalWeightKg !== undefined && profile.goalWeightKg !== "" && Number.isFinite(Number(profile.goalWeightKg))) {
     return Number(profile.goalWeightKg);
   }
-  const targetBmi = Number(profile.targetBmi || 24.9);
-  const calculated = weightForBmi(profile.heightCm, targetBmi);
-  return calculated ? Number(calculated.toFixed(1)) : null;
+  return getSuggestedGoalWeight(profile);
 }
 
 export function getGoalDirection(profile) {
@@ -38,7 +60,38 @@ export function calculateWeeklyChangeForDeadline(profile) {
   return Number((Math.abs(start - goal) / (months * 4.33)).toFixed(2));
 }
 
+export function resolveGoalTiming(profile) {
+  const next = {
+    ...profile,
+    goalDeadlineMode: profile.goalDeadlineMode === "custom" ? "custom" : "auto"
+  };
+  const start = finiteNumber(next.startWeightKg);
+  const goal = finiteNumber(getGoalWeight(next));
+  const mode = getProgressMode(next);
+
+  if (start === null || goal === null) return next;
+  if (mode === "maintain" || Math.abs(start - goal) < 0.05) {
+    next.goalWeightKg = goal;
+    next.goalDeadlineMonths = 0;
+    next.weeklyChangeGoalKg = 0;
+    next.weeklyLossGoalKg = 0;
+    return next;
+  }
+
+  if (next.goalDeadlineMode === "custom" && finiteNumber(next.goalDeadlineMonths) > 0) {
+    next.weeklyChangeGoalKg = calculateWeeklyChangeForDeadline(next);
+  } else {
+    next.goalDeadlineMode = "auto";
+    next.weeklyChangeGoalKg = getWeeklyChangeGoal(next);
+    next.goalDeadlineMonths = calculateGoalDeadlineMonths(next);
+  }
+  next.weeklyLossGoalKg = next.weeklyChangeGoalKg;
+  return next;
+}
+
 export function getGoalDeadlineMonths(profile) {
+  const mode = getProgressMode(profile);
+  if (mode === "maintain") return 12;
   return Number(profile.goalDeadlineMonths) || calculateGoalDeadlineMonths(profile) || 12;
 }
 

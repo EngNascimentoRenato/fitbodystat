@@ -7,10 +7,17 @@ import { toNumber } from "../utils/number-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { showToast } from "../components/toast.js";
 import { mergeDailyActivity } from "../services/activity-service.js";
+import { validateNumericFields } from "../utils/validation-utils.js";
 
-let activeEntryMode = "measurement";
+let activeEntryMode = "activity";
 let selectedActivityDate = todayISO();
 let editingActivityDate = null;
+
+export function resetEntryMode() {
+  activeEntryMode = "activity";
+  selectedActivityDate = todayISO();
+  editingActivityDate = null;
+}
 
 function consumeActivityEditRequest() {
   const editDate = sessionStorage.getItem("fitbodystat-edit-activity-date");
@@ -111,6 +118,17 @@ function bindMeasurementForm(state, persist, render) {
     }
     if (state.entries.some((item) => item.date === date)) {
       showToast("Já existe um registro nessa data. Edite-o pelo histórico.");
+      return;
+    }
+    const validation = validateNumericFields(event.currentTarget, {
+      weightKg: { rule: "weightKg", label: "Peso", required: true },
+      waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
+      neckCm: { rule: "circumferenceCm", label: "Pescoço" },
+      hipCm: { rule: "circumferenceCm", label: "Quadril", required: state.profile.sex === "female" },
+      bodyFatManual: { rule: "bodyFatPercent", label: "Gordura corporal" }
+    });
+    if (!validation.valid) {
+      showToast("Revise os campos destacados.");
       return;
     }
 

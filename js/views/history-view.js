@@ -5,6 +5,7 @@ import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../u
 import { confirmAction } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+import { validateNumericFields } from "../utils/validation-utils.js";
 
 let editingEntryId = null;
 
@@ -130,7 +131,7 @@ export function bindHistory(state, persist, render) {
     const value = (name) => row.querySelector(`[name="${name}"]`)?.value ?? "";
     const date = value("date");
     const weightKg = toNumber(value("weightKg"));
-    if (!date || !Number.isFinite(weightKg) || weightKg <= 0) {
+    if (!date) {
       showToast("Informe uma data e um peso válidos.");
       return;
     }
@@ -140,6 +141,17 @@ export function bindHistory(state, persist, render) {
     }
     if (state.entries.some((entry) => entry.id !== entryId && entry.date === date)) {
       showToast("Já existe outro registro nessa data.");
+      return;
+    }
+    const validation = validateNumericFields(row, {
+      weightKg: { rule: "weightKg", label: "Peso", required: true },
+      waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
+      neckCm: { rule: "circumferenceCm", label: "Pescoço" },
+      hipCm: { rule: "circumferenceCm", label: "Quadril", required: state.profile.sex === "female" },
+      bodyFatManual: { rule: "bodyFatPercent", label: "Gordura corporal" }
+    });
+    if (!validation.valid) {
+      showToast("Revise os campos destacados.");
       return;
     }
 

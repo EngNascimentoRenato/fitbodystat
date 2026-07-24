@@ -1,7 +1,7 @@
 import { canAccessRoute, getRoute, renderMenu } from "./menu.js";
 import { renderDashboard } from "./views/dashboard-view.js";
 import { renderProfile, bindProfile } from "./views/profile-view.js";
-import { renderEntry, bindEntry } from "./views/entry-view.js";
+import { renderEntry, bindEntry, resetEntryMode } from "./views/entry-view.js";
 import { renderHistory, bindHistory } from "./views/history-view.js";
 import { renderGoals } from "./views/goals-view.js";
 import { renderSettings, bindSettings } from "./views/settings-view.js";
@@ -65,6 +65,7 @@ export function renderRoute(context) {
   const activeRoute = canAccessRoute(requestedRoute, context.authState)
     ? requestedRoute
     : getRoute(fallbackPath(context.authState));
+  if (!["/registro", "/me/registro"].includes(activeRoute.path)) resetEntryMode();
 
   document.getElementById("route-title").textContent = activeRoute.title;
   document.getElementById("route-eyebrow").textContent = activeRoute.eyebrow;

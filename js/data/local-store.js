@@ -28,7 +28,8 @@ export function normalizeState(parsed = {}) {
   const profile = {
     ...defaultProfile,
     ...(parsed.profile || {}),
-    weeklyChangeGoalKg: parsed.profile?.weeklyChangeGoalKg ?? parsed.profile?.weeklyLossGoalKg ?? defaultProfile.weeklyChangeGoalKg
+    weeklyChangeGoalKg: parsed.profile?.weeklyChangeGoalKg ?? parsed.profile?.weeklyLossGoalKg ?? defaultProfile.weeklyChangeGoalKg,
+    goalDeadlineMode: parsed.profile?.goalDeadlineMode === "custom" ? "custom" : "auto"
   };
   profile.baselineLocked = profile.baselineLocked === true || entries.length > 0;
 

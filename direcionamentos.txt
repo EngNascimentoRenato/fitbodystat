@@ -1,118 +1,230 @@
-Etapa 1 — Correções e refinamentos
-Padronização visual dos campos do Perfil  
-Inclusão de Futvôlei no catálogo de atividades  
-Responsividade do Planejamento Mensal em dispositivos móveis  
-Reorganização dos cards da página Metas  
-Suporte a múltiplas atividades no mesmo dia
-Etapa 2 — Experiência e orientação
-Fluxo de primeiro acesso e conclusão do cadastro  
-Cadastro inicial específico para profissionais  
-Guia detalhado de como realizar medidas corporais  
-Área de métodos, cálculos, limitações e referências  
-Modo de apresentação e privacidade do Dashboard
-Etapa 3 — Estrutura profissional
-Perfil profissional público  
-Áreas de atuação, regiões e locais de atendimento  
-Estados do vínculo profissional–paciente  
-Pausa e retomada do acompanhamento  
-Consentimentos e permissões granulares por vínculo
-Etapa 4 — Descoberta e relacionamento
-Busca e localização de profissionais  
-Filtros por especialidade, região e atendimento  
-Solicitação voluntária de contato profissional  
-Conversão de usuário livre em paciente vinculado
-Etapa 5 — Agenda profissional
-Agenda e disponibilidade do profissional  
-Cadastro de locais de atendimento  
-Bloqueio de horários indisponíveis  
-Solicitação de pré-agendamento  
-Confirmação e sugestão de horários alternativos  
-Compartilhamento de dados associado ao agendamento  
-Criação opcional de vínculo após o agendamento
-Etapa 6 — Acesso e monetização
-Modelo de direito de acesso ao aplicativo  
-Trial para usuários livres  
-Assinatura individual do usuário  
-Assinatura mensal do profissional  
-Benefício de acesso patrocinado pelo profissional  
-Limites de pacientes por plano profissional  
-Período de carência após encerramento do vínculo  
-Modo somente leitura após término do acesso  
-Exportação e exclusão permanente dos dados  
-Cobrança, renovação e controle de assinaturas
+FITBODYSTAT - DIRECIONAMENTOS FUTUROS
+
+Este documento reúne apenas funcionalidades e decisões ainda não implementadas.
+A ordem das etapas considera valor para o usuário, potencial comercial, dependências
+técnicas e afinidade entre os ajustes.
 
 
+ETAPA 1 - ATUALIZAÇÃO E DISTRIBUIÇÃO DO PWA: PRIORIDADE TÉCNICA
+
+Objetivo: permitir que usuários recebam novas versões com segurança, sem limpar o
+cache, remover o aplicativo ou reinstalar o PWA.
+
+1. Controle de versão
+   - Definir uma versão central do aplicativo e do cache.
+   - Evitar que uma publicação dependa da alteração manual isolada do nome do cache.
+   - Exibir a versão instalada na página Configurações.
+
+2. Verificação de atualizações
+   - Verificar novas versões ao abrir o aplicativo.
+   - Repetir a verificação quando o PWA retornar ao primeiro plano.
+   - Considerar as limitações de atualização em segundo plano no Safari/iOS.
+
+3. Experiência de atualização
+   - Baixar a nova versão em segundo plano.
+   - Informar de forma discreta quando houver uma atualização disponível.
+   - Oferecer a ação "Atualizar agora".
+   - Ativar a nova versão e recarregar o aplicativo após a confirmação.
+   - Permitir que atualizações comuns sejam adiadas.
+
+4. Atualizações obrigatórias
+   - Prever uma modalidade obrigatória para versões incompatíveis com regras,
+     estruturas de dados ou recursos essenciais.
+   - Explicar ao usuário por que a atualização é necessária.
+   - Evitar bloqueios obrigatórios em atualizações apenas visuais ou opcionais.
+
+5. Proteção de dados não salvos
+   - Não recarregar o aplicativo enquanto houver formulários com alterações pendentes.
+   - Orientar o usuário a salvar ou descartar as alterações antes de atualizar.
+   - Garantir que a atualização do código não apague dados persistidos no Firestore.
+
+6. Estratégia de cache e funcionamento offline
+   - Buscar versões recentes de navegação e HTML na rede quando houver conexão.
+   - Manter CSS, JavaScript, ícones e arquivos essenciais disponíveis offline.
+   - Atualizar arquivos estáticos sem conservar versões antigas indefinidamente.
+   - Utilizar a página inicial como fallback somente para navegação, evitando retorná-la
+     incorretamente no lugar de imagens, scripts ou outros recursos.
+   - Remover caches antigos após a ativação bem-sucedida da nova versão.
+
+7. Processo de publicação
+   - Incorporar a atualização da versão ao procedimento de publicação no GitHub Pages.
+   - Garantir que todos os arquivos da versão sejam publicados antes de ela ser anunciada.
+   - Manter um registro curto das mudanças de cada versão.
+   - Prever automatização do versionamento em uma etapa posterior.
+
+8. Validação
+   - Testar atualização no navegador e no PWA instalado.
+   - Validar iPhone/Safari, Android/Chrome e navegadores de desktop.
+   - Testar abertura on-line, funcionamento offline, retorno da conexão e troca de versão.
+   - Confirmar que não seja necessário limpar cache ou reinstalar o aplicativo.
 
 
+ETAPA 2 - AGENDA PROFISSIONAL: PRIMEIRA VERSÃO PRIORITÁRIA
+
+Objetivo: aproximar o aplicativo de uma solução comercial para profissionais sem
+implementar, neste primeiro momento, agendamentos iniciados pelo paciente.
+
+1. Acesso e privacidade
+   - Disponibilizar a agenda apenas para contas profissionais.
+   - Permitir que somente o profissional crie e altere compromissos nesta versão.
+   - Impedir que a administração visualize detalhes pessoais da agenda.
+   - Reservar ao administrador apenas funções administrativas e de diagnóstico.
+
+2. Visualização
+   - Oferecer visualizações diária, semanal e mensal.
+   - Permitir navegação rápida entre períodos e retorno à data atual.
+   - Exibir compromissos e bloqueios de horário de maneira distinta.
+
+3. Compromissos
+   - Criar, editar e excluir compromissos.
+   - Registrar data, horário inicial, duração, modalidade e local.
+   - Permitir associar um paciente vinculado.
+   - Permitir compromisso avulso com uma pessoa ainda não cadastrada.
+   - Incluir observações privadas do profissional.
+   - Permitir cores por tipo de compromisso.
+
+4. Estados do compromisso
+   - Utilizar estados como agendado, confirmado, concluído, cancelado e falta.
+   - Permitir filtros por paciente, local e estado.
+
+5. Indisponibilidade
+   - Permitir bloqueios de horários e períodos indisponíveis.
+
+6. Contato do paciente
+   - Exibir telefone somente quando estiver preenchido e compartilhado com o profissional.
+
+7. Modelo preparado para evolução
+   - Estruturar os registros com proprietário da agenda, criador, paciente opcional,
+     participantes, início, término, fuso horário, local, modalidade e visibilidade.
+   - Prever estados de solicitação e confirmação sem exibi-los na primeira versão.
+   - Reservar suporte futuro para recorrência, lembretes, atendimento on-line e
+     consentimento associado ao agendamento.
+   - Tratar datas e horários de forma consistente com o fuso do usuário.
+
+8. Evoluções posteriores da agenda
+   - Cadastro de disponibilidade e compromissos recorrentes.
+   - Visualização da agenda pelo paciente.
+   - Solicitação de pré-agendamento pelo paciente.
+   - Confirmação, recusa e sugestão de horários alternativos.
+   - Lembretes e confirmação próxima ao atendimento.
+   - Criação opcional de vínculo após o primeiro atendimento.
+   - Integração opcional com Google Calendar e Outlook.
+   - Limites e recursos de agenda associados aos planos comerciais.
 
 
+ETAPA 3 - ESTRUTURA PROFISSIONAL E VÍNCULOS
+
+1. Perfil profissional público
+   - Exibir nome, apresentação, áreas de atuação, especialidades e registro profissional,
+     quando aplicável.
+   - Permitir que o profissional controle quais informações serão públicas.
+   - Preparar o cadastro para nutricionistas, profissionais de educação física,
+     fisioterapeutas, psicólogos e outras áreas de saúde e bem-estar.
+
+2. Regiões e locais de atendimento
+   - Cadastrar cidades, regiões e locais de atendimento.
+   - Informar atendimento presencial, on-line ou em domicílio.
+   - Reutilizar esses locais na agenda profissional.
+
+3. Ciclo de vida do vínculo profissional-paciente
+   - Prever estados como pendente, ativo, requer atenção, em pausa e encerrado.
+   - Permitir pausa, retomada e encerramento do acompanhamento.
+   - Manter um histórico básico das alterações do vínculo.
+
+4. Consentimentos e permissões por vínculo
+   - Definir separadamente o acesso a métricas, metas, telefone, observações,
+     indicadores de bem-estar e agenda.
+   - Permitir que o paciente revise ou revogue permissões quando aplicável.
+
+5. Situação interna do paciente
+   - Permitir ao profissional marcar um paciente como "requer atenção" ou "em pausa".
+   - Exibir essa situação apenas ao profissional responsável e à administração.
+   - Não limitar o acesso do usuário quando ele possuir assinatura própria ou outro
+     vínculo válido.
 
 
+ETAPA 4 - DESCOBERTA E RELACIONAMENTO
+
+1. Busca de profissionais
+   - Criar uma área para usuários localizarem profissionais cadastrados na plataforma.
+
+2. Filtros de pesquisa
+   - Filtrar por especialidade, região, modalidade de atendimento e local.
+
+3. Solicitação de contato
+   - Permitir que o usuário envie voluntariamente uma solicitação de contato.
+   - Compartilhar dados pessoais somente após consentimento explícito.
+
+4. Conversão em paciente vinculado
+   - Transformar o relacionamento iniciado pela busca em um vínculo formal.
+   - Exigir confirmação das duas partes antes de liberar dados de acompanhamento.
+
+5. Agenda pública opcional
+   - Permitir que o profissional disponibilize determinados horários para usuários
+     ainda não vinculados.
+   - Exigir aceite do profissional antes de confirmar o atendimento.
+   - Informar e solicitar consentimento antes de compartilhar qualquer histórico.
+   - Oferecer a criação do vínculo após a confirmação, sem torná-la automática.
 
 
+ETAPA 5 - BEM-ESTAR PESSOAL
+
+Objetivo inicial: oferecer acompanhamento pessoal e privado. O módulo não deve ser
+apresentado como diagnóstico ou tratamento psicológico.
+
+1. Registros pessoais
+   - Permitir registros simples de humor, sono, energia e frequência de hábitos.
+   - Tornar o preenchimento rápido e adequado ao uso diário.
+
+2. Privacidade
+   - Manter os registros visíveis somente para o próprio usuário na primeira versão.
+   - Não compartilhar automaticamente esses dados com profissionais.
+   - Manter anotações pessoais privadas separadas de observações profissionais.
+
+3. Indicadores
+   - Apresentar tendências pessoais sem conclusões clínicas.
+   - Permitir ao usuário observar relações entre bem-estar, atividade física e
+     evolução corporal.
+
+4. Expansão profissional futura
+   - Avaliar recursos específicos para psicólogos e profissionais de áreas afins.
+   - Criar check-ins e questionários apenas com critérios adequados e finalidade clara.
+   - Exigir consentimento granular por indicador antes de qualquer compartilhamento.
+   - Separar dados pessoais, dados compartilhados e anotações exclusivas do profissional.
+   - Tratar segurança, responsabilidade clínica e LGPD como requisitos da expansão.
 
 
+ETAPA 6 - ACESSO E MONETIZAÇÃO
 
+1. Direito de acesso ao aplicativo
+   - Separar autenticação, perfil, vínculo profissional e direito de uso.
+   - Considerar assinatura própria, benefício concedido por profissional e período
+     de avaliação.
 
+2. Período de avaliação
+   - Definir duração e recursos disponíveis para usuários sem assinatura ou vínculo.
 
-Correções:
+3. Assinatura individual
+   - Permitir que o usuário mantenha acesso completo independentemente de vínculo
+     profissional.
 
-1 - Em perfil, ajustar melhor espaçamento, alinhamento e altura (manter uma padrão) das caixas de texto. Mas em um contexto geral, estão muito bons. 
-	Não fazer muitas alterações, apenas esses pequenos alinhamentos agradarão mais à vista.
+4. Assinatura profissional
+   - Criar planos mensais para profissionais, com limites de pacientes e recursos
+     por plano.
+   - Permitir que o plano do profissional conceda acesso aos pacientes vinculados.
 
-2- Em perfil, incluir Futvôlei. Não alterar a estética dessa parte. Está muito boa!
+5. Encerramento do vínculo
+   - Aplicar um período de carência para que o usuário contrate um plano próprio ou
+     estabeleça outro vínculo.
+   - Considerar outros vínculos e assinaturas válidas antes de alterar o acesso.
 
-3- Em novo registro de atividade física, ao abrir esse menu, em um dia que já tenha sido preenchida atividade para essa data, os campos "herdam" os dados já registrados,
-   quando deveriam aparecer limpos, uma vez que entraremos com novas informações.
+6. Modo somente leitura
+   - Após o término do direito de uso, manter consulta e exportação dos dados.
+   - Bloquear apenas novas edições e registros.
 
+7. Dados do usuário
+   - Permitir exportação dos históricos.
+   - Disponibilizar exclusão permanente mediante confirmação e regras de segurança.
 
-4- Planejamentos futuros:
-
-	4.1- Para o caso de no futuro eu criar cobrança para a utilização do site/app.
-		4.1.1 - O profissional será cobrado mensalidade e poderá vincular pacientes à sua conta (ex. Personal trainer ou nutricionista). 
-		Os pacientes não pagarão mensalidade por utilizarem o app vinculado a um profissional;
-	
-		4.1.2 - Para os casos de o profissional desfazer o vínculo com o paciente, ou vice e versa, o paciente será avisado que ou ele passe a pagar por conta própria a
-		 	mensalidade, ou se vincule ao mesmo ou a outro profissional, dentro de um tempo estipulado, ele perderá acesso à movimentação do app (seus dados e conta serão
-			mantidas, só não poderá editar, mas sempre poderá acessar e baixar o histórico etc. Fica critério dele excluir permanentemente os dados ou não). Essa será uma
-			boa maneira de o profissional reter o cliente (benefício do app gratuito) e um incentivo ao profissional contratar o app, por se tratar de um diferencial a 
-			oferecer ao cliente. Seria um ganha/ganha/ganha.
-			Para profissionais, no menu de meus pacientes, o status ativo poderá ser convertido pelo profissional para standby (inadimplência ou algo do tipo)
-			Somente ele e admin vêem, mas isso faz com que os agendamentos futuros desse paciente mudem a forma de serem exibidos na agenda do profissional(agenda será detalhada
-			mais à frente). Além de que para o user, caso tenha outro profissional vinculado ou assine o app por conta própria, nada muda com relação ao acesso ao app.
-			Na relação de user aquele profissional que o suspendeu será exibido uma interjeição, ex. Requer atenção. (Me dê idéias melhoras desse tipo de interação)
-		
-	4.2- Criar um campo no perfil do usuário "Localizar profissionais", onde serão exibidos os dados dos profissionais cadastrados no app (filtro por área de atuação,
-		região,	etc. Essa é uma forma de usuários livres localizarem profissionais para os orientarem (o user livre terá um trial, nesse tempo podem passar a ser cliente
-		de algum profissional e por isso, evitar de pagar mensalidade, isso incentiva inclusive de usuários livres trazerem profissionais para a plataforma)e também de agregar
-		valor aos profissionais assinantes (acesso à rede de usuários). 
-
-	4.3 - Para a área do profissional. Criar agenda de atendimento (Terá de incluir mais dados, como local, pois existem profissionais que atendem in loco (nutri) ou em 
-		vários locais (personal em academias).
-		4.3.1 - Ele poderá habilitar ou não a agenda para seus clientes cadastrados, ou para usuários que o descobriram através de busca no app. Se decidir habilitar a exibição
-		para users, ele poderá antes reservar horários de indisponibilidade além dos atendimentos já marcados. O user cliente vê os dias e horários disponíveis daquele
-		profissional e, possivelmente, já faz um pré-agendamento (status possíveis: aguardando confirmação, confirmado, alternativas de datas sugeridas, etc), 	que necessitará
-		do aceite do profissional (pois envolverá acordo comercial entre as partes, real disponibilidade do profissional, etc.). Caso o user agende atendimento com um profissional
-		que ainda não possui vínculo, deve ser exibida a confirmação de que seus dados e históricos serão compartilhados com aquele profissional ,ele deve permitir.
-		Caso o profissional aceite o agendamento, o vínculo será criado. (Me ajude com ideias de ajuste de vinculo) 
-
-	4.4 - Criar informativo indicando como os cálculos são feitos (imc, % de bodyfat, etc), indicando também o que é estimativa ou imprecisão e fontes dos métodos utilizados.
-
-    4.5 - melhorar informações em "Como medir": 
-		- Para consistência, registre pela manhã, em jejum, depois de ir ao banheiro. 
-	 	- No método de % de gordura por medidas, mantenha a fita nivelada e sem apertar a pele:
-			cintura:xxx;
-			quadril:xxx;
-			pescoço:xxx
-	4.5 - Em dashboard do user, criar um "olho" para exibir ou ocultar os dados de peso atual, imc, cintura, gordura corporal. O intuito é, principalmente para o público feminino,
-		não se sentir desencorajada ou envergonhada a exibir seu dashboard a outras pessoas, para mostrar seu desempenho (melhorias). Para o caso de acesso do profissional, 
-		não há essa opção, por não haver essa necessidade ao abrir o perfil de seus pacientes.
-	
-	4.6 - Em menu de Metas, inverter a posição dos cards de Marcos importantes com Ritmo sustentável. Outro ponto é que em mobile, o conteúdo "estoura" horizontalmente. saindo da tela.
-		Muito provavelmente pelo campo de Planejamento mensal estar muito extenso horizontalmente. Caso não seja possível resolver sem quebrar,
-		 talvez seja melhor remover em mobiles somente, o Planejamento mensal dessa área, já que temos também em perfil.
-	
-	4.7 - Quanto um novo user se cadastra e loga pela primeira vez, ele abre automaticamene o dashboard, o que faz mais sentido para usuários padrão. O ideal seria ocultar 
-	todos os acessos de menus, habilitando somente perfil, pedindo para concluir o cadastro. (Nem tudo é de preenchimento obrigatório no início, mas o básico). Menu de conta,
-	e configs pode ser acessível tb. Talvez no perfil, um ícone de "i" circulado, que dê acesso á um card com informações básicas de configs e funcionalidades do app, ajudará
-	nesse preenchimento e uso. Isso também se aplica à profissionais, após serem ajustados com esse status pelo adm. 
+8. Cobrança e renovação
+   - Implementar pagamentos, renovações, cancelamentos, inadimplência e reativação.

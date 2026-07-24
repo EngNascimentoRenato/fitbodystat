@@ -3,12 +3,23 @@ import { measurementHelpButton } from "../components/measurement-guide.js";
 import { createDefaultMonthlyPlan } from "../data/seed-plan.js";
 import { calculateBodyFatByNavy, classifyBodyFat } from "../services/body-fat-service.js";
 import { calculateBmi, classifyBmi } from "../services/bmi-service.js";
-import { calculateGoalDeadlineMonths, getGoalWeight } from "../services/progress-service.js";
-import { todayISO } from "../utils/date-utils.js";
+import {
+  getGoalWeight,
+  getProgressMode,
+  getSuggestedGoalWeight,
+  resolveGoalTiming
+} from "../services/progress-service.js";
+import { addDays, formatDate, todayISO } from "../utils/date-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { formatDecimal, formatKg, formatPercent, toNumber } from "../utils/number-utils.js";
 import { normalizePhone, phoneIsValid } from "../utils/phone-utils.js";
 import { showToast } from "../components/toast.js";
+import {
+  clearFieldError,
+  resolveHeightInput,
+  setFieldError,
+  validateNumericFields
+} from "../utils/validation-utils.js";
 
 function userOnboarding(state, authState) {
   const profile = state.profile;
@@ -43,7 +54,7 @@ function userOnboarding(state, authState) {
           </div>
           <div class="field">
             <label for="onboarding-birth-date">Data de nascimento</label>
-            <input id="onboarding-birth-date" name="birthDate" type="date" required />
+            <input id="onboarding-birth-date" name="birthDate" type="date" max="${todayISO()}" required />
           </div>
           <div class="field">
             <label for="onboarding-height">Altura (cm)</label>
@@ -101,16 +112,35 @@ function userOnboarding(state, authState) {
           <div class="field">
             <label for="onboarding-target-bmi">IMC usado na sugestão</label>
             <input id="onboarding-target-bmi" name="targetBmi" inputmode="decimal" value="24.9" />
+            <span class="help-text">Referência editável. No emagrecimento, 24,9 representa o limite superior da faixa normal.</span>
           </div>
           <div class="field">
             <label for="onboarding-goal-weight">Peso final desejado (kg)</label>
             <input id="onboarding-goal-weight" name="goalWeightKg" inputmode="decimal" />
-            <span class="help-text">Deixe vazio para usar a sugestão calculada pelo IMC.</span>
+            <button class="button text-button field-action" id="onboarding-apply-goal-suggestion" type="button">Usar peso sugerido</button>
           </div>
           <div class="field">
             <label for="onboarding-weekly-change">Mudança semanal desejada (kg)</label>
             <input id="onboarding-weekly-change" name="weeklyChangeGoalKg" inputmode="decimal" value="0.5" />
           </div>
+          <div class="field">
+            <label for="onboarding-goal-deadline">Prazo estimado (meses)</label>
+            <input id="onboarding-goal-deadline" name="goalDeadlineMonths" inputmode="decimal" readonly />
+            <span class="help-text" id="onboarding-deadline-help">Calculado pelo peso final e pelo ritmo semanal.</span>
+          </div>
+          <fieldset class="field goal-mode-field">
+            <legend>Como deseja planejar?</legend>
+            <div class="radio-row">
+              <label class="radio-card">
+                <input type="radio" name="goalDeadlineMode" value="auto" checked />
+                <span><strong>Calcular prazo</strong><small>Prioriza o ritmo semanal.</small></span>
+              </label>
+              <label class="radio-card">
+                <input type="radio" name="goalDeadlineMode" value="custom" />
+                <span><strong>Definir prazo</strong><small>Recalcula o ritmo necessário.</small></span>
+              </label>
+            </div>
+          </fieldset>
           <div class="field">
             <label for="onboarding-activity-days">Meta semanal de dias ativos</label>
             <input id="onboarding-activity-days" name="weeklyActivityGoalDays" type="number" min="1" max="7" value="3" />
@@ -124,6 +154,7 @@ function userOnboarding(state, authState) {
           <label>Atividades preferidas</label>
           ${preferredActivityPicker([])}
         </div>
+        <div class="goal-preview" id="onboarding-goal-preview" aria-live="polite"></div>
       </section>
 
       <div class="button-row onboarding-submit">
@@ -232,26 +263,170 @@ function updateInsight(form) {
     : "Preencha altura, peso e circunferências para visualizar as estimativas iniciais.";
 }
 
+function readOnboardingGoalDraft(form) {
+  const data = new FormData(form);
+  return resolveGoalTiming({
+    goalType: data.get("goalType"),
+    targetBmi: toNumber(data.get("targetBmi")) || 24.9,
+    heightCm: toNumber(data.get("heightCm")),
+    startDate: data.get("startDate") || todayISO(),
+    startWeightKg: toNumber(data.get("startWeightKg")),
+    goalWeightKg: toNumber(data.get("goalWeightKg")),
+    weeklyChangeGoalKg: toNumber(data.get("weeklyChangeGoalKg")),
+    weeklyLossGoalKg: toNumber(data.get("weeklyChangeGoalKg")),
+    goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
+    goalDeadlineMode: data.get("goalDeadlineMode") === "custom" ? "custom" : "auto"
+  });
+}
+
+function renderGoalPreview(profile) {
+  const mode = getProgressMode(profile);
+  const goalWeight = getGoalWeight(profile);
+  const bmi = calculateBmi(goalWeight, profile.heightCm);
+  if (!goalWeight || !profile.startWeightKg) {
+    return `<p class="muted">Preencha o objetivo, a altura e o peso inicial para visualizar o planejamento.</p>`;
+  }
+  if (mode === "maintain" || Math.abs(goalWeight - profile.startWeightKg) < 0.05) {
+    return `
+      <strong>Planejamento de manutenção</strong>
+      <p>Referência de ${formatKg(goalWeight)}, com IMC estimado de ${formatDecimal(bmi, 1)}. Não há prazo de perda ou ganho.</p>
+    `;
+  }
+
+  const deadline = Number(profile.goalDeadlineMonths);
+  const finishDate = deadline
+    ? addDays(profile.startDate || todayISO(), deadline * 30.4375)
+    : null;
+  return `
+    <strong>Prévia da meta</strong>
+    <dl class="goal-preview-list">
+      <div><dt>Peso final</dt><dd>${formatKg(goalWeight)}</dd></div>
+      <div><dt>IMC estimado</dt><dd>${formatDecimal(bmi, 1)}</dd></div>
+      <div><dt>Ritmo semanal</dt><dd>${formatKg(Number(profile.weeklyChangeGoalKg))}</dd></div>
+      <div><dt>Prazo</dt><dd>${deadline ? `${formatDecimal(deadline, 1)} meses` : "-"}</dd></div>
+      <div><dt>Data estimada</dt><dd>${formatDate(finishDate)}</dd></div>
+    </dl>
+    <small>${profile.goalDeadlineMode === "custom"
+      ? "O prazo foi mantido e o ritmo semanal foi recalculado."
+      : "O ritmo semanal foi mantido e o prazo foi recalculado."}</small>
+  `;
+}
+
+function updateOnboardingGoalPlanner(form) {
+  const deadlineMode = form.elements.goalDeadlineMode?.value === "custom" ? "custom" : "auto";
+  const weeklyField = form.elements.weeklyChangeGoalKg;
+  const deadlineField = form.elements.goalDeadlineMonths;
+  const profile = readOnboardingGoalDraft(form);
+  const maintenance = getProgressMode(profile) === "maintain";
+
+  weeklyField.readOnly = deadlineMode === "custom" || maintenance;
+  deadlineField.readOnly = deadlineMode !== "custom" || maintenance;
+  if (Number.isFinite(Number(profile.weeklyChangeGoalKg))) {
+    weeklyField.value = profile.weeklyChangeGoalKg || "";
+  }
+  deadlineField.value = profile.goalDeadlineMonths
+    ? Number(profile.goalDeadlineMonths).toFixed(1)
+    : "";
+  document.getElementById("onboarding-deadline-help").textContent = deadlineMode === "custom"
+    ? "O prazo será mantido e o ritmo semanal será recalculado."
+    : "Calculado pelo peso final e pelo ritmo semanal.";
+  document.getElementById("onboarding-goal-preview").innerHTML = renderGoalPreview(profile);
+  return profile;
+}
+
+function goalDirectionIsValid(profile, field) {
+  clearFieldError(field);
+  const start = Number(profile.startWeightKg);
+  const goal = Number(profile.goalWeightKg);
+  if (![start, goal].every(Number.isFinite)) return false;
+  if (profile.goalType === "weight-loss" && goal >= start) {
+    setFieldError(field, "Para emagrecimento, o peso final deve ser menor que o peso inicial.");
+    field.focus();
+    return false;
+  }
+  if (["weight-gain", "recovery"].includes(profile.goalType) && goal <= start) {
+    setFieldError(field, "Para ganho ou recuperação, o peso final deve ser maior que o peso inicial.");
+    field.focus();
+    return false;
+  }
+  return true;
+}
+
 export function bindOnboarding(context) {
   const userForm = document.getElementById("onboarding-user-form");
   const sexField = document.getElementById("onboarding-sex");
   const hipField = document.getElementById("onboarding-hip");
+  const heightField = document.getElementById("onboarding-height");
+  const goalWeightField = document.getElementById("onboarding-goal-weight");
+  let goalWeightWasEdited = false;
   const updateHipRequirement = () => {
     if (!hipField) return;
     hipField.required = sexField?.value === "female";
   };
   sexField?.addEventListener("change", updateHipRequirement);
   updateHipRequirement();
-  userForm?.addEventListener("input", () => updateInsight(userForm));
+  const applyGoalSuggestion = () => {
+    const data = new FormData(userForm);
+    const suggestion = getSuggestedGoalWeight({
+      goalType: data.get("goalType"),
+      targetBmi: toNumber(data.get("targetBmi")) || 24.9,
+      heightCm: toNumber(data.get("heightCm")),
+      startWeightKg: toNumber(data.get("startWeightKg"))
+    });
+    goalWeightField.value = suggestion !== null ? suggestion.toFixed(1) : "";
+    goalWeightWasEdited = false;
+    updateOnboardingGoalPlanner(userForm);
+  };
+  heightField?.addEventListener("blur", () => {
+    if (resolveHeightInput(heightField)) {
+      updateInsight(userForm);
+      if (!goalWeightWasEdited) applyGoalSuggestion();
+    }
+  });
+  goalWeightField?.addEventListener("input", () => {
+    goalWeightWasEdited = true;
+  });
+  document.getElementById("onboarding-goal-type")?.addEventListener("change", applyGoalSuggestion);
+  document.getElementById("onboarding-apply-goal-suggestion")?.addEventListener("click", applyGoalSuggestion);
+  userForm?.addEventListener("input", (event) => {
+    updateInsight(userForm);
+    if (!goalWeightWasEdited && ["heightCm", "startWeightKg", "targetBmi"].includes(event.target.name)) {
+      applyGoalSuggestion();
+      return;
+    }
+    updateOnboardingGoalPlanner(userForm);
+  });
+  updateOnboardingGoalPlanner(userForm);
   userForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!resolveHeightInput(heightField)) return;
     const data = new FormData(event.currentTarget);
     if (!phoneIsValid(data.get("phone"))) {
       showToast("Informe um telefone válido, com DDD.");
       return;
     }
 
-    const profile = {
+    const deadlineMode = data.get("goalDeadlineMode") === "custom" ? "custom" : "auto";
+    const maintenanceGoal = data.get("goalType") === "maintenance";
+    const validation = validateNumericFields(event.currentTarget, {
+      heightCm: { rule: "heightCm", label: "Altura", required: true },
+      startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
+      startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: true },
+      startNeckCm: { rule: "circumferenceCm", label: "Pescoço inicial", required: true },
+      startHipCm: { rule: "circumferenceCm", label: "Quadril inicial", required: data.get("sex") === "female" },
+      targetBmi: { rule: "targetBmi", label: "IMC de referência", required: true },
+      goalWeightKg: { rule: "weightKg", label: "Peso final", required: true },
+      weeklyChangeGoalKg: { rule: "weeklyChangeKg", label: "Mudança semanal", required: deadlineMode === "auto" && !maintenanceGoal },
+      goalDeadlineMonths: { rule: "deadlineMonths", label: "Prazo", required: deadlineMode === "custom" && !maintenanceGoal },
+      weeklyActivityGoalDays: { rule: "activityDays", label: "Dias ativos", required: true },
+      averageActivityDurationMinutes: { rule: "activityMinutes", label: "Duração média" }
+    });
+    if (!validation.valid) {
+      showToast("Revise os campos destacados.");
+      return;
+    }
+
+    let profile = {
       ...context.personalState.profile,
       name: String(data.get("name") || "").trim(),
       sex: data.get("sex"),
@@ -267,16 +442,20 @@ export function bindOnboarding(context) {
       goalWeightKg: toNumber(data.get("goalWeightKg")),
       weeklyChangeGoalKg: toNumber(data.get("weeklyChangeGoalKg")) || 0.5,
       weeklyLossGoalKg: toNumber(data.get("weeklyChangeGoalKg")) || 0.5,
+      goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
+      goalDeadlineMode: deadlineMode,
       weeklyActivityGoalDays: toNumber(data.get("weeklyActivityGoalDays")) || 3,
       averageActivityDurationMinutes: toNumber(data.get("averageActivityDurationMinutes")),
       preferredActivities: data.getAll("preferredActivities")
     };
     if (!profile.goalWeightKg) {
-      profile.goalWeightKg = profile.goalType === "maintenance"
-        ? profile.startWeightKg
-        : getGoalWeight(profile);
+      profile.goalWeightKg = getSuggestedGoalWeight(profile);
     }
-    profile.goalDeadlineMonths = calculateGoalDeadlineMonths(profile);
+    if (!goalDirectionIsValid(profile, goalWeightField)) {
+      showToast("Revise a direção da meta.");
+      return;
+    }
+    profile = resolveGoalTiming(profile);
 
     const button = event.currentTarget.querySelector('button[type="submit"]');
     button.disabled = true;

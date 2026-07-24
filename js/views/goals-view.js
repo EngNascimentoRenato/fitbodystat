@@ -13,7 +13,7 @@ import { milestoneList } from "../components/milestone-list.js";
 import { formatCm, formatDecimal, formatKg } from "../utils/number-utils.js";
 import { escapeHtml } from "../utils/html-utils.js";
 import { calculateBmi } from "../services/bmi-service.js";
-import { addMonths, formatDate, todayISO } from "../utils/date-utils.js";
+import { addDays, formatDate, todayISO } from "../utils/date-utils.js";
 import { formatActivityMinutes } from "../services/activity-service.js";
 
 const goalTypeLabels = {
@@ -45,7 +45,7 @@ export function renderGoals(state) {
     : null;
   const weeklyLabel = progressMode === "loss" ? "Perda semanal" : "Ganho semanal";
   const deadlineDate = deadline
-    ? addMonths(state.profile.startDate || todayISO(), Math.round(deadline))
+    ? addDays(state.profile.startDate || todayISO(), deadline * 30.4375)
     : null;
   const weeklyActivityMinutes = (Number(state.profile.weeklyActivityGoalDays) || 0)
     * (Number(state.profile.averageActivityDurationMinutes) || 0);

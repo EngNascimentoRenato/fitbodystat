@@ -1,4 +1,5 @@
 .card {
+  min-width: 0;
   padding: 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -46,6 +47,13 @@
 
 .mini-stat strong {
   font-size: 1.3rem;
+}
+
+.account-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.08rem;
+  line-height: 1.25;
 }
 
 .button-row {

@@ -17,6 +17,7 @@ export const defaultProfile = {
   weeklyChangeGoalKg: 0.5,
   weeklyLossGoalKg: 0.5,
   goalDeadlineMonths: null,
+  goalDeadlineMode: "auto",
   goalType: "",
   customGoalLabel: "",
   weeklyActivityGoalDays: 3,

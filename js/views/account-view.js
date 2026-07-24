@@ -98,7 +98,7 @@ export function renderAccount(state, authState) {
           </article>
           <article class="mini-stat">
             <span>E-mail</span>
-            <strong>${escapeHtml(email)}</strong>
+            <strong class="account-email">${escapeHtml(email)}</strong>
             <small>${user.emailVerified ? "E-mail verificado" : "Verificação pendente"}</small>
           </article>
           <article class="mini-stat">

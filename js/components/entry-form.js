@@ -9,7 +9,7 @@ export function entryForm(profile, entry = {}) {
       <div class="form-grid">
         <div class="field">
           <label for="date">Data</label>
-          <input id="date" name="date" type="date" required value="${escapeAttribute(entry.date || todayISO())}" />
+          <input id="date" name="date" type="date" required max="${todayISO()}" value="${escapeAttribute(entry.date || todayISO())}" />
         </div>
         <div class="field">
           <label for="weightKg">Peso (kg)</label>

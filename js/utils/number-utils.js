@@ -1,6 +1,7 @@
 export function toNumber(value) {
   if (value === null || value === undefined || value === "") return null;
-  const normalized = String(value).replace(",", ".");
+  const normalized = String(value).trim().replace(",", ".");
+  if (!normalized) return null;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }

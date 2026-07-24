@@ -30,3 +30,10 @@ export function addMonths(dateISO, months) {
   date.setMonth(date.getMonth() + months);
   return localISODate(date);
 }
+
+export function addDays(dateISO, days) {
+  if (!dateISO || !Number.isFinite(Number(days))) return null;
+  const date = new Date(`${dateISO}T00:00:00`);
+  date.setDate(date.getDate() + Math.round(Number(days)));
+  return localISODate(date);
+}
