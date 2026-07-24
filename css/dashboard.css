@@ -5,6 +5,22 @@
   align-items: center;
 }
 
+.dashboard-stack > * {
+  order: 4;
+}
+
+.dashboard-summary-card {
+  order: 1;
+}
+
+.dashboard-metrics {
+  order: 2;
+}
+
+.dashboard-stack > .activity-summary-card {
+  order: 3;
+}
+
 .hero-panel p {
   color: var(--muted);
 }
@@ -48,6 +64,18 @@
 }
 
 @media (max-width: 720px) {
+  .dashboard-stack > .activity-summary-card {
+    order: 1;
+  }
+
+  .dashboard-summary-card {
+    order: 2;
+  }
+
+  .dashboard-metrics {
+    order: 3;
+  }
+
   .hero-panel {
     grid-template-columns: 1fr;
   }

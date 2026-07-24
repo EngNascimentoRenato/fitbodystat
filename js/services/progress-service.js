@@ -137,79 +137,164 @@ export function getLatestEntry(profile, entries) {
   return enriched.at(-1) || null;
 }
 
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+export function getProgressMode(profile) {
+  if (profile.goalType === "maintenance") return "maintain";
+  if (profile.goalType === "weight-loss") return "loss";
+  if (["weight-gain", "muscle-gain", "recovery"].includes(profile.goalType)) return "gain";
+  return getGoalDirection(profile);
+}
+
+export function getMaintenanceStatus(profile, latest, toleranceKg = 1) {
+  const start = finiteNumber(profile.startWeightKg);
+  const goal = finiteNumber(getGoalWeight(profile));
+  const current = finiteNumber(latest?.weightKg) ?? start;
+  const center = goal ?? start;
+  if (center === null || current === null) return null;
+
+  const tolerance = Math.max(0.1, finiteNumber(profile.maintenanceToleranceKg) ?? toleranceKg);
+  const minimum = center - tolerance;
+  const maximum = center + tolerance;
+  const reached = current >= minimum && current <= maximum;
+  const distance = reached ? 0 : current < minimum ? minimum - current : current - maximum;
+  return { center, current, minimum, maximum, tolerance, reached, distance };
+}
+
+function targetIsOnPath(target, start, goal, mode) {
+  if (![target, start, goal].every(Number.isFinite)) return false;
+  if (mode === "loss") return target < start && target >= goal;
+  if (mode === "gain") return target > start && target <= goal;
+  return false;
+}
+
+function enrichWeightMilestone(milestone, current) {
+  const reached = milestone.mode === "gain"
+    ? current >= milestone.target
+    : current <= milestone.target;
+  const remaining = milestone.mode === "gain"
+    ? milestone.target - current
+    : current - milestone.target;
+  return { ...milestone, reached, remaining };
+}
+
+function uniqueWeightMilestones(milestones) {
+  return milestones.reduce((unique, milestone) => {
+    const duplicateIndex = unique.findIndex((candidate) =>
+      Math.abs(candidate.target - milestone.target) < 0.05
+    );
+    if (duplicateIndex === -1) unique.push(milestone);
+    else if (milestone.isGoal) unique[duplicateIndex] = milestone;
+    return unique;
+  }, []);
+}
+
 export function getMilestones(profile, latest) {
-  const start = profile.startWeightKg || latest?.weightKg || 0;
-  const height = profile.heightCm;
-  const current = latest?.weightKg || start;
-  const currentWaist = latest?.waistCm || profile.startWaistCm;
-  const obesityExit = weightForBmi(height, 30);
-  const normalLimit = weightForBmi(height, 25);
-  const goal = getGoalWeight(profile);
-  const direction = getGoalDirection(profile);
+  const start = finiteNumber(profile.startWeightKg) ?? finiteNumber(latest?.weightKg);
+  const current = finiteNumber(latest?.weightKg) ?? start;
+  const goal = finiteNumber(getGoalWeight(profile));
+  const mode = getProgressMode(profile);
+  if (start === null || current === null) return [];
 
-  if (!start || !current) return [];
+  if (mode === "maintain") {
+    const maintenance = getMaintenanceStatus(profile, latest);
+    if (!maintenance) return [];
+    return [{
+      title: "Faixa de manutenção",
+      detail: `${maintenance.minimum.toFixed(1).replace(".", ",")} a ${maintenance.maximum.toFixed(1).replace(".", ",")} kg`,
+      mode: "maintain",
+      reached: maintenance.reached,
+      remaining: maintenance.distance,
+      statusText: maintenance.reached
+        ? "Dentro da faixa"
+        : `${maintenance.distance.toFixed(1).replace(".", ",")} kg para retornar à faixa`
+    }];
+  }
 
-  const weightMilestones = direction === "gain"
-    ? [
-        {
-          title: "Ganho de 5% do peso",
-          target: start * 1.05,
-          detail: `${(start * 0.05).toFixed(1).replace(".", ",")} kg de ganho acumulado`,
-          mode: "gain"
-        },
-        {
-          title: "Ganho de 10% do peso",
-          target: start * 1.1,
-          detail: `${(start * 0.1).toFixed(1).replace(".", ",")} kg de ganho acumulado`,
-          mode: "gain"
-        }
-      ]
-    : [
-    {
-      title: "Perda de 5% do peso",
-      target: start * 0.95,
-      detail: `${(start * 0.05).toFixed(1).replace(".", ",")} kg de perda acumulada`,
-      mode: "loss"
-    },
-    {
-      title: "Perda de 10% do peso",
-      target: start * 0.9,
-      detail: `${(start * 0.1).toFixed(1).replace(".", ",")} kg de perda acumulada`,
-      mode: "loss"
+  if (goal === null || start === goal) return [];
+  const candidates = [];
+
+  if (mode === "loss") {
+    [
+      [5, start * 0.95],
+      [10, start * 0.9]
+    ].forEach(([percentage, target]) => {
+      if (targetIsOnPath(target, start, goal, mode)) {
+        candidates.push({
+          title: `Perda de ${percentage}% do peso`,
+          target,
+          detail: `${(start * percentage / 100).toFixed(1).replace(".", ",")} kg de perda acumulada`,
+          mode
+        });
+      }
+    });
+
+    const obesityExit = finiteNumber(weightForBmi(profile.heightCm, 29.9));
+    if (obesityExit !== null && targetIsOnPath(obesityExit, start, goal, mode)) {
+      candidates.push({
+        title: "Sair da obesidade",
+        target: obesityExit,
+        detail: "IMC abaixo de 30",
+        mode
+      });
     }
-  ];
 
-  return [
-    ...weightMilestones,
-    {
-      title: "Meta de peso",
-      target: goal,
-      detail: direction === "gain" ? "Peso final planejado para ganho" : "Peso final planejado para perda",
-      mode: direction
-    },
-    {
-      title: "Sair da obesidade",
-      target: obesityExit,
-      detail: "IMC abaixo de 30",
-      mode: "loss"
-    },
-    {
-      title: "Cintura abaixo de 102 cm",
-      waistTarget: 102,
-      detail: "Marco importante de circunferencia abdominal"
-    },
-    {
-      title: "Limite do peso normal",
-      target: normalLimit,
-      detail: "IMC abaixo de 25",
-      mode: "loss"
+    const normalLimit = finiteNumber(weightForBmi(profile.heightCm, 24.9));
+    if (normalLimit !== null && targetIsOnPath(normalLimit, start, goal, mode)) {
+      candidates.push({
+        title: "Entrar na faixa de peso normal",
+        target: normalLimit,
+        detail: "IMC abaixo de 25",
+        mode
+      });
     }
-  ].filter((milestone) => Number.isFinite(Number(milestone.target)) || Number.isFinite(Number(milestone.waistTarget))).map((milestone) => {
-    const isGain = milestone.mode === "gain";
-    const reached = milestone.waistTarget ? currentWaist < milestone.waistTarget : isGain ? current >= milestone.target : current <= milestone.target;
-    const remaining = milestone.waistTarget ? currentWaist - milestone.waistTarget : isGain ? milestone.target - current : current - milestone.target;
-    return { ...milestone, reached, remaining };
+  } else {
+    [25, 50, 75].forEach((percentage) => {
+      const target = start + (goal - start) * (percentage / 100);
+      candidates.push({
+        title: `${percentage}% do caminho até a meta`,
+        target,
+        detail: `${Math.abs(target - start).toFixed(1).replace(".", ",")} kg de ganho acumulado`,
+        mode
+      });
+    });
+  }
+
+  candidates.push({
+    title: "Meta de peso",
+    target: goal,
+    detail: mode === "gain" ? "Peso final planejado para ganho" : "Peso final planejado para perda",
+    mode,
+    isGoal: true
   });
+
+  const weightMilestones = uniqueWeightMilestones(candidates)
+    .sort((a, b) => mode === "gain" ? a.target - b.target : b.target - a.target)
+    .map((milestone) => enrichWeightMilestone(milestone, current));
+
+  const startWaist = finiteNumber(profile.startWaistCm);
+  const currentWaist = finiteNumber(latest?.waistCm) ?? startWaist;
+  const waistTarget = profile.sex === "female" ? 88 : profile.sex === "male" ? 102 : null;
+  if (mode === "loss"
+    && startWaist !== null
+    && currentWaist !== null
+    && waistTarget !== null
+    && startWaist > waistTarget) {
+    weightMilestones.push({
+      title: `Cintura abaixo de ${waistTarget} cm`,
+      waistTarget,
+      detail: "Marco complementar de circunferência abdominal",
+      mode: "waist",
+      reached: currentWaist < waistTarget,
+      remaining: currentWaist - waistTarget
+    });
+  }
+
+  return weightMilestones;
 }
 
 export function nextMilestone(profile, latest) {

@@ -7,20 +7,60 @@ import {
   enrichEntries,
   generatePlannedSeries,
   getLatestEntry,
+  getMaintenanceStatus,
   getMilestones,
+  getProgressMode,
   goalProgress,
   nextMilestone
 } from "../services/progress-service.js";
 import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
 import { formatDate } from "../utils/date-utils.js";
 import { weeklyActivityCard } from "../components/activity-summary.js";
+import { formatActivityMinutes, weeklyActivitySummary } from "../services/activity-service.js";
+
+function dashboardSummary(profile, latest, activities) {
+  const mode = getProgressMode(profile);
+  const activity = weeklyActivitySummary(activities, profile.weeklyActivityGoalDays);
+  const targetMinutes = activity.goalDays * (Number(profile.averageActivityDurationMinutes) || 0);
+
+  if (mode === "maintain") {
+    const maintenance = getMaintenanceStatus(profile, latest);
+    const activityDetail = targetMinutes
+      ? `${formatActivityMinutes(activity.totalMinutes)} de ${formatActivityMinutes(targetMinutes)} planejados nesta semana.`
+      : `${activity.completedDays} de ${activity.goalDays} dias ativos nesta semana.`;
+    if (!maintenance) {
+      return {
+        title: "Construa sua consistência semanal",
+        detail: activityDetail,
+        progress: activity.progress,
+        ringLabel: "da semana"
+      };
+    }
+    const position = maintenance.current > maintenance.maximum ? "acima" : "abaixo";
+    return {
+      title: maintenance.reached
+        ? "Peso dentro da faixa de manutenção"
+        : `${maintenance.distance.toFixed(1).replace(".", ",")} kg ${position} da faixa`,
+      detail: activityDetail,
+      progress: activity.progress,
+      ringLabel: "da semana"
+    };
+  }
+
+  const next = nextMilestone(profile, latest);
+  return {
+    title: latest ? `Último registro em ${formatDate(latest.date)}` : "Comece pelo primeiro registro",
+    detail: next ? `Próximo marco: ${next.title}.` : "Todas as principais metas foram alcançadas.",
+    progress: goalProgress(profile, latest),
+    ringLabel: "da meta"
+  };
+}
 
 export function renderDashboard(state, routePrefix = "", options = {}) {
   const { profile, entries } = state;
   const enriched = enrichEntries(profile, entries);
   const latest = getLatestEntry(profile, entries);
-  const progress = goalProgress(profile, latest);
-  const next = nextMilestone(profile, latest);
+  const summary = dashboardSummary(profile, latest, state.activities || []);
   const startDate = profile.startDate || latest?.date;
   const startTime = startDate ? new Date(`${startDate}T00:00:00`).getTime() : Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
@@ -44,25 +84,25 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
   const evolutionOnly = options.presentationMode === "evolution";
 
   return `
-    <div class="view-stack">
-      <section class="card hero-panel">
+    <div class="view-stack dashboard-stack">
+      ${weeklyActivityCard(profile, state.activities || [], routePrefix)}
+
+      <section class="card hero-panel dashboard-summary-card">
         <div>
           <p class="eyebrow">Resumo atual</p>
-          <h2>${latest ? `Último registro em ${formatDate(latest.date)}` : "Comece pelo primeiro registro"}</h2>
-          <p>${next ? `Próximo marco: ${next.title}.` : "Todos as principais metas foram alcançadas."}</p>
-          ${progressBar(progress)}
+          <h2>${summary.title}</h2>
+          <p>${summary.detail}</p>
+          ${progressBar(summary.progress)}
         </div>
-        ${progressRing(progress, "da meta")}
+        ${progressRing(summary.progress, summary.ringLabel)}
       </section>
 
-      ${evolutionOnly ? "" : `<section class="grid four">
-        ${statCard("Peso atual", formatKg(latest?.weightKg), `${formatKg(latest?.accumulatedLoss || 0)} de diferença`)}
+      ${evolutionOnly ? "" : `<section class="grid four dashboard-metrics">
+        ${statCard("Peso atual", formatKg(latest?.weightKg), `${formatKg(latest?.weightKg - profile.startWeightKg)} desde o início`)}
         ${statCard("IMC", formatDecimal(latest?.bmi, 1), latest?.bmiClass || "Sem dados")}
         ${statCard("Cintura", formatCm(latest?.waistCm), `Inicial: ${formatCm(profile.startWaistCm)}`)}
         ${statCard("Gordura corporal", formatPercent(latest?.bodyFat), latest?.bodyFatClass || "Por medidas ou medidor")}
       </section>`}
-
-      ${weeklyActivityCard(profile, state.activities || [], routePrefix)}
 
       ${evolutionOnly
         ? lineChart({ title: "Peso real vs planejado", description: "A linha planejada cobre todo o prazo da meta.", actual: actualWeight, planned: plannedWeight, unit: "kg" })

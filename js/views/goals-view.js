@@ -4,7 +4,9 @@ import {
   getGoalDirection,
   getGoalWeight,
   getLatestEntry,
+  getMaintenanceStatus,
   getMilestones,
+  getProgressMode,
   getWeeklyChangeGoal
 } from "../services/progress-service.js";
 import { milestoneList } from "../components/milestone-list.js";
@@ -33,14 +35,15 @@ function goalLabel(profile) {
 export function renderGoals(state) {
   const latest = getLatestEntry(state.profile, state.entries);
   const monthlyPlan = normalizeMonthlyPlan(state.profile, state.goalPlan);
-  const deadline = getGoalDeadlineMonths(state.profile);
+  const progressMode = getProgressMode(state.profile);
+  const deadline = progressMode === "maintain" ? null : getGoalDeadlineMonths(state.profile);
   const goalWeight = getGoalWeight(state.profile);
+  const maintenance = getMaintenanceStatus(state.profile, latest);
   const finalBmi = calculateBmi(goalWeight, state.profile.heightCm);
   const totalChange = goalWeight !== null && state.profile.startWeightKg !== null
     ? Math.abs(goalWeight - state.profile.startWeightKg)
     : null;
-  const direction = getGoalDirection(state.profile);
-  const weeklyLabel = direction === "loss" ? "Perda semanal" : direction === "gain" ? "Ganho semanal" : "Variação semanal";
+  const weeklyLabel = progressMode === "loss" ? "Perda semanal" : "Ganho semanal";
   const deadlineDate = deadline
     ? addMonths(state.profile.startDate || todayISO(), Math.round(deadline))
     : null;
@@ -53,12 +56,18 @@ export function renderGoals(state) {
           <h2>Ritmo sustentável</h2>
           <dl class="goal-summary-list">
             <div><dt>Objetivo</dt><dd>${escapeHtml(goalLabel(state.profile))}</dd></div>
-            <div><dt>Peso final desejado</dt><dd>${formatKg(goalWeight)}</dd></div>
+            <div><dt>${progressMode === "maintain" ? "Faixa de manutenção" : "Peso final desejado"}</dt><dd>${progressMode === "maintain" && maintenance
+              ? `${formatKg(maintenance.minimum)} a ${formatKg(maintenance.maximum)}`
+              : formatKg(goalWeight)}</dd></div>
             <div><dt>IMC final estimado</dt><dd>${formatDecimal(finalBmi, 1)}</dd></div>
-            <div><dt>Mudança total planejada</dt><dd>${formatKg(totalChange)}</dd></div>
-            <div><dt>${weeklyLabel}</dt><dd>${formatKg(getWeeklyChangeGoal(state.profile))}</dd></div>
-            <div><dt>Prazo estimado</dt><dd>${deadline ? `${formatDecimal(deadline, 1)} meses` : "-"}</dd></div>
-            <div><dt>Data prevista</dt><dd>${formatDate(deadlineDate)}</dd></div>
+            ${progressMode === "maintain"
+              ? `<div><dt>Situação atual</dt><dd>${maintenance?.reached ? "Dentro da faixa" : "Fora da faixa"}</dd></div>`
+              : `
+                <div><dt>Mudança total planejada</dt><dd>${formatKg(totalChange)}</dd></div>
+                <div><dt>${weeklyLabel}</dt><dd>${formatKg(getWeeklyChangeGoal(state.profile))}</dd></div>
+                <div><dt>Prazo estimado</dt><dd>${deadline ? `${formatDecimal(deadline, 1)} meses` : "-"}</dd></div>
+                <div><dt>Data prevista</dt><dd>${formatDate(deadlineDate)}</dd></div>
+              `}
             <div><dt>Atividades</dt><dd>${state.profile.weeklyActivityGoalDays || 3} dias${weeklyActivityMinutes
               ? ` · ${formatActivityMinutes(weeklyActivityMinutes)} por semana`
               : ""}</dd></div>
