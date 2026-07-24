@@ -4,6 +4,7 @@ import { listPatientsForProfessional } from "../data/firestore-store.js";
 import {
   agendaEventPerson,
   agendaPeriodLabel,
+  agendaStatusColor,
   agendaViewDays,
   cancellationBlockInput,
   eventConflicts,
@@ -110,9 +111,7 @@ function eventTitle(event) {
 }
 
 function eventColor(event) {
-  return /^#[0-9a-f]{6}$/i.test(String(event.color || ""))
-    ? event.color
-    : event.type === "block" ? "#657076" : "#25636f";
+  return agendaStatusColor(event.status);
 }
 
 function renderStatusBadge(status) {
@@ -121,7 +120,7 @@ function renderStatusBadge(status) {
     : status === "confirmed" || status === "completed"
       ? "success"
       : status === "blocked" ? "neutral" : "";
-  return `<span class="agenda-status ${tone}">${escapeHtml(statusLabels[status] || status)}</span>`;
+  return `<span class="agenda-status event-status ${tone}" style="--status-color:${agendaStatusColor(status)}">${escapeHtml(statusLabels[status] || status)}</span>`;
 }
 
 function renderEventButton(event, compact = false) {
@@ -331,7 +330,6 @@ function blankDraft(type = "appointment", date = agendaUi.anchor) {
     modality: "in-person",
     location: "",
     status: type === "block" ? "blocked" : "scheduled",
-    color: type === "block" ? "#657076" : "#25636f",
     bookingMode: "exclusive",
     capacity: 2,
     recurrence: { frequency: "none", weekDays: [], untilDate: null },
@@ -339,12 +337,15 @@ function blankDraft(type = "appointment", date = agendaUi.anchor) {
   };
 }
 
-function renderEditor(patients) {
+function renderEditor(patients, professionalProfile = {}) {
   const event = agendaUi.draft || blankDraft();
   const isEdit = Boolean(event.id);
   const isBlock = event.type === "block";
   const patientValue = event.patientId || "__guest";
   const patient = selectedPatient(event, patients);
+  const locations = (professionalProfile.locations || []).filter((location) => location?.name);
+  const knownLocation = locations.find((location) => location.name === event.location);
+  const locationChoice = event.location ? knownLocation?.name || "__custom" : "";
   const bookingMode = event.bookingMode || "exclusive";
   const recurrence = event.recurrence || { frequency: "none", weekDays: [], untilDate: null };
   const recurrenceDays = new Set(recurrence.weekDays || []);
@@ -378,23 +379,13 @@ function renderEditor(patients) {
           </div>
         `}
 
-        <div class="form-grid">
-          <div class="field">
-            <label for="agenda-title">Título</label>
-            <input id="agenda-title" name="title" maxlength="80" required value="${escapeAttribute(event.title || "")}" />
-          </div>
+        <fieldset class="agenda-form-section">
+          <legend>Quando</legend>
           <div class="field">
             <label for="agenda-date">Data</label>
             <input id="agenda-date" name="date" type="date" required value="${escapeAttribute(event.date)}" />
           </div>
-          <div class="field">
-            <label for="agenda-color">Cor</label>
-            <input id="agenda-color" name="color" type="color" value="${escapeAttribute(event.color || (isBlock ? "#657076" : "#25636f"))}" />
-          </div>
-        </div>
-
-        <div class="agenda-appointment-fields" ${isBlock ? "hidden" : ""}>
-          <div class="form-grid">
+          <div class="form-grid agenda-appointment-time-fields" ${isBlock ? "hidden" : ""}>
             <div class="field">
               <label for="agenda-start-time">Horário inicial</label>
               <input id="agenda-start-time" name="startTime" type="time" required value="${escapeAttribute(event.startTime)}" />
@@ -404,126 +395,154 @@ function renderEditor(patients) {
               <input id="agenda-duration" name="durationMinutes" type="number" min="15" max="720" step="15" required
                 value="${escapeAttribute(event.durationMinutes)}" />
             </div>
-          <div class="field">
-            <label for="agenda-patient">Paciente ou pessoa avulsa</label>
-            <select id="agenda-patient" name="patientId">
-              ${patients.map((item) => {
-                const id = patientId(item);
-                return `<option value="${escapeAttribute(id)}" ${patientValue === id ? "selected" : ""}>${escapeHtml(item.name || item.email)}</option>`;
-              }).join("")}
-              <option value="__guest" ${patientValue === "__guest" ? "selected" : ""}>Pessoa ainda não cadastrada</option>
-            </select>
           </div>
-          <div class="field agenda-guest-field" ${patientValue !== "__guest" ? "hidden" : ""}>
-            <label for="agenda-guest-name">Nome da pessoa</label>
-            <input id="agenda-guest-name" name="guestName" maxlength="80" value="${escapeAttribute(event.guestName || "")}" />
-          </div>
-          <div class="field">
-            <label for="agenda-modality">Modalidade</label>
-            <select id="agenda-modality" name="modality">
-              ${Object.entries(modalityLabels).map(([value, label]) =>
-                `<option value="${value}" ${event.modality === value ? "selected" : ""}>${label}</option>`
-              ).join("")}
-            </select>
-          </div>
-          <div class="field">
-            <label for="agenda-location">Local ou link</label>
-            <input id="agenda-location" name="location" maxlength="160" value="${escapeAttribute(event.location || "")}" />
-          </div>
-          <div class="field">
-            <label for="agenda-status">Estado</label>
-            ${event.status === "cancelled" ? `
-              <input type="hidden" name="status" value="cancelled" />
-              <p class="agenda-readonly-value">${renderStatusBadge("cancelled")}</p>
-            ` : `
-              <select id="agenda-status" name="status">
-                ${Object.entries(statusLabels)
-                  .filter(([value]) => !["blocked", "cancelled"].includes(value))
-                  .map(([value, label]) =>
-                    `<option value="${value}" ${event.status === value ? "selected" : ""}>${label}</option>`
-                  ).join("")}
-              </select>
-            `}
-          </div>
-          </div>
-
-          <fieldset class="agenda-booking-field">
-            <legend>Ocupação do horário</legend>
-            <div class="agenda-booking-switch">
-              <label>
-                <input type="radio" name="bookingMode" value="exclusive" ${bookingMode === "exclusive" ? "checked" : ""} />
-                <span><strong>Exclusivo</strong><small>Bloqueia o período para os demais</small></span>
-              </label>
-              <label>
-                <input type="radio" name="bookingMode" value="group" ${bookingMode === "group" ? "checked" : ""} />
-                <span><strong>Coletivo</strong><small>Permite participantes até a capacidade</small></span>
-              </label>
-              <label>
-                <input type="radio" name="bookingMode" value="informational" ${bookingMode === "informational" ? "checked" : ""} />
-                <span><strong>Informativo</strong><small>Não bloqueia novos agendamentos</small></span>
-              </label>
+          <div class="agenda-block-fields" ${!isBlock ? "hidden" : ""}>
+            <label class="consent-option agenda-all-day">
+              <input type="checkbox" name="allDay" value="true" ${event.allDay ? "checked" : ""} />
+              <span>Bloquear o dia inteiro</span>
+            </label>
+            <div class="form-grid agenda-block-time-fields" ${event.allDay ? "hidden" : ""}>
+              <div class="field">
+                <label for="agenda-block-start">Horário inicial</label>
+                <input id="agenda-block-start" name="blockStartTime" type="time" value="${escapeAttribute(event.startTime)}" />
+              </div>
+              <div class="field">
+                <label for="agenda-end-time">Horário final</label>
+                <input id="agenda-end-time" name="endTime" type="time" value="${escapeAttribute(endTime)}" />
+              </div>
             </div>
+            <div class="field">
+              <label for="agenda-recurrence">Repetição</label>
+              <select id="agenda-recurrence" name="recurrenceFrequency">
+                <option value="none" ${recurrence.frequency !== "weekly" ? "selected" : ""}>Não repetir</option>
+                <option value="weekly" ${recurrence.frequency === "weekly" ? "selected" : ""}>Semanalmente</option>
+              </select>
+            </div>
+            <div class="agenda-recurrence-fields" ${recurrence.frequency !== "weekly" ? "hidden" : ""}>
+              <fieldset>
+                <legend>Dias da semana</legend>
+                <div class="agenda-weekday-picker">
+                  ${weekDays.map((day) => `
+                    <label>
+                      <input type="checkbox" name="recurrenceWeekDays" value="${day.index}" ${recurrenceDays.has(day.index) ? "checked" : ""} />
+                      <span>${day.label.slice(0, 3)}</span>
+                    </label>
+                  `).join("")}
+                </div>
+              </fieldset>
+              <div class="field">
+                <label for="agenda-recurrence-until">Repetir até</label>
+                <input id="agenda-recurrence-until" name="recurrenceUntilDate" type="date"
+                  value="${escapeAttribute(recurrence.untilDate || "")}" />
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="agenda-appointment-fields" ${isBlock ? "hidden" : ""}>
+          <fieldset class="agenda-form-section">
+            <legend>Atendimento</legend>
+            <div class="form-grid">
+              <div class="field">
+                <label for="agenda-patient">Paciente ou pessoa avulsa</label>
+                <select id="agenda-patient" name="patientId">
+                  ${patients.map((item) => {
+                    const id = patientId(item);
+                    return `<option value="${escapeAttribute(id)}" ${patientValue === id ? "selected" : ""}>${escapeHtml(item.name || item.email)}</option>`;
+                  }).join("")}
+                  <option value="__guest" ${patientValue === "__guest" ? "selected" : ""}>Pessoa ainda não cadastrada</option>
+                </select>
+              </div>
+              <div class="field agenda-guest-field" ${patientValue !== "__guest" ? "hidden" : ""}>
+                <label for="agenda-guest-name">Nome da pessoa</label>
+                <input id="agenda-guest-name" name="guestName" maxlength="80" value="${escapeAttribute(event.guestName || "")}" />
+              </div>
+              <div class="field">
+                <label for="agenda-modality">Modalidade</label>
+                <select id="agenda-modality" name="modality">
+                  ${Object.entries(modalityLabels).map(([value, label]) =>
+                    `<option value="${value}" ${event.modality === value ? "selected" : ""}>${label}</option>`
+                  ).join("")}
+                </select>
+              </div>
+              <div class="field">
+                <label for="agenda-location-choice">Local ou link</label>
+                <select id="agenda-location-choice" name="locationChoice">
+                  <option value="" ${!locationChoice ? "selected" : ""}>Não informado</option>
+                  ${locations.map((location) =>
+                    `<option value="${escapeAttribute(location.name)}" ${locationChoice === location.name ? "selected" : ""}>${escapeHtml(location.name)}</option>`
+                  ).join("")}
+                  <option value="__custom" ${locationChoice === "__custom" ? "selected" : ""}>Outro local ou link</option>
+                </select>
+              </div>
+              <div class="field agenda-custom-location-field" ${locationChoice !== "__custom" ? "hidden" : ""}>
+                <label for="agenda-location-custom">Informe o local ou link</label>
+                <input id="agenda-location-custom" name="locationCustom" maxlength="160"
+                  value="${escapeAttribute(locationChoice === "__custom" ? event.location : "")}" />
+              </div>
+            </div>
+            ${patient?.phone ? `
+              <p class="agenda-contact">
+                Telefone compartilhado: <a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>
+              </p>
+            ` : ""}
           </fieldset>
 
-          <div class="field agenda-capacity-field" ${bookingMode !== "group" ? "hidden" : ""}>
-            <label for="agenda-capacity">Capacidade máxima</label>
-            <input id="agenda-capacity" name="capacity" type="number" min="2" max="100" value="${escapeAttribute(event.capacity || 2)}" />
-          </div>
-        </div>
-
-        <div class="agenda-block-fields" ${!isBlock ? "hidden" : ""}>
-          <label class="consent-option agenda-all-day">
-            <input type="checkbox" name="allDay" value="true" ${event.allDay ? "checked" : ""} />
-            <span>Bloquear o dia inteiro</span>
-          </label>
-          <div class="form-grid agenda-block-time-fields" ${event.allDay ? "hidden" : ""}>
-            <div class="field">
-              <label for="agenda-block-start">Horário inicial</label>
-              <input id="agenda-block-start" name="blockStartTime" type="time" value="${escapeAttribute(event.startTime)}" />
-            </div>
-            <div class="field">
-              <label for="agenda-end-time">Horário final</label>
-              <input id="agenda-end-time" name="endTime" type="time" value="${escapeAttribute(endTime)}" />
-            </div>
-          </div>
-          <div class="field">
-            <label for="agenda-recurrence">Repetição</label>
-            <select id="agenda-recurrence" name="recurrenceFrequency">
-              <option value="none" ${recurrence.frequency !== "weekly" ? "selected" : ""}>Não repetir</option>
-              <option value="weekly" ${recurrence.frequency === "weekly" ? "selected" : ""}>Semanalmente</option>
-            </select>
-          </div>
-          <div class="agenda-recurrence-fields" ${recurrence.frequency !== "weekly" ? "hidden" : ""}>
-            <fieldset>
-              <legend>Dias da semana</legend>
-              <div class="agenda-weekday-picker">
-                ${weekDays.map((day) => `
-                  <label>
-                    <input type="checkbox" name="recurrenceWeekDays" value="${day.index}" ${recurrenceDays.has(day.index) ? "checked" : ""} />
-                    <span>${day.label.slice(0, 3)}</span>
-                  </label>
-                `).join("")}
+          <fieldset class="agenda-form-section">
+            <legend>Organização da agenda</legend>
+            ${isEdit ? `
+              <div class="field agenda-status-field">
+                <label for="agenda-status">Estado</label>
+                ${event.status === "cancelled" ? `
+                  <input type="hidden" name="status" value="cancelled" />
+                  <p class="agenda-readonly-value">${renderStatusBadge("cancelled")}</p>
+                ` : `
+                  <select id="agenda-status" name="status">
+                    ${Object.entries(statusLabels)
+                      .filter(([value]) => !["blocked", "cancelled"].includes(value))
+                      .map(([value, label]) =>
+                        `<option value="${value}" ${event.status === value ? "selected" : ""}>${label}</option>`
+                      ).join("")}
+                  </select>
+                `}
+              </div>
+            ` : `<input type="hidden" name="status" value="scheduled" />`}
+            <fieldset class="agenda-booking-field">
+              <legend>Ocupação do horário</legend>
+              <div class="agenda-booking-switch">
+                <label>
+                  <input type="radio" name="bookingMode" value="exclusive" ${bookingMode === "exclusive" ? "checked" : ""} />
+                  <span><strong>Exclusivo</strong><small>Bloqueia o período para os demais</small></span>
+                </label>
+                <label>
+                  <input type="radio" name="bookingMode" value="group" ${bookingMode === "group" ? "checked" : ""} />
+                  <span><strong>Coletivo</strong><small>Permite participantes até a capacidade</small></span>
+                </label>
+                <label>
+                  <input type="radio" name="bookingMode" value="informational" ${bookingMode === "informational" ? "checked" : ""} />
+                  <span><strong>Informativo</strong><small>Não bloqueia novos agendamentos</small></span>
+                </label>
               </div>
             </fieldset>
-            <div class="field">
-              <label for="agenda-recurrence-until">Repetir até</label>
-              <input id="agenda-recurrence-until" name="recurrenceUntilDate" type="date"
-                value="${escapeAttribute(recurrence.untilDate || "")}" />
+            <div class="field agenda-capacity-field" ${bookingMode !== "group" ? "hidden" : ""}>
+              <label for="agenda-capacity">Capacidade máxima</label>
+              <input id="agenda-capacity" name="capacity" type="number" min="2" max="100" value="${escapeAttribute(event.capacity || 2)}" />
             </div>
+          </fieldset>
+        </div>
+
+        <fieldset class="agenda-form-section">
+          <legend>Detalhes</legend>
+          <div class="field">
+            <label for="agenda-title">Título</label>
+            <input id="agenda-title" name="title" maxlength="80" required value="${escapeAttribute(event.title || "")}" />
           </div>
-        </div>
-
-        ${patient?.phone ? `
-          <p class="agenda-contact">
-            Telefone compartilhado: <a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>
-          </p>
-        ` : ""}
-
-        <div class="field">
-          <label for="agenda-private-notes">Observações privadas</label>
-          <textarea id="agenda-private-notes" name="privateNotes" maxlength="1000">${escapeHtml(event.privateNotes || "")}</textarea>
-          <span class="help-text">Visíveis somente para você nesta versão.</span>
-        </div>
+          <div class="field">
+            <label for="agenda-private-notes">Observações privadas</label>
+            <textarea id="agenda-private-notes" name="privateNotes" maxlength="1000">${escapeHtml(event.privateNotes || "")}</textarea>
+            <span class="help-text">Visíveis somente para você nesta versão.</span>
+          </div>
+        </fieldset>
 
         <footer class="agenda-dialog-actions">
           ${isEdit ? `<button class="button danger" id="delete-agenda-event" type="button">Excluir</button>` : "<span></span>"}
@@ -876,7 +895,7 @@ export function renderAgenda(authState) {
     ${agendaUi.detailOpen ? renderEventDetails(detailEvent, patients) : ""}
     ${agendaUi.cancelOpen ? renderCancellationDialog(detailEvent) : ""}
     ${agendaUi.reopenOpen ? renderReopenDialog(detailEvent, linkedCancellationBlock) : ""}
-    ${agendaUi.editorOpen ? renderEditor(patients) : ""}
+    ${agendaUi.editorOpen ? renderEditor(patients, authState.professionalProfile) : ""}
     ${agendaUi.availabilityOpen ? renderAvailabilityEditor() : ""}
   `;
 }
@@ -976,22 +995,22 @@ function updateEditorVisibility() {
   const allDay = form.elements.allDay?.checked === true;
   const recurrence = form.elements.recurrenceFrequency?.value || "none";
   const bookingMode = form.elements.bookingMode?.value || "exclusive";
+  const customLocation = form.elements.locationChoice?.value === "__custom";
   const heading = document.querySelector(".agenda-dialog-header h2");
   const title = form.elements.title;
-  const color = form.elements.color;
   if (heading) heading.textContent = isBlock ? "Bloqueio de horário" : "Compromisso";
   if (title?.value === "Atendimento" && isBlock) title.value = "Indisponível";
   else if (title?.value === "Indisponível" && !isBlock) title.value = "Atendimento";
-  if (color) {
-    if (isBlock && color.value === "#25636f") color.value = "#657076";
-    else if (!isBlock && color.value === "#657076") color.value = "#25636f";
-  }
+  document.querySelector(".agenda-appointment-time-fields")?.toggleAttribute("hidden", isBlock);
   document.querySelector(".agenda-appointment-fields")?.toggleAttribute("hidden", isBlock);
   document.querySelector(".agenda-block-fields")?.toggleAttribute("hidden", !isBlock);
   document.querySelector(".agenda-guest-field")?.toggleAttribute("hidden", isBlock || !guest);
   document.querySelector(".agenda-block-time-fields")?.toggleAttribute("hidden", allDay);
   document.querySelector(".agenda-recurrence-fields")?.toggleAttribute("hidden", recurrence !== "weekly");
   document.querySelector(".agenda-capacity-field")?.toggleAttribute("hidden", bookingMode !== "group");
+  document.querySelector(".agenda-custom-location-field")?.toggleAttribute("hidden", !customLocation);
+  document.querySelectorAll(".agenda-appointment-time-fields input")
+    .forEach((control) => { control.disabled = isBlock; });
   document.querySelectorAll(".agenda-appointment-fields input, .agenda-appointment-fields select")
     .forEach((control) => { control.disabled = isBlock; });
   document.querySelectorAll(".agenda-block-fields input, .agenda-block-fields select")
@@ -999,6 +1018,10 @@ function updateEditorVisibility() {
   if (form.elements.blockStartTime) form.elements.blockStartTime.disabled = !isBlock || allDay;
   if (form.elements.endTime) form.elements.endTime.disabled = !isBlock || allDay;
   if (form.elements.guestName) form.elements.guestName.required = !isBlock && guest;
+  if (form.elements.locationCustom) {
+    form.elements.locationCustom.disabled = isBlock || !customLocation;
+    form.elements.locationCustom.required = !isBlock && customLocation;
+  }
   if (form.elements.capacity) {
     form.elements.capacity.required = !isBlock && bookingMode === "group";
     form.elements.capacity.disabled = isBlock || bookingMode !== "group";
@@ -1054,6 +1077,7 @@ function eventInputFromForm(form, patients) {
     patientId: patient ? patientId(patient) : "",
     patientName: patient?.name || patient?.email || "",
     guestName: data.patientId === "__guest" ? data.guestName : "",
+    location: data.locationChoice === "__custom" ? data.locationCustom : data.locationChoice || "",
     bookingMode: type === "appointment" ? data.bookingMode || "exclusive" : "exclusive",
     recurrence: {
       frequency: type === "block" ? data.recurrenceFrequency || "none" : "none",
@@ -1345,6 +1369,7 @@ export function bindAgenda(context) {
   document.querySelectorAll('input[name="type"]').forEach((input) => input.addEventListener("change", updateEditorVisibility));
   document.querySelectorAll('input[name="bookingMode"]').forEach((input) => input.addEventListener("change", updateEditorVisibility));
   document.getElementById("agenda-patient")?.addEventListener("change", updateEditorVisibility);
+  document.getElementById("agenda-location-choice")?.addEventListener("change", updateEditorVisibility);
   document.querySelector('input[name="allDay"]')?.addEventListener("change", updateEditorVisibility);
   document.getElementById("agenda-recurrence")?.addEventListener("change", updateEditorVisibility);
   updateEditorVisibility();

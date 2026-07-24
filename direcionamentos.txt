@@ -31,9 +31,9 @@ ETAPA 2 - ESTRUTURA PROFISSIONAL E VÍNCULOS
      fisioterapeutas, psicólogos e outras áreas de saúde e bem-estar.
 
 2. Regiões e locais de atendimento
-   - Cadastrar cidades, regiões e locais de atendimento.
-   - Informar atendimento presencial, on-line ou em domicílio.
-   - Reutilizar esses locais na agenda profissional.
+   - Evoluir os locais básicos já cadastrados com cidade, região, coordenadas e
+     visibilidade pública opcional.
+   - Usar as modalidades e os locais cadastrados na futura busca de profissionais.
 
 3. Ciclo de vida do vínculo profissional-paciente
    - Prever estados como pendente, ativo, requer atenção, em pausa e encerrado.

@@ -249,6 +249,11 @@
   background: var(--border);
 }
 
+.agenda-status.event-status {
+  color: var(--status-color);
+  background: color-mix(in srgb, var(--status-color) 13%, var(--surface));
+}
+
 .agenda-empty-slot {
   min-height: 42px;
   color: var(--muted);
@@ -448,6 +453,28 @@
 
 .agenda-dialog-header h2 {
   margin: 0;
+}
+
+.agenda-form-section {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 0 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.agenda-form-section > legend {
+  padding: 0 0.4rem 0 0;
+  font-weight: 800;
+}
+
+.agenda-status-field {
+  max-width: 320px;
+}
+
+.agenda-custom-location-field {
+  grid-column: 1 / -1;
 }
 
 .agenda-detail-heading {
@@ -749,6 +776,7 @@
 }
 
 .agenda-appointment-fields[hidden],
+.agenda-appointment-time-fields[hidden],
 .agenda-block-fields[hidden],
 .agenda-block-time-fields[hidden],
 .agenda-custom-block-fields[hidden],
@@ -756,6 +784,10 @@
 .agenda-guest-field[hidden],
 .agenda-recurrence-fields[hidden],
 .agenda-capacity-field[hidden] {
+  display: none;
+}
+
+.agenda-custom-location-field[hidden] {
   display: none;
 }
 

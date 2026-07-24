@@ -4,6 +4,19 @@ const modalities = new Set(["in-person", "online", "home", "other"]);
 const bookingModes = new Set(["exclusive", "group", "informational"]);
 const recurrenceFrequencies = new Set(["none", "weekly"]);
 
+const statusColors = {
+  scheduled: "#b66a16",
+  confirmed: "#2f7d68",
+  completed: "#3d6f9e",
+  cancelled: "#7a8280",
+  "no-show": "#b64d4d",
+  blocked: "#596166"
+};
+
+export function agendaStatusColor(status) {
+  return statusColors[status] || statusColors.scheduled;
+}
+
 export const weekDays = [
   { key: "monday", label: "Segunda-feira", index: 1 },
   { key: "tuesday", label: "Terça-feira", index: 2 },
@@ -132,9 +145,7 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
   const title = type === "block"
     ? cleanText(input.title, "Indisponível") || "Indisponível"
     : cleanText(input.title, "Atendimento") || "Atendimento";
-  const color = /^#[0-9a-f]{6}$/i.test(cleanText(input.color))
-    ? cleanText(input.color).toLowerCase()
-    : type === "block" ? "#657076" : "#25636f";
+  const color = agendaStatusColor(status);
   const bookingMode = type === "appointment" && bookingModes.has(input.bookingMode)
     ? input.bookingMode
     : type === "appointment" ? "exclusive" : "exclusive";

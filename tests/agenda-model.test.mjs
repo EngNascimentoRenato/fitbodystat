@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   agendaEventPerson,
   agendaPeriodLabel,
+  agendaStatusColor,
   agendaViewDays,
   cancellationBlockInput,
   eventConflicts,
@@ -96,6 +97,15 @@ test("compromisso é exclusivo por padrão e coletivo aceita capacidade", () => 
   assert.equal(exclusive.bookingMode, "exclusive");
   assert.equal(exclusive.blocksAvailability, true);
   assert.equal(group.capacity, 12);
+  assert.equal(exclusive.color, agendaStatusColor("scheduled"));
+  assert.equal(group.color, agendaStatusColor("scheduled"));
+});
+
+test("cores da agenda são determinadas pelo estado", () => {
+  const colors = ["scheduled", "confirmed", "completed", "no-show", "cancelled", "blocked"]
+    .map(agendaStatusColor);
+  assert.equal(new Set(colors).size, colors.length);
+  assert.equal(agendaStatusColor("confirmed"), "#2f7d68");
 });
 
 test("cancelamento preserva o compromisso e registra seu motivo", () => {

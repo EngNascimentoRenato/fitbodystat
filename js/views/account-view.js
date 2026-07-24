@@ -8,6 +8,7 @@ import {
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { saveProfessionalProfile } from "../data/firestore-store.js";
+import { normalizeProfessionalLocations } from "../models/professional-profile-model.js";
 import { formatPhone, normalizePhone, phoneIsValid } from "../utils/phone-utils.js";
 
 const roleLabels = {
@@ -18,6 +19,31 @@ const roleLabels = {
 
 function passwordIsStrong(password) {
   return password.length >= 8 && /[A-Za-zÀ-ÿ]/.test(password) && /\d/.test(password);
+}
+
+function professionalLocationRow(location = {}, index = 0) {
+  return `
+    <div class="professional-location-row" data-professional-location>
+      <input type="hidden" name="locationId" value="${escapeAttribute(location.id || `location-${index + 1}`)}" />
+      <div class="field">
+        <label for="professional-location-name-${index}">Nome do local</label>
+        <input id="professional-location-name-${index}" name="locationName" maxlength="80" required
+          placeholder="Ex.: Consultório Centro" value="${escapeAttribute(location.name || "")}" />
+      </div>
+      <div class="field">
+        <label for="professional-location-address-${index}">Endereço <span class="muted">(opcional)</span></label>
+        <input id="professional-location-address-${index}" name="locationAddress" maxlength="220"
+          value="${escapeAttribute(location.address || "")}" />
+      </div>
+      <div class="field">
+        <label for="professional-location-contact-${index}">Contato <span class="muted">(opcional)</span></label>
+        <input id="professional-location-contact-${index}" name="locationContact" maxlength="120"
+          value="${escapeAttribute(location.contact || "")}" />
+      </div>
+      <button class="icon-button professional-location-remove" type="button"
+        data-remove-professional-location aria-label="Remover local">×</button>
+    </div>
+  `;
 }
 
 function professionalProfileEditor(state, authState) {
@@ -31,6 +57,7 @@ function professionalProfileEditor(state, authState) {
     ["physical-educator", "Profissional de educação física"],
     ["other", "Outra"]
   ];
+  const locations = profile.locations || [];
   return `
     <section class="card">
       <h2>Perfil profissional</h2>
@@ -65,6 +92,15 @@ function professionalProfileEditor(state, authState) {
               value="${escapeAttribute((profile.specialties || []).join(", "))}" />
           </div>
         </div>
+        <fieldset class="professional-locations">
+          <legend>Locais de atendimento</legend>
+          <p class="muted">Cadastre os locais usados com frequência para selecioná-los rapidamente na agenda.</p>
+          <div class="professional-location-list" id="professional-location-list">
+            ${locations.map((location, index) => professionalLocationRow(location, index)).join("")}
+            <p class="professional-location-empty muted" ${locations.length ? "hidden" : ""}>Nenhum local cadastrado.</p>
+          </div>
+          <button class="button" id="add-professional-location" type="button">Adicionar local</button>
+        </fieldset>
         <div class="button-row">
           <button class="button primary" type="submit">Salvar perfil profissional</button>
         </div>
@@ -161,6 +197,32 @@ export function renderAccount(state, authState) {
 }
 
 export function bindAccount(context) {
+  const bindLocationRemoval = (button) => {
+    button.addEventListener("click", () => {
+      button.closest("[data-professional-location]")?.remove();
+      const list = document.getElementById("professional-location-list");
+      list?.querySelector(".professional-location-empty")
+        ?.toggleAttribute("hidden", Boolean(list.querySelector("[data-professional-location]")));
+    });
+  };
+  document.querySelectorAll("[data-remove-professional-location]").forEach(bindLocationRemoval);
+  document.getElementById("add-professional-location")?.addEventListener("click", () => {
+    const list = document.getElementById("professional-location-list");
+    if (!list) return;
+    const count = list.querySelectorAll("[data-professional-location]").length;
+    if (count >= 20) {
+      showToast("O limite é de 20 locais de atendimento.");
+      return;
+    }
+    const index = Date.now();
+    const id = globalThis.crypto?.randomUUID?.() || `location-${index}`;
+    list.querySelector(".professional-location-empty")?.setAttribute("hidden", "");
+    list.insertAdjacentHTML("beforeend", professionalLocationRow({ id }, index));
+    const row = list.lastElementChild;
+    bindLocationRemoval(row.querySelector("[data-remove-professional-location]"));
+    row.querySelector('input[name="locationName"]')?.focus();
+  });
+
   document.getElementById("professional-profile-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -168,13 +230,27 @@ export function bindAccount(context) {
       showToast("Informe um telefone válido, com DDD.");
       return;
     }
-    const professionalProfile = {
-      name: String(data.get("name") || "").trim(),
-      professionType: data.get("professionType"),
-      registrationNumber: String(data.get("registrationNumber") || "").trim(),
-      specialties: String(data.get("specialties") || "").split(",").map((item) => item.trim()).filter(Boolean),
-      phone: normalizePhone(data.get("phone"))
-    };
+    let professionalProfile;
+    try {
+      professionalProfile = {
+        name: String(data.get("name") || "").trim(),
+        professionType: data.get("professionType"),
+        registrationNumber: String(data.get("registrationNumber") || "").trim(),
+        specialties: String(data.get("specialties") || "").split(",").map((item) => item.trim()).filter(Boolean),
+        phone: normalizePhone(data.get("phone")),
+        locations: normalizeProfessionalLocations(
+          [...event.currentTarget.querySelectorAll("[data-professional-location]")].map((row) => ({
+            id: row.querySelector('[name="locationId"]').value,
+            name: row.querySelector('[name="locationName"]').value,
+            address: row.querySelector('[name="locationAddress"]').value,
+            contact: row.querySelector('[name="locationContact"]').value
+          }))
+        )
+      };
+    } catch (error) {
+      showToast(error.message);
+      return;
+    }
     const button = event.currentTarget.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
