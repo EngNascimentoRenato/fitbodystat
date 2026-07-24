@@ -1,4 +1,6 @@
-const CACHE_NAME = "fitbodystat-v21";
+importScripts("./js/config/app-version.js");
+
+const CACHE_NAME = `fitbodystat-build-${self.FITBODYSTAT_VERSION.build}`;
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -19,6 +21,7 @@ const APP_SHELL = [
   "./js/menu.js",
   "./js/config/firebase-config.example.js",
   "./js/config/firebase-config.js",
+  "./js/config/app-version.js",
   "./js/data/local-store.js",
   "./js/data/firestore-store.js",
   "./js/data/seed-plan.js",
@@ -68,28 +71,62 @@ const APP_SHELL = [
   "./js/utils/html-utils.js"
 ];
 
+async function cacheAppShell() {
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.all(APP_SHELL.map(async (path) => {
+    const response = await fetch(path, { cache: "reload" });
+    if (!response.ok) throw new Error(`Falha ao armazenar ${path}`);
+    await cache.put(path, response);
+  }));
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(cacheAppShell().then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      Promise.all(keys
+        .filter((key) => key.startsWith("fitbodystat-") && key !== CACHE_NAME)
+        .map((key) => caches.delete(key)))
     ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
+  if (event.request.method !== "GET") return;
+
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then(async (response) => {
+          if (response.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, response.clone());
+          }
+          return response;
+        })
+        .catch(async () => (
+          await caches.match(event.request, { ignoreSearch: true })
+          || await caches.match("./index.html")
+        ))
+    );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => caches.match("./index.html")))
+    caches.match(event.request).then(async (cached) => {
+      if (cached) return cached;
+      const response = await fetch(event.request);
+      if (response.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(event.request, response.clone());
+      }
+      return response;
+    })
   );
 });

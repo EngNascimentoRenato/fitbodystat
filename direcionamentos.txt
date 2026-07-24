@@ -5,61 +5,7 @@ A ordem das etapas considera valor para o usuário, potencial comercial, depend�
 técnicas e afinidade entre os ajustes.
 
 
-ETAPA 1 - ATUALIZAÇÃO E DISTRIBUIÇÃO DO PWA: PRIORIDADE TÉCNICA
-
-Objetivo: permitir que usuários recebam novas versões com segurança, sem limpar o
-cache, remover o aplicativo ou reinstalar o PWA.
-
-1. Controle de versão
-   - Definir uma versão central do aplicativo e do cache.
-   - Evitar que uma publicação dependa da alteração manual isolada do nome do cache.
-   - Exibir a versão instalada na página Configurações.
-
-2. Verificação de atualizações
-   - Verificar novas versões ao abrir o aplicativo.
-   - Repetir a verificação quando o PWA retornar ao primeiro plano.
-   - Considerar as limitações de atualização em segundo plano no Safari/iOS.
-
-3. Experiência de atualização
-   - Baixar a nova versão em segundo plano.
-   - Informar de forma discreta quando houver uma atualização disponível.
-   - Oferecer a ação "Atualizar agora".
-   - Ativar a nova versão e recarregar o aplicativo após a confirmação.
-   - Permitir que atualizações comuns sejam adiadas.
-
-4. Atualizações obrigatórias
-   - Prever uma modalidade obrigatória para versões incompatíveis com regras,
-     estruturas de dados ou recursos essenciais.
-   - Explicar ao usuário por que a atualização é necessária.
-   - Evitar bloqueios obrigatórios em atualizações apenas visuais ou opcionais.
-
-5. Proteção de dados não salvos
-   - Não recarregar o aplicativo enquanto houver formulários com alterações pendentes.
-   - Orientar o usuário a salvar ou descartar as alterações antes de atualizar.
-   - Garantir que a atualização do código não apague dados persistidos no Firestore.
-
-6. Estratégia de cache e funcionamento offline
-   - Buscar versões recentes de navegação e HTML na rede quando houver conexão.
-   - Manter CSS, JavaScript, ícones e arquivos essenciais disponíveis offline.
-   - Atualizar arquivos estáticos sem conservar versões antigas indefinidamente.
-   - Utilizar a página inicial como fallback somente para navegação, evitando retorná-la
-     incorretamente no lugar de imagens, scripts ou outros recursos.
-   - Remover caches antigos após a ativação bem-sucedida da nova versão.
-
-7. Processo de publicação
-   - Incorporar a atualização da versão ao procedimento de publicação no GitHub Pages.
-   - Garantir que todos os arquivos da versão sejam publicados antes de ela ser anunciada.
-   - Manter um registro curto das mudanças de cada versão.
-   - Prever automatização do versionamento em uma etapa posterior.
-
-8. Validação
-   - Testar atualização no navegador e no PWA instalado.
-   - Validar iPhone/Safari, Android/Chrome e navegadores de desktop.
-   - Testar abertura on-line, funcionamento offline, retorno da conexão e troca de versão.
-   - Confirmar que não seja necessário limpar cache ou reinstalar o aplicativo.
-
-
-ETAPA 2 - AGENDA PROFISSIONAL: PRIMEIRA VERSÃO PRIORITÁRIA
+ETAPA 1 - AGENDA PROFISSIONAL: PRIMEIRA VERSÃO PRIORITÁRIA
 
 Objetivo: aproximar o aplicativo de uma solução comercial para profissionais sem
 implementar, neste primeiro momento, agendamentos iniciados pelo paciente.
@@ -112,7 +58,7 @@ implementar, neste primeiro momento, agendamentos iniciados pelo paciente.
    - Limites e recursos de agenda associados aos planos comerciais.
 
 
-ETAPA 3 - ESTRUTURA PROFISSIONAL E VÍNCULOS
+ETAPA 2 - ESTRUTURA PROFISSIONAL E VÍNCULOS
 
 1. Perfil profissional público
    - Exibir nome, apresentação, áreas de atuação, especialidades e registro profissional,
@@ -143,7 +89,7 @@ ETAPA 3 - ESTRUTURA PROFISSIONAL E VÍNCULOS
      vínculo válido.
 
 
-ETAPA 4 - DESCOBERTA E RELACIONAMENTO
+ETAPA 3 - DESCOBERTA E RELACIONAMENTO
 
 1. Busca de profissionais
    - Criar uma área para usuários localizarem profissionais cadastrados na plataforma.
@@ -167,7 +113,7 @@ ETAPA 4 - DESCOBERTA E RELACIONAMENTO
    - Oferecer a criação do vínculo após a confirmação, sem torná-la automática.
 
 
-ETAPA 5 - BEM-ESTAR PESSOAL
+ETAPA 4 - BEM-ESTAR PESSOAL
 
 Objetivo inicial: oferecer acompanhamento pessoal e privado. O módulo não deve ser
 apresentado como diagnóstico ou tratamento psicológico.
@@ -194,7 +140,7 @@ apresentado como diagnóstico ou tratamento psicológico.
    - Tratar segurança, responsabilidade clínica e LGPD como requisitos da expansão.
 
 
-ETAPA 6 - ACESSO E MONETIZAÇÃO
+ETAPA 5 - ACESSO E MONETIZAÇÃO
 
 1. Direito de acesso ao aplicativo
    - Separar autenticação, perfil, vínculo profissional e direito de uso.

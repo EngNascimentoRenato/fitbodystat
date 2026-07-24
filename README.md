@@ -64,6 +64,18 @@ Com a Firebase CLI instalada:
 firebase deploy --only firestore:rules
 ```
 
+## Preparar uma versão
+
+A versão funcional, a build e a data da publicação ficam centralizadas em
+`js/config/app-version.js`. Atualize os três valores com:
+
+```powershell
+node scripts/set-version.mjs 0.1.0-alpha.23 23
+```
+
+Ao iniciar outra fase, a revisão da fase pode reiniciar e a build deve continuar
+crescendo. Exemplo: `0.1.0-beta.1`, build `35`.
+
 ## Tecnologias
 
 - HTML5, CSS3 e JavaScript Vanilla com ES Modules

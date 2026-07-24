@@ -3,8 +3,12 @@ import { resetState } from "../data/local-store.js";
 import { showToast } from "../components/toast.js";
 import { confirmAction } from "../components/modal.js";
 import { escapeHtml } from "../utils/html-utils.js";
+import { formatDate } from "../utils/date-utils.js";
+import { getAppVersionInfo, getPwaRuntimeInfo } from "../services/pwa-service.js";
 
 export function renderSettings(state, authState = {}) {
+  const version = getAppVersionInfo();
+  const runtime = getPwaRuntimeInfo();
   return `
     <div class="view-stack">
       <section class="card">
@@ -54,11 +58,63 @@ export function renderSettings(state, authState = {}) {
         <h2>Perfis de acesso</h2>
         <p class="muted">Papéis previstos: usuário, profissional e admin. Nesta fase, novos cadastros entram como usuário padrão.</p>
       </section>
+      <section class="card">
+        <div class="chart-header">
+          <div>
+            <h2>Versão do aplicativo</h2>
+            <p class="muted">Use estas informações ao solicitar suporte.</p>
+          </div>
+          <span class="badge">${runtime.updateSupport ? "Atualização automática ativa" : "Atualização indisponível"}</span>
+        </div>
+        <div class="grid four">
+          <article class="mini-stat">
+            <span>Versão instalada</span>
+            <strong>${escapeHtml(version.version)}</strong>
+            <small>Fase e revisão funcional</small>
+          </article>
+          <article class="mini-stat">
+            <span>Build</span>
+            <strong>${escapeHtml(String(version.build))}</strong>
+            <small>Identificador da publicação</small>
+          </article>
+          <article class="mini-stat">
+            <span>Publicada em</span>
+            <strong>${escapeHtml(formatDate(version.releasedAt))}</strong>
+            <small>Data desta versão</small>
+          </article>
+          <article class="mini-stat">
+            <span>Execução</span>
+            <strong>${escapeHtml(runtime.executionMode)}</strong>
+            <small>${runtime.online ? "Dispositivo on-line" : "Dispositivo off-line"}</small>
+          </article>
+        </div>
+        <div class="button-row version-actions">
+          <button class="button" id="copy-support-info" type="button">Copiar informações técnicas</button>
+        </div>
+      </section>
     </div>
   `;
 }
 
 export function bindSettings(state, persist, render, replaceState, authState, setPresentationMode) {
+  document.getElementById("copy-support-info")?.addEventListener("click", async () => {
+    const version = getAppVersionInfo();
+    const runtime = getPwaRuntimeInfo();
+    const text = [
+      `FitBodyStat ${version.version}`,
+      `Build ${version.build}`,
+      `Publicada em ${formatDate(version.releasedAt)}`,
+      `Execução: ${runtime.executionMode}`,
+      `Conexão: ${runtime.online ? "on-line" : "off-line"}`
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Informações técnicas copiadas.");
+    } catch {
+      showToast("Não foi possível copiar automaticamente.");
+    }
+  });
+
   document.getElementById("theme-toggle").addEventListener("click", () => {
     state.settings = state.settings || {};
     state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";

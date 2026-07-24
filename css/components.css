@@ -56,6 +56,10 @@
   line-height: 1.25;
 }
 
+.version-actions {
+  margin-top: 1rem;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
