@@ -9,6 +9,11 @@ initializeApp();
 const db = getFirestore();
 const auth = getAuth();
 const allowedRoles = new Set(["user", "professional", "admin"]);
+const callableOptions = {
+  region: "us-central1",
+  invoker: "public",
+  cors: true
+};
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -47,7 +52,7 @@ async function applyRole(uid, role) {
   return user;
 }
 
-export const registerProfessional = onCall(async (request) => {
+export const registerProfessional = onCall(callableOptions, async (request) => {
   await requireAdmin(request);
   const email = normalizeEmail(request.data?.email);
   const name = String(request.data?.name || "").trim();
@@ -95,7 +100,7 @@ export const registerProfessional = onCall(async (request) => {
   return { id, status, userId: user?.uid || null };
 });
 
-export const activateProfessionalAccess = onCall(async (request) => {
+export const activateProfessionalAccess = onCall(callableOptions, async (request) => {
   if (!request.auth?.uid || !request.auth.token?.email) {
     throw new HttpsError("unauthenticated", "Entre novamente.");
   }
@@ -128,7 +133,7 @@ export const activateProfessionalAccess = onCall(async (request) => {
   return { role: "professional", activated: true };
 });
 
-export const setUserRole = onCall(async (request) => {
+export const setUserRole = onCall(callableOptions, async (request) => {
   await requireAdmin(request);
   const userId = String(request.data?.userId || "");
   const role = String(request.data?.role || "");
@@ -164,7 +169,7 @@ export const setUserRole = onCall(async (request) => {
   return { role };
 });
 
-export const cancelProfessionalRegistration = onCall(async (request) => {
+export const cancelProfessionalRegistration = onCall(callableOptions, async (request) => {
   await requireAdmin(request);
   const registrationIdValue = String(request.data?.registrationId || "");
   if (!registrationIdValue) throw new HttpsError("invalid-argument", "Cadastro inválido.");

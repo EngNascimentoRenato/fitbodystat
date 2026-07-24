@@ -325,13 +325,15 @@ observeAuth(async (user) => {
     render();
 
     let userDoc = await ensureUserDocument(user);
-    try {
-      const activation = await activateProfessionalAccess();
-      if (activation?.role && activation.role !== userDoc.role) {
-        userDoc = await getUser(user.uid) || { ...userDoc, role: activation.role };
+    if ((userDoc.role || "user") === "user") {
+      try {
+        const activation = await activateProfessionalAccess();
+        if (activation?.role && activation.role !== userDoc.role) {
+          userDoc = await getUser(user.uid) || { ...userDoc, role: activation.role };
+        }
+      } catch (error) {
+        console.warn("Não foi possível verificar o pré-cadastro profissional.", error);
       }
-    } catch (error) {
-      if (!["functions/not-found", "functions/unavailable"].includes(error.code)) throw error;
     }
     authState.role = userDoc.role || "user";
     authState.status = userDoc.status || "active";
