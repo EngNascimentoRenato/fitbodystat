@@ -5,8 +5,12 @@ import {
   agendaEventPerson,
   agendaPeriodLabel,
   agendaViewDays,
+  eventConflicts,
+  eventIsWithinAvailability,
+  expandRecurringEvents,
   filterAgendaEvents,
   moveAgendaAnchor,
+  normalizeAvailability,
   normalizeAgendaEvent,
   startOfWeek
 } from "../js/models/agenda-model.js";
@@ -59,7 +63,7 @@ test("bloqueio remove dados de paciente e usa estado próprio", () => {
     title: "Almoço",
     date: "2026-07-27",
     startTime: "12:00",
-    durationMinutes: 60,
+    endTime: "13:00",
     patientId: "patient-1",
     patientName: "Paciente Teste"
   }, "professional-1");
@@ -68,6 +72,95 @@ test("bloqueio remove dados de paciente e usa estado próprio", () => {
   assert.equal(event.patientId, null);
   assert.equal(event.modality, "");
   assert.deepEqual(event.participants, ["professional-1"]);
+});
+
+test("compromisso é exclusivo por padrão e coletivo aceita capacidade", () => {
+  const exclusive = normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-07-27",
+    startTime: "10:00",
+    durationMinutes: 60,
+    guestName: "Paciente"
+  }, "professional-1");
+  const group = normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-07-27",
+    startTime: "11:00",
+    durationMinutes: 60,
+    guestName: "Turma",
+    bookingMode: "group",
+    capacity: 12
+  }, "professional-1");
+
+  assert.equal(exclusive.bookingMode, "exclusive");
+  assert.equal(exclusive.blocksAvailability, true);
+  assert.equal(group.capacity, 12);
+});
+
+test("bloqueio aceita dia inteiro e recorrência semanal", () => {
+  const event = normalizeAgendaEvent({
+    type: "block",
+    date: "2026-07-26",
+    allDay: true,
+    recurrence: {
+      frequency: "weekly",
+      weekDays: [0, 1],
+      untilDate: "2026-08-10"
+    }
+  }, "professional-1");
+  const occurrences = expandRecurringEvents(
+    [{ id: "block-1", ...event }],
+    ["2026-07-26", "2026-07-27", "2026-08-02", "2026-08-03"]
+  );
+
+  assert.equal(event.durationMinutes, 1440);
+  assert.equal(occurrences.length, 4);
+  assert.ok(occurrences.every((item) => item.sourceEventId === "block-1"));
+});
+
+test("normaliza vários períodos por dia e valida sobreposição", () => {
+  const availability = normalizeAvailability({
+    slotIntervalMinutes: 30,
+    weekly: {
+      monday: [
+        { startTime: "06:00", endTime: "10:00" },
+        { startTime: "18:00", endTime: "22:00" }
+      ]
+    }
+  }, "professional-1");
+
+  assert.equal(availability.weekly.monday.length, 2);
+  assert.throws(() => normalizeAvailability({
+    weekly: {
+      monday: [
+        { startTime: "08:00", endTime: "12:00" },
+        { startTime: "11:00", endTime: "13:00" }
+      ]
+    }
+  }, "professional-1"), /sobrepostos/);
+});
+
+test("detecta conflito e compromisso fora da disponibilidade", () => {
+  const base = normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-07-27",
+    startTime: "09:00",
+    durationMinutes: 60,
+    guestName: "Paciente 1"
+  }, "professional-1");
+  const candidate = normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-07-27",
+    startTime: "09:30",
+    durationMinutes: 60,
+    guestName: "Paciente 2"
+  }, "professional-1");
+  const availability = normalizeAvailability({
+    weekly: { monday: [{ startTime: "08:00", endTime: "10:00" }] }
+  }, "professional-1");
+
+  assert.equal(eventConflicts(candidate, [{ id: "base", ...base }]).length, 1);
+  assert.equal(eventIsWithinAvailability(candidate, availability), false);
 });
 
 test("gera períodos de dia, semana e mês", () => {
@@ -96,4 +189,3 @@ test("filtra por estado, paciente e local", () => {
   assert.equal(filterAgendaEvents(events, { patient: "__guest" }).length, 1);
   assert.equal(filterAgendaEvents(events, { patient: "p1", location: "Sala 1" }).length, 1);
 });
-

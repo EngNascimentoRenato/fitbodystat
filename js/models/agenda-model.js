@@ -1,6 +1,18 @@
 const eventTypes = new Set(["appointment", "block"]);
 const appointmentStatuses = new Set(["scheduled", "confirmed", "completed", "cancelled", "no-show"]);
 const modalities = new Set(["in-person", "online", "home", "other"]);
+const bookingModes = new Set(["exclusive", "group", "informational"]);
+const recurrenceFrequencies = new Set(["none", "weekly"]);
+
+export const weekDays = [
+  { key: "monday", label: "Segunda-feira", index: 1 },
+  { key: "tuesday", label: "Terça-feira", index: 2 },
+  { key: "wednesday", label: "Quarta-feira", index: 3 },
+  { key: "thursday", label: "Quinta-feira", index: 4 },
+  { key: "friday", label: "Sexta-feira", index: 5 },
+  { key: "saturday", label: "Sábado", index: 6 },
+  { key: "sunday", label: "Domingo", index: 0 }
+];
 
 function localISODate(date) {
   const year = date.getFullYear();
@@ -26,24 +38,82 @@ function validTime(value) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ""));
 }
 
+function minutesFromTime(value) {
+  if (!validTime(value)) return null;
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function timeFromMinutes(value) {
+  const minutes = Math.max(0, Math.min(1439, Math.round(value)));
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
 function addMinutes(date, minutes) {
   return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function normalizeRecurrence(input, date, type) {
+  if (type !== "block") return { frequency: "none", weekDays: [], untilDate: null };
+  const source = input.recurrence || {};
+  const frequency = recurrenceFrequencies.has(source.frequency) ? source.frequency : "none";
+  if (frequency === "none") return { frequency, weekDays: [], untilDate: null };
+
+  const dateDay = parseDate(date).getDay();
+  const days = Array.isArray(source.weekDays)
+    ? source.weekDays.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    : [];
+  const weekDayValues = [...new Set(days.length ? days : [dateDay])];
+  const untilDate = validDate(source.untilDate) && source.untilDate >= date
+    ? source.untilDate
+    : addCalendarMonths(date, 3);
+  return { frequency, weekDays: weekDayValues, untilDate };
+}
+
+function resolveTiming(input, type) {
+  const allDay = type === "block" && input.allDay === true;
+  if (allDay) {
+    return { startTime: "00:00", endTime: "00:00", durationMinutes: 1440, allDay: true };
+  }
+
+  const startTime = cleanText(input.startTime);
+  if (!validTime(startTime)) throw new Error("Informe um horário inicial válido.");
+
+  if (type === "block") {
+    const endTime = cleanText(input.endTime);
+    const startMinutes = minutesFromTime(startTime);
+    const endMinutes = minutesFromTime(endTime);
+    if (endMinutes === null || endMinutes <= startMinutes) {
+      throw new Error("O horário final deve ser posterior ao horário inicial.");
+    }
+    return {
+      startTime,
+      endTime,
+      durationMinutes: endMinutes - startMinutes,
+      allDay: false
+    };
+  }
+
+  const durationMinutes = Math.round(Number(input.durationMinutes));
+  if (!Number.isFinite(durationMinutes) || durationMinutes < 15 || durationMinutes > 720) {
+    throw new Error("A duração deve estar entre 15 minutos e 12 horas.");
+  }
+  return {
+    startTime,
+    endTime: timeFromMinutes(minutesFromTime(startTime) + durationMinutes),
+    durationMinutes,
+    allDay: false
+  };
 }
 
 export function normalizeAgendaEvent(input, professionalId, existing = {}) {
   const type = eventTypes.has(input.type) ? input.type : "appointment";
   const date = cleanText(input.date);
-  const startTime = cleanText(input.startTime);
-  const durationMinutes = Math.round(Number(input.durationMinutes));
-
   if (!professionalId) throw new Error("Profissional não identificado.");
   if (!validDate(date)) throw new Error("Informe uma data válida.");
-  if (!validTime(startTime)) throw new Error("Informe um horário válido.");
-  if (!Number.isFinite(durationMinutes) || durationMinutes < 15 || durationMinutes > 720) {
-    throw new Error("A duração deve estar entre 15 minutos e 12 horas.");
-  }
 
-  const startsAtDate = new Date(`${date}T${startTime}:00`);
+  const timing = resolveTiming(input, type);
+  const startsAtDate = new Date(`${date}T${timing.startTime}:00`);
   if (Number.isNaN(startsAtDate.getTime())) throw new Error("Data ou horário inválido.");
 
   const patientId = type === "appointment" ? cleanText(input.patientId) || null : null;
@@ -65,6 +135,12 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
   const color = /^#[0-9a-f]{6}$/i.test(cleanText(input.color))
     ? cleanText(input.color).toLowerCase()
     : type === "block" ? "#657076" : "#25636f";
+  const bookingMode = type === "appointment" && bookingModes.has(input.bookingMode)
+    ? input.bookingMode
+    : type === "appointment" ? "exclusive" : "exclusive";
+  const capacity = type === "appointment" && bookingMode === "group"
+    ? Math.max(2, Math.min(100, Math.round(Number(input.capacity) || 2)))
+    : 1;
 
   return {
     professionalId,
@@ -72,10 +148,12 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
     type,
     title,
     date,
-    startTime,
-    durationMinutes,
+    startTime: timing.startTime,
+    endTime: timing.endTime,
+    durationMinutes: timing.durationMinutes,
+    allDay: timing.allDay,
     startsAt: startsAtDate.toISOString(),
-    endsAt: addMinutes(startsAtDate, durationMinutes).toISOString(),
+    endsAt: addMinutes(startsAtDate, timing.durationMinutes).toISOString(),
     timeZone: cleanText(input.timeZone)
       || Intl.DateTimeFormat().resolvedOptions().timeZone
       || "America/Cuiaba",
@@ -87,11 +165,51 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
     location: type === "appointment" ? cleanText(input.location) : "",
     status,
     color,
+    bookingMode,
+    capacity,
+    blocksAvailability: type === "block" || bookingMode !== "informational",
     privateNotes: cleanText(input.privateNotes),
     visibility: "private",
     confirmationStatus: existing.confirmationStatus || "not_requested",
-    recurrence: existing.recurrence || { frequency: "none" },
+    recurrence: normalizeRecurrence(input, date, type),
     reminderMinutes: existing.reminderMinutes ?? null
+  };
+}
+
+export function normalizeAvailability(input, professionalId) {
+  if (!professionalId) throw new Error("Profissional não identificado.");
+  const weekly = {};
+
+  weekDays.forEach(({ key }) => {
+    const intervals = Array.isArray(input.weekly?.[key]) ? input.weekly[key] : [];
+    weekly[key] = intervals.map((interval) => {
+      const startTime = cleanText(interval.startTime);
+      const endTime = cleanText(interval.endTime);
+      const start = minutesFromTime(startTime);
+      const end = minutesFromTime(endTime);
+      if (start === null || end === null || end <= start) {
+        throw new Error(`Revise os horários de ${weekDays.find((day) => day.key === key).label}.`);
+      }
+      return { startTime, endTime };
+    }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    weekly[key].forEach((interval, index) => {
+      const previous = weekly[key][index - 1];
+      if (previous && previous.endTime > interval.startTime) {
+        throw new Error(`Existem horários sobrepostos em ${weekDays.find((day) => day.key === key).label}.`);
+      }
+    });
+  });
+
+  return {
+    professionalId,
+    timeZone: cleanText(input.timeZone)
+      || Intl.DateTimeFormat().resolvedOptions().timeZone
+      || "America/Cuiaba",
+    slotIntervalMinutes: [15, 30, 45, 60].includes(Number(input.slotIntervalMinutes))
+      ? Number(input.slotIntervalMinutes)
+      : 30,
+    weekly
   };
 }
 
@@ -170,5 +288,58 @@ export function filterAgendaEvents(events, filters = {}) {
     if (filters.location && event.location !== filters.location) return false;
     return true;
   });
+}
+
+export function expandRecurringEvents(events, visibleDates) {
+  const dates = Array.isArray(visibleDates) ? visibleDates : [];
+  return (events || []).flatMap((event) => {
+    if (event.recurrence?.frequency !== "weekly") return [event];
+    const untilDate = event.recurrence.untilDate || event.date;
+    const weekDaySet = new Set(event.recurrence.weekDays || []);
+    const occurrences = dates
+      .filter((date) =>
+        date >= event.date
+        && date <= untilDate
+        && weekDaySet.has(parseDate(date).getDay())
+      )
+      .map((date) => ({
+        ...event,
+        id: `${event.id}__${date}`,
+        sourceEventId: event.id,
+        date,
+        startsAt: new Date(`${date}T${event.startTime}:00`).toISOString(),
+        endsAt: addMinutes(new Date(`${date}T${event.startTime}:00`), event.durationMinutes).toISOString()
+      }));
+    return occurrences;
+  });
+}
+
+export function eventConflicts(candidate, events) {
+  if (!candidate.blocksAvailability) return [];
+  const candidateStart = new Date(candidate.startsAt).getTime();
+  const candidateEnd = new Date(candidate.endsAt).getTime();
+  return (events || []).filter((event) => {
+    const sourceId = event.sourceEventId || event.id;
+    const candidateId = candidate.sourceEventId || candidate.id;
+    if (candidateId && sourceId === candidateId) return false;
+    if (!event.blocksAvailability || ["cancelled", "no-show"].includes(event.status)) return false;
+    const start = new Date(event.startsAt).getTime();
+    const end = new Date(event.endsAt).getTime();
+    return candidateStart < end && candidateEnd > start;
+  });
+}
+
+export function eventIsWithinAvailability(event, availability) {
+  const weekly = availability?.weekly;
+  if (!weekly || event.type === "block" || event.bookingMode === "informational") return true;
+  const day = weekDays.find((item) => item.index === parseDate(event.date).getDay());
+  const intervals = weekly[day?.key] || [];
+  if (!intervals.length) return false;
+  const start = minutesFromTime(event.startTime);
+  const end = start + event.durationMinutes;
+  return intervals.some((interval) =>
+    start >= minutesFromTime(interval.startTime)
+    && end <= minutesFromTime(interval.endTime)
+  );
 }
 

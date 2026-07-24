@@ -3,12 +3,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   serverTimestamp,
   setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { db } from "./firebase-core.js";
-import { normalizeAgendaEvent } from "../models/agenda-model.js";
+import { normalizeAgendaEvent, normalizeAvailability } from "../models/agenda-model.js";
 
 function agendaCollection(professionalId) {
   return collection(db, "professionalAgendas", professionalId, "events");
@@ -36,7 +37,7 @@ export async function saveAgendaEvent(professionalId, input, existing = null) {
       { ...event, ...metadata },
       { merge: true }
     );
-    return existing.id;
+    return { id: existing.id, ...event };
   }
 
   const reference = await addDoc(agendaCollection(professionalId), {
@@ -44,10 +45,26 @@ export async function saveAgendaEvent(professionalId, input, existing = null) {
     ...metadata,
     createdAt: serverTimestamp()
   });
-  return reference.id;
+  return { id: reference.id, ...event };
 }
 
 export async function deleteAgendaEvent(professionalId, eventId) {
   await deleteDoc(doc(db, "professionalAgendas", professionalId, "events", eventId));
 }
 
+export async function loadAgendaAvailability(professionalId) {
+  const snapshot = await getDoc(
+    doc(db, "professionalAgendas", professionalId, "settings", "availability")
+  );
+  return snapshot.exists() ? withoutMetadata(snapshot.data()) : null;
+}
+
+export async function saveAgendaAvailability(professionalId, input) {
+  const availability = normalizeAvailability(input, professionalId);
+  await setDoc(
+    doc(db, "professionalAgendas", professionalId, "settings", "availability"),
+    { ...availability, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+  return availability;
+}

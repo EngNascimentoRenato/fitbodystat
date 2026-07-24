@@ -5,15 +5,22 @@ import {
   agendaEventPerson,
   agendaPeriodLabel,
   agendaViewDays,
+  eventConflicts,
+  eventIsWithinAvailability,
+  expandRecurringEvents,
   filterAgendaEvents,
-  moveAgendaAnchor
+  moveAgendaAnchor,
+  normalizeAgendaEvent,
+  weekDays
 } from "../models/agenda-model.js";
 import {
   deleteAgendaEvent,
   listAgendaEvents,
+  loadAgendaAvailability,
+  saveAgendaAvailability,
   saveAgendaEvent
 } from "../services/agenda-service.js";
-import { formatDate, todayISO } from "../utils/date-utils.js";
+import { addMonths, formatDate, todayISO } from "../utils/date-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { formatPhone } from "../utils/phone-utils.js";
 
@@ -40,7 +47,9 @@ const agendaUi = {
   anchor: todayISO(),
   filters: { status: "", patient: "", location: "" },
   editorOpen: false,
-  draft: null
+  draft: null,
+  availabilityOpen: false,
+  availabilityDraft: null
 };
 
 function parseLocalDate(dateISO) {
@@ -57,6 +66,10 @@ function shortDayLabel(dateISO) {
 
 function capitalizeFirst(value) {
   return value ? value[0].toUpperCase() + value.slice(1) : "";
+}
+
+function cloneData(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function defaultStartTime(dateISO) {
@@ -99,9 +112,10 @@ function renderStatusBadge(status) {
 }
 
 function renderEventButton(event, compact = false) {
+  const sourceId = event.sourceEventId || event.id;
   return `
     <button class="agenda-event ${compact ? "compact" : ""} ${event.type === "block" ? "block" : ""}"
-      type="button" data-agenda-event="${escapeAttribute(event.id)}"
+      type="button" data-agenda-event="${escapeAttribute(sourceId)}"
       style="--event-color:${eventColor(event)}">
       <span class="agenda-event-time">${escapeHtml(event.startTime)}</span>
       <strong>${escapeHtml(eventTitle(event))}</strong>
@@ -118,7 +132,16 @@ function eventsByDate(events) {
   }, {});
 }
 
-function renderDayView(days, groups, patients) {
+function availabilityLabel(date, availability) {
+  if (!availability?.weekly) return "Horário não configurado";
+  const day = weekDays.find((item) => item.index === parseLocalDate(date).getDay());
+  const intervals = availability?.weekly?.[day?.key] || [];
+  return intervals.length
+    ? intervals.map((interval) => `${interval.startTime}–${interval.endTime}`).join(", ")
+    : "Não atende";
+}
+
+function renderDayView(days, groups, patients, availability) {
   const date = days[0];
   const events = groups[date] || [];
   return `
@@ -127,15 +150,17 @@ function renderDayView(days, groups, patients) {
         <div>
           <p class="eyebrow">${escapeHtml(shortDayLabel(date))}</p>
           <h2>${events.length} ${events.length === 1 ? "item" : "itens"}</h2>
+          <small class="agenda-availability-label">${escapeHtml(availabilityLabel(date, availability))}</small>
         </div>
         <button class="button" type="button" data-create-on-date="${escapeAttribute(date)}">Adicionar</button>
       </header>
       <div class="agenda-day-list">
         ${events.map((event) => {
           const patient = selectedPatient(event, patients);
+          const sourceId = event.sourceEventId || event.id;
           return `
             <article class="agenda-day-event" style="--event-color:${eventColor(event)}">
-              <button type="button" data-agenda-event="${escapeAttribute(event.id)}">
+              <button type="button" data-agenda-event="${escapeAttribute(sourceId)}">
                 <span class="agenda-day-time">${escapeHtml(event.startTime)}<small>${event.durationMinutes} min</small></span>
                 <span class="agenda-day-main">
                   <strong>${escapeHtml(eventTitle(event))}</strong>
@@ -155,7 +180,7 @@ function renderDayView(days, groups, patients) {
   `;
 }
 
-function renderWeekView(days, groups) {
+function renderWeekView(days, groups, availability) {
   return `
     <div class="agenda-week">
       ${days.map((date) => {
@@ -163,7 +188,7 @@ function renderWeekView(days, groups) {
         return `
           <section class="agenda-week-day ${date === todayISO() ? "today" : ""}">
             <button class="agenda-day-heading" type="button" data-open-day="${escapeAttribute(date)}">
-              <span>${escapeHtml(shortDayLabel(date))}</span>
+              <span>${escapeHtml(shortDayLabel(date))}<small>${escapeHtml(availabilityLabel(date, availability))}</small></span>
               <strong>${events.length}</strong>
             </button>
             <div class="agenda-week-events">
@@ -244,12 +269,17 @@ function renderFilters(events, patients) {
 }
 
 function blankDraft(type = "appointment", date = agendaUi.anchor) {
+  const startTime = defaultStartTime(date);
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const endMinutes = Math.min(hours * 60 + minutes + 60, 23 * 60 + 59);
   return {
     type,
     title: type === "block" ? "Indisponível" : "Atendimento",
     date,
-    startTime: defaultStartTime(date),
+    startTime,
+    endTime: `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`,
     durationMinutes: 60,
+    allDay: false,
     patientId: "",
     patientName: "",
     guestName: "",
@@ -257,6 +287,9 @@ function blankDraft(type = "appointment", date = agendaUi.anchor) {
     location: "",
     status: type === "block" ? "blocked" : "scheduled",
     color: type === "block" ? "#657076" : "#25636f",
+    bookingMode: "exclusive",
+    capacity: 2,
+    recurrence: { frequency: "none", weekDays: [], untilDate: null },
     privateNotes: ""
   };
 }
@@ -267,6 +300,14 @@ function renderEditor(patients) {
   const isBlock = event.type === "block";
   const patientValue = event.patientId || "__guest";
   const patient = selectedPatient(event, patients);
+  const bookingMode = event.bookingMode || "exclusive";
+  const recurrence = event.recurrence || { frequency: "none", weekDays: [], untilDate: null };
+  const recurrenceDays = new Set(recurrence.weekDays || []);
+  const endTime = event.endTime || (() => {
+    const [hours, minutes] = event.startTime.split(":").map(Number);
+    const total = Math.min(hours * 60 + minutes + Number(event.durationMinutes || 60), 1439);
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  })();
   return `
     <dialog class="agenda-dialog" id="agenda-dialog">
       <form class="form agenda-form" id="agenda-form">
@@ -294,17 +335,22 @@ function renderEditor(patients) {
             <input id="agenda-date" name="date" type="date" required value="${escapeAttribute(event.date)}" />
           </div>
           <div class="field">
-            <label for="agenda-start-time">Horário inicial</label>
-            <input id="agenda-start-time" name="startTime" type="time" required value="${escapeAttribute(event.startTime)}" />
-          </div>
-          <div class="field">
-            <label for="agenda-duration">Duração em minutos</label>
-            <input id="agenda-duration" name="durationMinutes" type="number" min="15" max="720" step="15" required
-              value="${escapeAttribute(event.durationMinutes)}" />
+            <label for="agenda-color">Cor</label>
+            <input id="agenda-color" name="color" type="color" value="${escapeAttribute(event.color || (isBlock ? "#657076" : "#25636f"))}" />
           </div>
         </div>
 
-        <div class="form-grid agenda-appointment-fields" ${isBlock ? "hidden" : ""}>
+        <div class="agenda-appointment-fields" ${isBlock ? "hidden" : ""}>
+          <div class="form-grid">
+            <div class="field">
+              <label for="agenda-start-time">Horário inicial</label>
+              <input id="agenda-start-time" name="startTime" type="time" required value="${escapeAttribute(event.startTime)}" />
+            </div>
+            <div class="field">
+              <label for="agenda-duration">Duração em minutos</label>
+              <input id="agenda-duration" name="durationMinutes" type="number" min="15" max="720" step="15" required
+                value="${escapeAttribute(event.durationMinutes)}" />
+            </div>
           <div class="field">
             <label for="agenda-patient">Paciente ou pessoa avulsa</label>
             <select id="agenda-patient" name="patientId">
@@ -339,9 +385,71 @@ function renderEditor(patients) {
               ).join("")}
             </select>
           </div>
+          </div>
+
+          <fieldset class="agenda-booking-field">
+            <legend>Ocupação do horário</legend>
+            <div class="agenda-booking-switch">
+              <label>
+                <input type="radio" name="bookingMode" value="exclusive" ${bookingMode === "exclusive" ? "checked" : ""} />
+                <span><strong>Exclusivo</strong><small>Bloqueia o período para os demais</small></span>
+              </label>
+              <label>
+                <input type="radio" name="bookingMode" value="group" ${bookingMode === "group" ? "checked" : ""} />
+                <span><strong>Coletivo</strong><small>Permite participantes até a capacidade</small></span>
+              </label>
+              <label>
+                <input type="radio" name="bookingMode" value="informational" ${bookingMode === "informational" ? "checked" : ""} />
+                <span><strong>Informativo</strong><small>Não bloqueia novos agendamentos</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="field agenda-capacity-field" ${bookingMode !== "group" ? "hidden" : ""}>
+            <label for="agenda-capacity">Capacidade máxima</label>
+            <input id="agenda-capacity" name="capacity" type="number" min="2" max="100" value="${escapeAttribute(event.capacity || 2)}" />
+          </div>
+        </div>
+
+        <div class="agenda-block-fields" ${!isBlock ? "hidden" : ""}>
+          <label class="consent-option agenda-all-day">
+            <input type="checkbox" name="allDay" value="true" ${event.allDay ? "checked" : ""} />
+            <span>Bloquear o dia inteiro</span>
+          </label>
+          <div class="form-grid agenda-block-time-fields" ${event.allDay ? "hidden" : ""}>
+            <div class="field">
+              <label for="agenda-block-start">Horário inicial</label>
+              <input id="agenda-block-start" name="blockStartTime" type="time" value="${escapeAttribute(event.startTime)}" />
+            </div>
+            <div class="field">
+              <label for="agenda-end-time">Horário final</label>
+              <input id="agenda-end-time" name="endTime" type="time" value="${escapeAttribute(endTime)}" />
+            </div>
+          </div>
           <div class="field">
-            <label for="agenda-color">Cor do compromisso</label>
-            <input id="agenda-color" name="color" type="color" value="${escapeAttribute(event.color || "#25636f")}" />
+            <label for="agenda-recurrence">Repetição</label>
+            <select id="agenda-recurrence" name="recurrenceFrequency">
+              <option value="none" ${recurrence.frequency !== "weekly" ? "selected" : ""}>Não repetir</option>
+              <option value="weekly" ${recurrence.frequency === "weekly" ? "selected" : ""}>Semanalmente</option>
+            </select>
+          </div>
+          <div class="agenda-recurrence-fields" ${recurrence.frequency !== "weekly" ? "hidden" : ""}>
+            <fieldset>
+              <legend>Dias da semana</legend>
+              <div class="agenda-weekday-picker">
+                ${weekDays.map((day) => `
+                  <label>
+                    <input type="checkbox" name="recurrenceWeekDays" value="${day.index}" ${recurrenceDays.has(day.index) ? "checked" : ""} />
+                    <span>${day.label.slice(0, 3)}</span>
+                  </label>
+                `).join("")}
+              </div>
+            </fieldset>
+            <div class="field">
+              <label for="agenda-recurrence-until">Repetir até</label>
+              <input id="agenda-recurrence-until" name="recurrenceUntilDate" type="date"
+                value="${escapeAttribute(recurrence.untilDate || "")}" />
+            </div>
           </div>
         </div>
 
@@ -369,6 +477,72 @@ function renderEditor(patients) {
   `;
 }
 
+function blankAvailability() {
+  return {
+    slotIntervalMinutes: 30,
+    weekly: Object.fromEntries(weekDays.map((day) => [day.key, []]))
+  };
+}
+
+function renderAvailabilityEditor() {
+  const availability = agendaUi.availabilityDraft || blankAvailability();
+  return `
+    <dialog class="agenda-dialog availability-dialog" id="availability-dialog">
+      <form class="form" id="availability-form">
+        <header class="agenda-dialog-header">
+          <div>
+            <p class="eyebrow">Agenda profissional</p>
+            <h2>Horários de atendimento</h2>
+          </div>
+          <button class="icon-button" id="close-availability-dialog" type="button" aria-label="Fechar">×</button>
+        </header>
+        <p class="muted">Defina um ou mais períodos para cada dia. Compromissos fora desses horários continuam permitidos para você, mas não serão oferecidos em um agendamento futuro.</p>
+        <div class="field availability-slot-field">
+          <label for="availability-slot">Intervalo sugerido para futuros horários</label>
+          <select id="availability-slot" name="slotIntervalMinutes">
+            ${[15, 30, 45, 60].map((minutes) =>
+              `<option value="${minutes}" ${Number(availability.slotIntervalMinutes) === minutes ? "selected" : ""}>${minutes} minutos</option>`
+            ).join("")}
+          </select>
+        </div>
+        <div class="availability-week">
+          ${weekDays.map((day) => {
+            const intervals = availability.weekly?.[day.key] || [];
+            return `
+              <section class="availability-day" data-availability-day="${day.key}">
+                <header>
+                  <label class="consent-option">
+                    <input type="checkbox" data-toggle-availability="${day.key}" ${intervals.length ? "checked" : ""} />
+                    <strong>${day.label}</strong>
+                  </label>
+                  <button class="button text-button" type="button" data-add-availability="${day.key}" ${intervals.length ? "" : "hidden"}>Adicionar período</button>
+                </header>
+                <div class="availability-intervals">
+                  ${intervals.map((interval, index) => `
+                    <div class="availability-interval">
+                      <label><span class="sr-only">Início</span><input type="time" data-availability-start="${day.key}" data-index="${index}" value="${escapeAttribute(interval.startTime)}" /></label>
+                      <span>até</span>
+                      <label><span class="sr-only">Fim</span><input type="time" data-availability-end="${day.key}" data-index="${index}" value="${escapeAttribute(interval.endTime)}" /></label>
+                      <button class="icon-button" type="button" data-remove-availability="${day.key}" data-index="${index}" aria-label="Remover período">×</button>
+                    </div>
+                  `).join("") || `<span class="availability-closed">Não atende</span>`}
+                </div>
+              </section>
+            `;
+          }).join("")}
+        </div>
+        <footer class="agenda-dialog-actions">
+          <span></span>
+          <div class="button-row">
+            <button class="button" id="cancel-availability-dialog" type="button">Cancelar</button>
+            <button class="button primary" type="submit">Salvar horários</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+  `;
+}
+
 export function renderAgenda(authState) {
   if (authState.role !== "professional") {
     return `<section class="card empty-state"><h2>Acesso restrito</h2><p class="muted">Esta área é destinada a profissionais.</p></section>`;
@@ -376,19 +550,22 @@ export function renderAgenda(authState) {
 
   const events = authState.agendaEvents || [];
   const patients = authState.patients || [];
-  const filteredEvents = filterAgendaEvents(events, agendaUi.filters);
   const days = agendaViewDays(agendaUi.anchor, agendaUi.view);
+  const expandedEvents = expandRecurringEvents(events, days);
+  const filteredEvents = filterAgendaEvents(expandedEvents, agendaUi.filters);
   const visibleDates = new Set(days);
   const visibleEvents = filteredEvents.filter((event) => visibleDates.has(event.date));
   const groups = eventsByDate(visibleEvents);
   const appointmentCount = visibleEvents.filter((event) => event.type === "appointment").length;
   const blockCount = visibleEvents.filter((event) => event.type === "block").length;
+  const availabilityConfigured = Object.values(authState.agendaAvailability?.weekly || {})
+    .some((intervals) => intervals.length);
 
   const calendar = agendaUi.view === "day"
-    ? renderDayView(days, groups, patients)
+    ? renderDayView(days, groups, patients, authState.agendaAvailability)
     : agendaUi.view === "month"
       ? renderMonthView(days, groups, agendaUi.anchor)
-      : renderWeekView(days, groups);
+      : renderWeekView(days, groups, authState.agendaAvailability);
 
   return `
     <div class="view-stack agenda-view">
@@ -412,10 +589,16 @@ export function renderAgenda(authState) {
           <p>${appointmentCount} ${appointmentCount === 1 ? "compromisso" : "compromissos"} · ${blockCount} ${blockCount === 1 ? "bloqueio" : "bloqueios"}</p>
           <div class="button-row">
             <button class="button" id="refresh-agenda" type="button">Atualizar</button>
-            <button class="button" data-new-agenda-event="block" type="button">Bloquear horário</button>
+            <button class="button" id="open-availability" type="button">Horários de atendimento</button>
+            <button class="button" data-new-agenda-event="block" type="button">Indisponibilidade</button>
             <button class="button primary" data-new-agenda-event="appointment" type="button">Novo compromisso</button>
           </div>
         </div>
+        <p class="agenda-availability-status">
+          <span class="agenda-status ${availabilityConfigured ? "success" : "neutral"}">
+            ${availabilityConfigured ? "Disponibilidade configurada" : "Disponibilidade ainda não configurada"}
+          </span>
+        </p>
         ${renderFilters(events, patients)}
       </section>
 
@@ -426,17 +609,20 @@ export function renderAgenda(authState) {
       </section>
     </div>
     ${agendaUi.editorOpen ? renderEditor(patients) : ""}
+    ${agendaUi.availabilityOpen ? renderAvailabilityEditor() : ""}
   `;
 }
 
 async function refreshAgenda(context) {
   try {
-    const [events, patients] = await Promise.all([
+    const [events, patients, availability] = await Promise.all([
       listAgendaEvents(context.authState.user.uid),
-      listPatientsForProfessional(context.authState.user.uid)
+      listPatientsForProfessional(context.authState.user.uid),
+      loadAgendaAvailability(context.authState.user.uid)
     ]);
     context.authState.agendaEvents = events;
     context.authState.patients = patients;
+    context.authState.agendaAvailability = availability;
     context.render();
   } catch (error) {
     context.authState.agendaEvents = [];
@@ -457,11 +643,43 @@ function closeEditor() {
   document.getElementById("agenda-dialog")?.close();
 }
 
+function openAvailabilityEditor(context) {
+  agendaUi.availabilityDraft = context.authState.agendaAvailability
+    ? cloneData(context.authState.agendaAvailability)
+    : blankAvailability();
+  agendaUi.availabilityOpen = true;
+  context.render();
+}
+
+function closeAvailabilityEditor() {
+  agendaUi.availabilityOpen = false;
+  agendaUi.availabilityDraft = null;
+  document.getElementById("availability-dialog")?.close();
+}
+
+function readAvailabilityDraft() {
+  const form = document.getElementById("availability-form");
+  const draft = cloneData(agendaUi.availabilityDraft || blankAvailability());
+  if (!form) return draft;
+  draft.slotIntervalMinutes = Number(form.elements.slotIntervalMinutes.value);
+  weekDays.forEach((day) => {
+    const starts = [...form.querySelectorAll(`[data-availability-start="${day.key}"]`)];
+    draft.weekly[day.key] = starts.map((input) => ({
+      startTime: input.value,
+      endTime: form.querySelector(`[data-availability-end="${day.key}"][data-index="${input.dataset.index}"]`)?.value || ""
+    }));
+  });
+  return draft;
+}
+
 function updateEditorVisibility() {
   const form = document.getElementById("agenda-form");
   if (!form) return;
   const isBlock = form.elements.type.value === "block";
   const guest = form.elements.patientId?.value === "__guest";
+  const allDay = form.elements.allDay?.checked === true;
+  const recurrence = form.elements.recurrenceFrequency?.value || "none";
+  const bookingMode = form.elements.bookingMode?.value || "exclusive";
   const heading = document.querySelector(".agenda-dialog-header h2");
   const title = form.elements.title;
   const color = form.elements.color;
@@ -473,8 +691,75 @@ function updateEditorVisibility() {
     else if (!isBlock && color.value === "#657076") color.value = "#25636f";
   }
   document.querySelector(".agenda-appointment-fields")?.toggleAttribute("hidden", isBlock);
+  document.querySelector(".agenda-block-fields")?.toggleAttribute("hidden", !isBlock);
   document.querySelector(".agenda-guest-field")?.toggleAttribute("hidden", isBlock || !guest);
+  document.querySelector(".agenda-block-time-fields")?.toggleAttribute("hidden", allDay);
+  document.querySelector(".agenda-recurrence-fields")?.toggleAttribute("hidden", recurrence !== "weekly");
+  document.querySelector(".agenda-capacity-field")?.toggleAttribute("hidden", bookingMode !== "group");
+  document.querySelectorAll(".agenda-appointment-fields input, .agenda-appointment-fields select")
+    .forEach((control) => { control.disabled = isBlock; });
+  document.querySelectorAll(".agenda-block-fields input, .agenda-block-fields select")
+    .forEach((control) => { control.disabled = !isBlock; });
+  if (form.elements.blockStartTime) form.elements.blockStartTime.disabled = !isBlock || allDay;
+  if (form.elements.endTime) form.elements.endTime.disabled = !isBlock || allDay;
   if (form.elements.guestName) form.elements.guestName.required = !isBlock && guest;
+  if (form.elements.capacity) form.elements.capacity.required = !isBlock && bookingMode === "group";
+  if (form.elements.recurrenceUntilDate) {
+    form.elements.recurrenceUntilDate.required = isBlock && recurrence === "weekly";
+    if (isBlock && recurrence === "weekly" && !form.elements.recurrenceUntilDate.value) {
+      form.elements.recurrenceUntilDate.value = addMonths(form.elements.date.value, 3);
+    }
+  }
+  if (isBlock && recurrence === "weekly") {
+    const checkedDays = [...form.querySelectorAll('input[name="recurrenceWeekDays"]:checked')];
+    if (!checkedDays.length && form.elements.date.value) {
+      const dayIndex = parseLocalDate(form.elements.date.value).getDay();
+      form.querySelector(`input[name="recurrenceWeekDays"][value="${dayIndex}"]`)?.click();
+    }
+  }
+}
+
+function eventInputFromForm(form, patients) {
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData);
+  const type = data.type === "block" ? "block" : "appointment";
+  const patient = patients.find((item) => patientId(item) === data.patientId);
+  const allDay = type === "block" && formData.get("allDay") === "true";
+  return {
+    ...data,
+    type,
+    startTime: type === "block" ? (allDay ? "00:00" : data.blockStartTime) : data.startTime,
+    endTime: type === "block" ? (allDay ? "00:00" : data.endTime) : undefined,
+    allDay,
+    patientId: patient ? patientId(patient) : "",
+    patientName: patient?.name || patient?.email || "",
+    guestName: data.patientId === "__guest" ? data.guestName : "",
+    bookingMode: type === "appointment" ? data.bookingMode || "exclusive" : "exclusive",
+    recurrence: {
+      frequency: type === "block" ? data.recurrenceFrequency || "none" : "none",
+      weekDays: formData.getAll("recurrenceWeekDays").map(Number),
+      untilDate: data.recurrenceUntilDate || null
+    }
+  };
+}
+
+function occurrenceDates(event) {
+  if (event.recurrence?.frequency !== "weekly") return [event.date];
+  const dates = [];
+  const current = parseLocalDate(event.date);
+  const until = parseLocalDate(event.recurrence.untilDate || event.date);
+  const days = new Set(event.recurrence.weekDays || []);
+  for (let index = 0; current <= until && index < 370; index += 1) {
+    if (days.has(current.getDay())) {
+      dates.push([
+        current.getFullYear(),
+        String(current.getMonth() + 1).padStart(2, "0"),
+        String(current.getDate()).padStart(2, "0")
+      ].join("-"));
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
 }
 
 export function bindAgenda(context) {
@@ -511,6 +796,7 @@ export function bindAgenda(context) {
   document.querySelectorAll("[data-new-agenda-event]").forEach((button) => {
     button.addEventListener("click", () => openEditor(context, null, button.dataset.newAgendaEvent));
   });
+  document.getElementById("open-availability")?.addEventListener("click", () => openAvailabilityEditor(context));
   document.querySelectorAll("[data-agenda-event]").forEach((button) => {
     button.addEventListener("click", () => {
       const event = (context.authState.agendaEvents || []).find((item) => item.id === button.dataset.agendaEvent);
@@ -545,30 +831,145 @@ export function bindAgenda(context) {
   document.getElementById("close-agenda-dialog")?.addEventListener("click", closeEditor);
   document.getElementById("cancel-agenda-dialog")?.addEventListener("click", closeEditor);
   document.querySelectorAll('input[name="type"]').forEach((input) => input.addEventListener("change", updateEditorVisibility));
+  document.querySelectorAll('input[name="bookingMode"]').forEach((input) => input.addEventListener("change", updateEditorVisibility));
   document.getElementById("agenda-patient")?.addEventListener("change", updateEditorVisibility);
+  document.querySelector('input[name="allDay"]')?.addEventListener("change", updateEditorVisibility);
+  document.getElementById("agenda-recurrence")?.addEventListener("change", updateEditorVisibility);
   updateEditorVisibility();
+
+  const availabilityDialog = document.getElementById("availability-dialog");
+  if (availabilityDialog) {
+    if (!availabilityDialog.open) availabilityDialog.showModal();
+    availabilityDialog.addEventListener("cancel", () => {
+      agendaUi.availabilityOpen = false;
+      agendaUi.availabilityDraft = null;
+    });
+  }
+  document.getElementById("close-availability-dialog")?.addEventListener("click", closeAvailabilityEditor);
+  document.getElementById("cancel-availability-dialog")?.addEventListener("click", closeAvailabilityEditor);
+
+  document.querySelectorAll("[data-toggle-availability]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const draft = readAvailabilityDraft();
+      draft.weekly[input.dataset.toggleAvailability] = input.checked
+        ? draft.weekly[input.dataset.toggleAvailability].length
+          ? draft.weekly[input.dataset.toggleAvailability]
+          : [{ startTime: "08:00", endTime: "17:00" }]
+        : [];
+      agendaUi.availabilityDraft = draft;
+      context.render();
+    });
+  });
+  document.querySelectorAll("[data-add-availability]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = readAvailabilityDraft();
+      const intervals = draft.weekly[button.dataset.addAvailability];
+      const lastEnd = intervals.at(-1)?.endTime || "08:00";
+      const [hours, minutes] = lastEnd.split(":").map(Number);
+      const startMinutes = hours * 60 + minutes;
+      const endMinutes = Math.min(startMinutes + 120, 1439);
+      intervals.push({
+        startTime: startMinutes < 1439 ? lastEnd : "",
+        endTime: startMinutes < 1439
+          ? `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`
+          : ""
+      });
+      agendaUi.availabilityDraft = draft;
+      context.render();
+    });
+  });
+  document.querySelectorAll("[data-remove-availability]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = readAvailabilityDraft();
+      draft.weekly[button.dataset.removeAvailability].splice(Number(button.dataset.index), 1);
+      agendaUi.availabilityDraft = draft;
+      context.render();
+    });
+  });
+  document.getElementById("availability-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = event.currentTarget.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    try {
+      const availability = await saveAgendaAvailability(
+        context.authState.user.uid,
+        readAvailabilityDraft()
+      );
+      context.authState.agendaAvailability = availability;
+      agendaUi.availabilityOpen = false;
+      agendaUi.availabilityDraft = null;
+      showToast("Horários de atendimento atualizados.");
+      context.render();
+    } catch (error) {
+      submit.disabled = false;
+      showToast(`Não foi possível salvar os horários: ${error.message}`);
+    }
+  });
 
   document.getElementById("agenda-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = Object.fromEntries(new FormData(form));
-    const existing = (context.authState.agendaEvents || []).find((item) => item.id === data.eventId) || null;
-    const patient = (context.authState.patients || []).find((item) => patientId(item) === data.patientId);
     const submit = form.querySelector('button[type="submit"]');
     submit.disabled = true;
 
     try {
-      await saveAgendaEvent(context.authState.user.uid, {
-        ...data,
-        patientId: patient ? patientId(patient) : "",
-        patientName: patient?.name || patient?.email || "",
-        guestName: data.patientId === "__guest" ? data.guestName : "",
-        timeZone: existing?.timeZone
-      }, existing);
+      const input = eventInputFromForm(form, context.authState.patients || []);
+      const existing = (context.authState.agendaEvents || []).find((item) => item.id === input.eventId) || null;
+      const candidate = normalizeAgendaEvent(
+        { ...input, timeZone: existing?.timeZone },
+        context.authState.user.uid,
+        existing || {}
+      );
+      const dates = occurrenceDates(candidate);
+      const existingOccurrences = expandRecurringEvents(context.authState.agendaEvents || [], dates);
+      const candidateOccurrences = expandRecurringEvents(
+        [{ id: existing?.id || "candidate", ...candidate }],
+        dates
+      );
+      const conflicts = candidateOccurrences.flatMap((occurrence) =>
+        eventConflicts(occurrence, existingOccurrences)
+      );
+      if (conflicts.length && !confirmAction(
+        `Há ${new Set(conflicts.map((item) => item.sourceEventId || item.id)).size} item(ns) ocupando este período. Salvar mesmo assim?`
+      )) {
+        submit.disabled = false;
+        return;
+      }
+      if (!eventIsWithinAvailability(candidate, context.authState.agendaAvailability)
+        && !confirmAction("Este compromisso está fora dos horários habituais de atendimento. Salvar mesmo assim?")) {
+        submit.disabled = false;
+        return;
+      }
+
+      const previousEvents = [...(context.authState.agendaEvents || [])];
+      const temporaryId = existing?.id || `local-${Date.now()}`;
+      const optimistic = { id: temporaryId, ...candidate };
+      context.authState.agendaEvents = existing
+        ? previousEvents.map((item) => item.id === existing.id ? optimistic : item)
+        : [...previousEvents, optimistic];
+      context.authState.agendaEvents.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      agendaUi.anchor = candidate.date;
       agendaUi.editorOpen = false;
       agendaUi.draft = null;
-      showToast(existing ? "Compromisso atualizado." : "Item adicionado à agenda.");
-      await refreshAgenda(context);
+      context.render();
+
+      try {
+        const saved = await saveAgendaEvent(context.authState.user.uid, candidate, existing);
+        context.authState.agendaEvents = context.authState.agendaEvents
+          .map((item) => item.id === temporaryId ? saved : item)
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+        const hiddenByFilters = filterAgendaEvents([saved], agendaUi.filters).length === 0;
+        showToast(hiddenByFilters
+          ? "Item salvo, mas oculto pelos filtros atuais."
+          : existing ? "Compromisso atualizado." : "Item adicionado à agenda.");
+        context.render();
+      } catch (error) {
+        context.authState.agendaEvents = previousEvents;
+        agendaUi.editorOpen = true;
+        agendaUi.draft = existing ? { ...existing } : { ...candidate };
+        context.render();
+        showToast(`Não foi possível salvar: ${error.message}`);
+      }
     } catch (error) {
       submit.disabled = false;
       showToast(`Não foi possível salvar: ${error.message}`);
@@ -578,13 +979,17 @@ export function bindAgenda(context) {
   document.getElementById("delete-agenda-event")?.addEventListener("click", async () => {
     const event = agendaUi.draft;
     if (!event?.id || !confirmAction("Excluir este item da agenda?")) return;
+    const previousEvents = [...(context.authState.agendaEvents || [])];
+    context.authState.agendaEvents = previousEvents.filter((item) => item.id !== event.id);
+    agendaUi.editorOpen = false;
+    agendaUi.draft = null;
+    context.render();
     try {
       await deleteAgendaEvent(context.authState.user.uid, event.id);
-      agendaUi.editorOpen = false;
-      agendaUi.draft = null;
       showToast("Item excluído da agenda.");
-      await refreshAgenda(context);
     } catch (error) {
+      context.authState.agendaEvents = previousEvents;
+      context.render();
       showToast(`Não foi possível excluir: ${error.message}`);
     }
   });

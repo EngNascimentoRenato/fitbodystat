@@ -30,6 +30,10 @@
   color: var(--muted);
 }
 
+.agenda-availability-status {
+  margin: 0;
+}
+
 .agenda-navigation,
 .agenda-view-switch {
   display: inline-flex;
@@ -107,7 +111,7 @@
 .agenda-day-heading {
   display: flex;
   width: 100%;
-  min-height: 52px;
+  min-height: 68px;
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem;
@@ -115,6 +119,21 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--border);
+}
+
+.agenda-day-heading > span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.agenda-day-heading small,
+.agenda-availability-label {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 .agenda-day-heading strong {
@@ -391,6 +410,106 @@
   border-radius: var(--radius);
 }
 
+.agenda-booking-field,
+.agenda-recurrence-fields fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.agenda-booking-field legend,
+.agenda-recurrence-fields legend {
+  margin-bottom: 0.45rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.agenda-booking-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.agenda-booking-switch label {
+  position: relative;
+}
+
+.agenda-booking-switch input {
+  position: absolute;
+  opacity: 0;
+}
+
+.agenda-booking-switch span {
+  display: grid;
+  min-height: 82px;
+  gap: 0.2rem;
+  align-content: center;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-booking-switch small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.agenda-booking-switch input:checked + span {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.agenda-block-fields,
+.agenda-appointment-fields,
+.agenda-recurrence-fields {
+  display: grid;
+  gap: 1rem;
+}
+
+.agenda-all-day {
+  width: fit-content;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.agenda-weekday-picker {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.agenda-weekday-picker label {
+  position: relative;
+}
+
+.agenda-weekday-picker input {
+  position: absolute;
+  opacity: 0;
+}
+
+.agenda-weekday-picker span {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  color: var(--muted);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-weekday-picker input:checked + span {
+  color: var(--text);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
 .agenda-type-switch label {
   position: relative;
 }
@@ -424,8 +543,67 @@
 }
 
 .agenda-appointment-fields[hidden],
-.agenda-guest-field[hidden] {
+.agenda-block-fields[hidden],
+.agenda-block-time-fields[hidden],
+.agenda-guest-field[hidden],
+.agenda-recurrence-fields[hidden],
+.agenda-capacity-field[hidden] {
   display: none;
+}
+
+.availability-dialog {
+  width: min(820px, calc(100vw - 2rem));
+}
+
+.availability-slot-field {
+  max-width: 320px;
+}
+
+.availability-week {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.availability-day {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.availability-day > header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.availability-intervals {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.availability-interval {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr) 42px;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.availability-interval input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.55rem;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.availability-closed {
+  align-self: center;
+  color: var(--muted);
 }
 
 .agenda-dialog-actions {
@@ -487,6 +665,11 @@
 
   .agenda-toolbar-actions .button-row .primary {
     grid-column: 1 / -1;
+  }
+
+  .agenda-toolbar-actions [data-new-agenda-event="block"] {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .agenda-filters {
@@ -558,5 +741,21 @@
   .agenda-dialog-actions .button-row,
   .agenda-dialog-actions .button-row .button {
     width: 100%;
+  }
+
+  .agenda-booking-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-booking-switch span {
+    min-height: 64px;
+  }
+
+  .availability-day {
+    grid-template-columns: 1fr;
+  }
+
+  .availability-interval {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 42px;
   }
 }

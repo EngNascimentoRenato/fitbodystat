@@ -11,7 +11,7 @@ Objetivo: ampliar a agenda já disponível com participação do paciente, autom
 integrações externas.
 
 1. Evoluções posteriores da agenda
-   - Cadastro de disponibilidade e compromissos recorrentes.
+   - Compromissos recorrentes.
    - Visualização da agenda pelo paciente.
    - Solicitação de pré-agendamento pelo paciente.
    - Confirmação, recusa e sugestão de horários alternativos.
