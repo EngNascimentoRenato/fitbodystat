@@ -18,7 +18,9 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - Horários recorrentes de atendimento com múltiplos períodos por dia.
 - Compromissos exclusivos, coletivos ou informativos e indisponibilidades recorrentes.
 - Consulta resumida dos compromissos antes da edição e indicação persistente dos filtros ativos.
-- Cancelamento com histórico preservado e bloqueio opcional do horário.
+- Estado atualizado diretamente no resumo do compromisso.
+- Cancelamento com histórico preservado e bloqueio opcional ou personalizado.
+- Reabertura controlada com remoção opcional do bloqueio associado.
 - Administração de cadastros, níveis, situação das contas, convites e vínculos.
 - Pré-cadastro de profissionais por e-mail, sem envio de convite.
 - Primeiro acesso orientado conforme o tipo de conta.
@@ -78,7 +80,7 @@ A versão funcional, a build e a data da publicação ficam centralizadas em
 `js/config/app-version.js`. Atualize os três valores com:
 
 ```powershell
-node scripts/set-version.mjs 0.2.0-alpha.3 26
+node scripts/set-version.mjs 0.2.0-alpha.4 27
 ```
 
 Ao iniciar outra fase, a revisão da fase pode reiniciar e a build deve continuar

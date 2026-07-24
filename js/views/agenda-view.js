@@ -5,6 +5,7 @@ import {
   agendaEventPerson,
   agendaPeriodLabel,
   agendaViewDays,
+  cancellationBlockInput,
   eventConflicts,
   eventIsWithinAvailability,
   expandRecurringEvents,
@@ -18,6 +19,7 @@ import {
   deleteAgendaEvent,
   listAgendaEvents,
   loadAgendaAvailability,
+  reopenAgendaAppointment,
   saveAgendaAvailability,
   saveAgendaEvent
 } from "../services/agenda-service.js";
@@ -56,6 +58,7 @@ const agendaUi = {
   detailOpen: false,
   detailEventId: null,
   cancelOpen: false,
+  reopenOpen: false,
   editorOpen: false,
   draft: null,
   availabilityOpen: false,
@@ -567,8 +570,20 @@ function renderEventDetails(event, patients) {
         </header>
 
         <div class="agenda-detail-heading">
-          ${renderStatusBadge(event.status)}
           <strong>${escapeHtml(formatDate(event.date))} · ${escapeHtml(timeLabel)}</strong>
+          ${isBlock || event.status === "cancelled" ? renderStatusBadge(event.status) : `
+            <form class="agenda-quick-status" id="agenda-quick-status-form">
+              <label class="sr-only" for="agenda-quick-status">Estado do compromisso</label>
+              <select id="agenda-quick-status" name="status">
+                ${Object.entries(statusLabels)
+                  .filter(([value]) => !["blocked", "cancelled"].includes(value))
+                  .map(([value, label]) =>
+                    `<option value="${value}" ${event.status === value ? "selected" : ""}>${label}</option>`
+                  ).join("")}
+              </select>
+              <button class="button" type="submit">Atualizar estado</button>
+            </form>
+          `}
         </div>
 
         <dl class="agenda-detail-grid">
@@ -590,9 +605,11 @@ function renderEventDetails(event, patients) {
         </dl>
 
         <footer class="agenda-dialog-actions">
-          ${!isBlock && !["cancelled", "completed"].includes(event.status)
-            ? `<button class="button danger" id="open-cancel-agenda-event" type="button">Cancelar compromisso</button>`
-            : "<span></span>"}
+          ${!isBlock && event.status === "cancelled"
+            ? `<button class="button" id="open-reopen-agenda-event" type="button">Reabrir compromisso</button>`
+            : !isBlock && event.status !== "completed"
+              ? `<button class="button danger" id="open-cancel-agenda-event" type="button">Cancelar compromisso</button>`
+              : "<span></span>"}
           <div class="button-row">
             <button class="button" id="close-agenda-details-secondary" type="button">Fechar</button>
             <button class="button primary" id="edit-agenda-event" type="button">Editar</button>
@@ -622,18 +639,94 @@ function renderCancellationDialog(event) {
           <label for="agenda-cancellation-reason">Motivo do cancelamento <span class="muted">(opcional)</span></label>
           <textarea id="agenda-cancellation-reason" name="reason" maxlength="500"></textarea>
         </div>
-        <label class="consent-option agenda-cancel-block-option">
-          <input type="checkbox" name="blockSlot" value="true" checked />
-          <span>
-            <strong>Bloquear este horário na agenda</strong>
-            <small>Cria uma indisponibilidade separada em ${escapeHtml(formatDate(event.date))}, das ${escapeHtml(event.startTime)} às ${escapeHtml(event.endTime)}.</small>
-          </span>
-        </label>
+        <fieldset class="agenda-cancel-options">
+          <legend>Bloqueio da agenda</legend>
+          <label>
+            <input type="radio" name="blockMode" value="none" />
+            <span><strong>Não bloquear</strong><small>Somente registra o cancelamento.</small></span>
+          </label>
+          <label>
+            <input type="radio" name="blockMode" value="current" checked />
+            <span>
+              <strong>Bloquear o horário deste compromisso</strong>
+              <small>${escapeHtml(formatDate(event.date))}, das ${escapeHtml(event.startTime)} às ${escapeHtml(event.endTime)}.</small>
+            </span>
+          </label>
+          <label>
+            <input type="radio" name="blockMode" value="custom" />
+            <span><strong>Definir outro período</strong><small>Escolha uma data e uma faixa de horário diferente.</small></span>
+          </label>
+        </fieldset>
+        <div class="agenda-custom-block-fields" hidden>
+          <div class="form-grid">
+            <div class="field">
+              <label for="agenda-custom-block-date">Data do bloqueio</label>
+              <input id="agenda-custom-block-date" name="blockDate" type="date" value="${escapeAttribute(event.date)}" />
+            </div>
+            <div class="field agenda-custom-time-field">
+              <label for="agenda-custom-block-start">Horário inicial</label>
+              <input id="agenda-custom-block-start" name="blockStartTime" type="time" value="${escapeAttribute(event.startTime)}" />
+            </div>
+            <div class="field agenda-custom-time-field">
+              <label for="agenda-custom-block-end">Horário final</label>
+              <input id="agenda-custom-block-end" name="blockEndTime" type="time" value="${escapeAttribute(event.endTime)}" />
+            </div>
+          </div>
+          <label class="consent-option agenda-all-day">
+            <input type="checkbox" name="blockAllDay" value="true" />
+            <span>Bloquear o dia inteiro</span>
+          </label>
+        </div>
         <footer class="agenda-dialog-actions">
           <span></span>
           <div class="button-row">
             <button class="button" id="cancel-cancellation" type="button">Voltar</button>
             <button class="button danger" type="submit">Confirmar cancelamento</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+  `;
+}
+
+function renderReopenDialog(event, linkedBlock) {
+  if (!event || event.type !== "appointment" || event.status !== "cancelled") return "";
+  return `
+    <dialog class="agenda-dialog agenda-reopen-dialog" id="agenda-reopen-dialog">
+      <form class="form" id="agenda-reopen-form">
+        <header class="agenda-dialog-header">
+          <div>
+            <p class="eyebrow">Reabrir compromisso</p>
+            <h2>${escapeHtml(event.title)}</h2>
+          </div>
+          <button class="icon-button" id="close-reopen-agenda" type="button" aria-label="Fechar">×</button>
+        </header>
+        <p class="muted">
+          O cancelamento permanecerá registrado no histórico. O horário será verificado novamente antes da reabertura.
+        </p>
+        <div class="field">
+          <label for="agenda-reopen-status">Novo estado</label>
+          <select id="agenda-reopen-status" name="status">
+            <option value="scheduled">Agendado</option>
+            <option value="confirmed">Confirmado</option>
+          </select>
+        </div>
+        ${linkedBlock ? `
+          <label class="consent-option agenda-cancel-block-option">
+            <input type="checkbox" name="removeLinkedBlock" value="true" checked />
+            <span>
+              <strong>Remover o bloqueio criado no cancelamento</strong>
+              <small>${linkedBlock.allDay
+                ? `${escapeHtml(formatDate(linkedBlock.date))}, dia inteiro.`
+                : `${escapeHtml(formatDate(linkedBlock.date))}, das ${escapeHtml(linkedBlock.startTime)} às ${escapeHtml(linkedBlock.endTime)}.`}</small>
+            </span>
+          </label>
+        ` : `<p class="agenda-inline-note">Nenhum bloqueio associado a este cancelamento.</p>`}
+        <footer class="agenda-dialog-actions">
+          <span></span>
+          <div class="button-row">
+            <button class="button" id="cancel-reopen-agenda" type="button">Voltar</button>
+            <button class="button primary" type="submit">Reabrir</button>
           </div>
         </footer>
       </form>
@@ -723,6 +816,12 @@ export function renderAgenda(authState) {
   const appointmentCount = visibleEvents.filter((event) => event.type === "appointment").length;
   const blockCount = visibleEvents.filter((event) => event.type === "block").length;
   const detailEvent = events.find((event) => event.id === agendaUi.detailEventId) || null;
+  const linkedCancellationBlock = detailEvent
+    ? events.find((event) =>
+      event.type === "block"
+      && event.relatedEventId === detailEvent.id
+    ) || null
+    : null;
   const availabilityConfigured = Object.values(authState.agendaAvailability?.weekly || {})
     .some((intervals) => intervals.length);
 
@@ -776,6 +875,7 @@ export function renderAgenda(authState) {
     </div>
     ${agendaUi.detailOpen ? renderEventDetails(detailEvent, patients) : ""}
     ${agendaUi.cancelOpen ? renderCancellationDialog(detailEvent) : ""}
+    ${agendaUi.reopenOpen ? renderReopenDialog(detailEvent, linkedCancellationBlock) : ""}
     ${agendaUi.editorOpen ? renderEditor(patients) : ""}
     ${agendaUi.availabilityOpen ? renderAvailabilityEditor() : ""}
   `;
@@ -803,6 +903,7 @@ function openEditor(context, event = null, type = "appointment", date = agendaUi
   agendaUi.draft = event ? { ...event } : blankDraft(type, date);
   agendaUi.detailOpen = false;
   agendaUi.cancelOpen = false;
+  agendaUi.reopenOpen = false;
   agendaUi.editorOpen = true;
   context.render();
 }
@@ -817,19 +918,23 @@ function openEventDetails(context, event) {
   agendaUi.detailEventId = event.id;
   agendaUi.detailOpen = true;
   agendaUi.cancelOpen = false;
+  agendaUi.reopenOpen = false;
   context.render();
 }
 
 function closeEventDetails() {
   agendaUi.detailOpen = false;
   agendaUi.cancelOpen = false;
+  agendaUi.reopenOpen = false;
   agendaUi.detailEventId = null;
   document.getElementById("agenda-details-dialog")?.close();
   document.getElementById("agenda-cancel-dialog")?.close();
+  document.getElementById("agenda-reopen-dialog")?.close();
 }
 
 function returnToEventDetails(context) {
   agendaUi.cancelOpen = false;
+  agendaUi.reopenOpen = false;
   agendaUi.detailOpen = true;
   context.render();
 }
@@ -894,7 +999,10 @@ function updateEditorVisibility() {
   if (form.elements.blockStartTime) form.elements.blockStartTime.disabled = !isBlock || allDay;
   if (form.elements.endTime) form.elements.endTime.disabled = !isBlock || allDay;
   if (form.elements.guestName) form.elements.guestName.required = !isBlock && guest;
-  if (form.elements.capacity) form.elements.capacity.required = !isBlock && bookingMode === "group";
+  if (form.elements.capacity) {
+    form.elements.capacity.required = !isBlock && bookingMode === "group";
+    form.elements.capacity.disabled = isBlock || bookingMode !== "group";
+  }
   if (form.elements.recurrenceUntilDate) {
     form.elements.recurrenceUntilDate.required = isBlock && recurrence === "weekly";
     if (isBlock && recurrence === "weekly" && !form.elements.recurrenceUntilDate.value) {
@@ -908,6 +1016,27 @@ function updateEditorVisibility() {
       form.querySelector(`input[name="recurrenceWeekDays"][value="${dayIndex}"]`)?.click();
     }
   }
+}
+
+function updateCancellationVisibility() {
+  const form = document.getElementById("agenda-cancel-form");
+  if (!form) return;
+  const mode = form.elements.blockMode.value;
+  const custom = mode === "custom";
+  const allDay = form.elements.blockAllDay.checked;
+  const customFields = form.querySelector(".agenda-custom-block-fields");
+  customFields?.toggleAttribute("hidden", !custom);
+  if (form.elements.blockDate) {
+    form.elements.blockDate.disabled = !custom;
+    form.elements.blockDate.required = custom;
+  }
+  [form.elements.blockStartTime, form.elements.blockEndTime].forEach((control) => {
+    if (!control) return;
+    control.disabled = !custom || allDay;
+    control.required = custom && !allDay;
+  });
+  form.querySelectorAll(".agenda-custom-time-field")
+    .forEach((field) => field.toggleAttribute("hidden", custom && allDay));
 }
 
 function eventInputFromForm(form, patients) {
@@ -1025,9 +1154,47 @@ export function bindAgenda(context) {
       .find((item) => item.id === agendaUi.detailEventId);
     if (event) openEditor(context, event);
   });
+  document.getElementById("agenda-quick-status-form")?.addEventListener("submit", async (statusEvent) => {
+    statusEvent.preventDefault();
+    const form = statusEvent.currentTarget;
+    const submit = form.querySelector('button[type="submit"]');
+    const source = (context.authState.agendaEvents || [])
+      .find((item) => item.id === agendaUi.detailEventId);
+    if (!source) return;
+    if (source.status === form.elements.status.value) {
+      showToast("O compromisso já está com este estado.");
+      return;
+    }
+    submit.disabled = true;
+    const previousEvents = [...context.authState.agendaEvents];
+    const candidate = normalizeAgendaEvent(
+      { ...source, status: form.elements.status.value },
+      context.authState.user.uid,
+      source
+    );
+    context.authState.agendaEvents = previousEvents
+      .map((item) => item.id === source.id ? { id: source.id, ...candidate } : item);
+    context.render();
+    try {
+      const saved = await saveAgendaEvent(context.authState.user.uid, candidate, source);
+      context.authState.agendaEvents = context.authState.agendaEvents
+        .map((item) => item.id === source.id ? saved : item);
+      showToast("Estado do compromisso atualizado.");
+      context.render();
+    } catch (error) {
+      context.authState.agendaEvents = previousEvents;
+      context.render();
+      showToast(`Não foi possível atualizar o estado: ${error.message}`);
+    }
+  });
   document.getElementById("open-cancel-agenda-event")?.addEventListener("click", () => {
     agendaUi.detailOpen = false;
     agendaUi.cancelOpen = true;
+    context.render();
+  });
+  document.getElementById("open-reopen-agenda-event")?.addEventListener("click", () => {
+    agendaUi.detailOpen = false;
+    agendaUi.reopenOpen = true;
     context.render();
   });
 
@@ -1038,6 +1205,9 @@ export function bindAgenda(context) {
   }
   document.getElementById("close-cancel-agenda")?.addEventListener("click", () => returnToEventDetails(context));
   document.getElementById("cancel-cancellation")?.addEventListener("click", () => returnToEventDetails(context));
+  document.querySelectorAll('input[name="blockMode"], input[name="blockAllDay"]')
+    .forEach((input) => input.addEventListener("change", updateCancellationVisibility));
+  updateCancellationVisibility();
   document.getElementById("agenda-cancel-form")?.addEventListener("submit", async (submitEvent) => {
     submitEvent.preventDefault();
     const form = submitEvent.currentTarget;
@@ -1052,9 +1222,38 @@ export function bindAgenda(context) {
     }
     submit.disabled = true;
     try {
+      const blockMode = form.elements.blockMode.value;
+      const blockDetails = {
+        date: form.elements.blockDate?.value,
+        startTime: form.elements.blockStartTime?.value,
+        endTime: form.elements.blockEndTime?.value,
+        allDay: form.elements.blockAllDay?.checked === true
+      };
+      const blockInput = cancellationBlockInput(source, {
+        blockMode,
+        blockDetails,
+        reason: form.elements.reason.value
+      });
+      if (blockInput) {
+        const blockCandidate = {
+          id: "cancellation-block",
+          ...normalizeAgendaEvent(blockInput, context.authState.user.uid)
+        };
+        const conflicts = eventConflicts(
+          blockCandidate,
+          (context.authState.agendaEvents || []).filter((item) => item.id !== source.id)
+        );
+        if (conflicts.length && !confirmAction(
+          `O bloqueio se sobrepõe a ${conflicts.length} item(ns) da agenda. Cancelar e bloquear mesmo assim?`
+        )) {
+          submit.disabled = false;
+          return;
+        }
+      }
       const result = await cancelAgendaAppointment(context.authState.user.uid, source, {
         reason: form.elements.reason.value,
-        blockSlot: form.elements.blockSlot.checked
+        blockMode,
+        blockDetails
       });
       context.authState.agendaEvents = (context.authState.agendaEvents || [])
         .map((item) => item.id === source.id ? result.appointment : item);
@@ -1062,6 +1261,7 @@ export function bindAgenda(context) {
       context.authState.agendaEvents.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
       agendaUi.detailOpen = false;
       agendaUi.cancelOpen = false;
+      agendaUi.reopenOpen = false;
       agendaUi.detailEventId = null;
       showToast(result.block
         ? "Compromisso cancelado e horário bloqueado."
@@ -1070,6 +1270,65 @@ export function bindAgenda(context) {
     } catch (error) {
       submit.disabled = false;
       showToast(`Não foi possível cancelar: ${error.message}`);
+    }
+  });
+
+  const reopenDialog = document.getElementById("agenda-reopen-dialog");
+  if (reopenDialog) {
+    if (!reopenDialog.open) reopenDialog.showModal();
+    reopenDialog.addEventListener("cancel", () => returnToEventDetails(context));
+  }
+  document.getElementById("close-reopen-agenda")?.addEventListener("click", () => returnToEventDetails(context));
+  document.getElementById("cancel-reopen-agenda")?.addEventListener("click", () => returnToEventDetails(context));
+  document.getElementById("agenda-reopen-form")?.addEventListener("submit", async (reopenEvent) => {
+    reopenEvent.preventDefault();
+    const form = reopenEvent.currentTarget;
+    const submit = form.querySelector('button[type="submit"]');
+    const source = (context.authState.agendaEvents || [])
+      .find((item) => item.id === agendaUi.detailEventId);
+    const linkedBlock = (context.authState.agendaEvents || []).find((item) =>
+      item.type === "block"
+      && item.relatedEventId === source?.id
+    ) || null;
+    if (!source) return;
+    const removeLinkedBlock = linkedBlock && form.elements.removeLinkedBlock?.checked === true;
+    const candidate = {
+      id: source.id,
+      ...normalizeAgendaEvent(
+        { ...source, status: form.elements.status.value },
+        context.authState.user.uid,
+        source
+      )
+    };
+    const conflictEvents = (context.authState.agendaEvents || [])
+      .filter((item) => !removeLinkedBlock || item.id !== linkedBlock.id);
+    const conflicts = eventConflicts(candidate, conflictEvents);
+    if (conflicts.length && !confirmAction(
+      `Há ${conflicts.length} item(ns) ocupando este horário. Reabrir mesmo assim?`
+    )) return;
+    if (!eventIsWithinAvailability(candidate, context.authState.agendaAvailability)
+      && !confirmAction("Este compromisso está fora dos horários habituais. Reabrir mesmo assim?")) return;
+
+    submit.disabled = true;
+    try {
+      const result = await reopenAgendaAppointment(context.authState.user.uid, source, {
+        status: form.elements.status.value,
+        linkedBlock: removeLinkedBlock ? linkedBlock : null
+      });
+      context.authState.agendaEvents = (context.authState.agendaEvents || [])
+        .filter((item) => item.id !== result.removedBlockId)
+        .map((item) => item.id === source.id ? result.appointment : item)
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      agendaUi.detailOpen = true;
+      agendaUi.cancelOpen = false;
+      agendaUi.reopenOpen = false;
+      showToast(result.removedBlockId
+        ? "Compromisso reaberto e bloqueio associado removido."
+        : "Compromisso reaberto.");
+      context.render();
+    } catch (error) {
+      submit.disabled = false;
+      showToast(`Não foi possível reabrir: ${error.message}`);
     }
   });
 

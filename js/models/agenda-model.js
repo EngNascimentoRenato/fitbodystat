@@ -169,14 +169,39 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
     capacity,
     blocksAvailability: type === "block" || bookingMode !== "informational",
     privateNotes: cleanText(input.privateNotes),
-    cancellationReason: status === "cancelled"
-      ? cleanText(input.cancellationReason, existing.cancellationReason)
-      : "",
+    cancellationReason: cleanText(input.cancellationReason, existing.cancellationReason),
     relatedEventId: cleanText(input.relatedEventId, existing.relatedEventId) || null,
     visibility: "private",
     confirmationStatus: existing.confirmationStatus || "not_requested",
     recurrence: normalizeRecurrence(input, date, type),
     reminderMinutes: existing.reminderMinutes ?? null
+  };
+}
+
+export function cancellationBlockInput(
+  appointment,
+  { blockMode = "current", blockDetails = {}, reason = "" } = {}
+) {
+  if (!appointment?.id || appointment.type !== "appointment") {
+    throw new Error("Compromisso não identificado.");
+  }
+  if (blockMode === "none") return null;
+
+  const custom = blockMode === "custom";
+  const allDay = custom && blockDetails.allDay === true;
+  return {
+    type: "block",
+    title: "Indisponível após cancelamento",
+    date: custom ? blockDetails.date : appointment.date,
+    startTime: allDay ? "00:00" : custom ? blockDetails.startTime : appointment.startTime,
+    endTime: allDay ? "00:00" : custom ? blockDetails.endTime : appointment.endTime,
+    allDay,
+    color: "#657076",
+    recurrence: { frequency: "none", weekDays: [], untilDate: null },
+    privateNotes: reason
+      ? `Horário bloqueado após cancelamento. Motivo: ${reason}`
+      : "Horário bloqueado após cancelamento.",
+    relatedEventId: appointment.id
   };
 }
 

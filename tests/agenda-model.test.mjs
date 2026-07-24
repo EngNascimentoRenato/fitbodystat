@@ -5,6 +5,7 @@ import {
   agendaEventPerson,
   agendaPeriodLabel,
   agendaViewDays,
+  cancellationBlockInput,
   eventConflicts,
   eventIsWithinAvailability,
   expandRecurringEvents,
@@ -118,6 +119,41 @@ test("cancelamento preserva o compromisso e registra seu motivo", () => {
   assert.equal(cancelled.status, "cancelled");
   assert.equal(cancelled.cancellationReason, "Imprevisto profissional");
   assert.equal(cancelled.blocksAvailability, true);
+
+  const reopened = normalizeAgendaEvent({
+    ...cancelled,
+    status: "scheduled"
+  }, "professional-1", { id: "event-1", ...cancelled });
+  assert.equal(reopened.status, "scheduled");
+  assert.equal(reopened.cancellationReason, "Imprevisto profissional");
+});
+
+test("cancelamento permite não bloquear, manter o período ou definir outro", () => {
+  const appointment = {
+    id: "event-1",
+    type: "appointment",
+    date: "2026-07-24",
+    startTime: "08:00",
+    endTime: "09:00"
+  };
+  assert.equal(cancellationBlockInput(appointment, { blockMode: "none" }), null);
+
+  const current = cancellationBlockInput(appointment, { blockMode: "current" });
+  assert.equal(current.date, "2026-07-24");
+  assert.equal(current.startTime, "08:00");
+  assert.equal(current.endTime, "09:00");
+
+  const custom = cancellationBlockInput(appointment, {
+    blockMode: "custom",
+    blockDetails: {
+      date: "2026-07-25",
+      startTime: "08:00",
+      endTime: "13:00"
+    }
+  });
+  assert.equal(custom.date, "2026-07-25");
+  assert.equal(custom.endTime, "13:00");
+  assert.equal(custom.relatedEventId, "event-1");
 });
 
 test("bloqueio aceita dia inteiro e recorrência semanal", () => {

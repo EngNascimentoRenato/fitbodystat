@@ -410,6 +410,8 @@
 .agenda-dialog {
   width: min(760px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
+  box-sizing: border-box;
+  margin: auto;
   padding: 0;
   overflow: auto;
   color: var(--text);
@@ -424,6 +426,11 @@
 }
 
 .agenda-form {
+  padding: 1rem;
+}
+
+.agenda-cancel-dialog > form,
+.agenda-reopen-dialog > form {
   padding: 1rem;
 }
 
@@ -450,6 +457,17 @@
   justify-content: space-between;
   padding: 1rem 0;
   border-bottom: 1px solid var(--border);
+}
+
+.agenda-quick-status {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.agenda-quick-status select {
+  min-height: 38px;
+  padding: 0.4rem 2rem 0.4rem 0.55rem;
 }
 
 .agenda-detail-grid {
@@ -526,6 +544,67 @@
 
 .agenda-cancel-block-option small {
   color: var(--muted);
+}
+
+.agenda-cancel-options {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.agenda-cancel-options legend {
+  margin-bottom: 0.45rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.agenda-cancel-options label {
+  position: relative;
+}
+
+.agenda-cancel-options input {
+  position: absolute;
+  opacity: 0;
+}
+
+.agenda-cancel-options span {
+  display: grid;
+  min-height: 62px;
+  gap: 0.2rem;
+  align-content: center;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.agenda-cancel-options small {
+  color: var(--muted);
+}
+
+.agenda-cancel-options input:checked + span {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.agenda-custom-block-fields {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--surface-strong);
+  border-left: 3px solid var(--primary);
+}
+
+.agenda-inline-note {
+  margin: 0;
+  padding: 0.75rem;
+  color: var(--muted);
+  background: var(--surface-strong);
+  border-left: 3px solid var(--border);
 }
 
 .agenda-type-switch {
@@ -672,6 +751,8 @@
 .agenda-appointment-fields[hidden],
 .agenda-block-fields[hidden],
 .agenda-block-time-fields[hidden],
+.agenda-custom-block-fields[hidden],
+.agenda-custom-time-field[hidden],
 .agenda-guest-field[hidden],
 .agenda-recurrence-fields[hidden],
 .agenda-capacity-field[hidden] {
@@ -887,6 +968,17 @@
   .agenda-detail-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .agenda-quick-status {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agenda-quick-status select,
+  .agenda-quick-status .button {
+    width: 100%;
   }
 
   .agenda-detail-grid {
