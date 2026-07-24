@@ -363,6 +363,7 @@ export function bindProfile(state, persist, render) {
   const weeklyField = form.elements.weeklyChangeGoalKg;
   const deadlineField = form.elements.goalDeadlineMonths;
   const mobileSave = document.getElementById("profile-mobile-save");
+  let goalPlannerTimer = null;
   profileHasPendingChanges = false;
 
   const markDirty = () => {
@@ -370,16 +371,20 @@ export function bindProfile(state, persist, render) {
     mobileSave.hidden = false;
   };
 
-  const updateGoalPlanner = () => {
+  const updateGoalPlanner = (sourceName = "") => {
     const draft = readProfileForm(form, state.profile);
     const maintenance = getProgressMode(draft) === "maintain";
     const customDeadline = draft.goalDeadlineMode === "custom";
     weeklyField.readOnly = customDeadline || maintenance;
     deadlineField.readOnly = !customDeadline || maintenance;
-    weeklyField.value = draft.weeklyChangeGoalKg || "";
-    deadlineField.value = draft.goalDeadlineMonths
-      ? Number(draft.goalDeadlineMonths).toFixed(1)
-      : "";
+    if (sourceName !== "weeklyChangeGoalKg" && document.activeElement !== weeklyField) {
+      weeklyField.value = draft.weeklyChangeGoalKg || "";
+    }
+    if (sourceName !== "goalDeadlineMonths" && document.activeElement !== deadlineField) {
+      deadlineField.value = draft.goalDeadlineMonths
+        ? Number(draft.goalDeadlineMonths).toFixed(1)
+        : "";
+    }
     document.getElementById("goal-deadline-help").textContent = customDeadline
       ? "O prazo será mantido e o ritmo semanal será recalculado."
       : "Calculado automaticamente pelo peso final e pelo ritmo.";
@@ -421,7 +426,16 @@ export function bindProfile(state, persist, render) {
       "startNeckCm",
       "startHipCm"
     ].includes(event.target.name)) {
-      updateGoalPlanner();
+      if (["weeklyChangeGoalKg", "goalDeadlineMonths"].includes(event.target.name)) {
+        const sourceName = event.target.name;
+        window.clearTimeout(goalPlannerTimer);
+        goalPlannerTimer = window.setTimeout(
+          () => updateGoalPlanner(sourceName),
+          180
+        );
+        return;
+      }
+      updateGoalPlanner(event.target.name);
     }
   });
   updateGoalPlanner();

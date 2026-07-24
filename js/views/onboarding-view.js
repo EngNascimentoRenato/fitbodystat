@@ -312,7 +312,7 @@ function renderGoalPreview(profile) {
   `;
 }
 
-function updateOnboardingGoalPlanner(form) {
+function updateOnboardingGoalPlanner(form, sourceName = "") {
   const deadlineMode = form.elements.goalDeadlineMode?.value === "custom" ? "custom" : "auto";
   const weeklyField = form.elements.weeklyChangeGoalKg;
   const deadlineField = form.elements.goalDeadlineMonths;
@@ -321,12 +321,16 @@ function updateOnboardingGoalPlanner(form) {
 
   weeklyField.readOnly = deadlineMode === "custom" || maintenance;
   deadlineField.readOnly = deadlineMode !== "custom" || maintenance;
-  if (Number.isFinite(Number(profile.weeklyChangeGoalKg))) {
+  if (sourceName !== "weeklyChangeGoalKg"
+    && document.activeElement !== weeklyField
+    && Number.isFinite(Number(profile.weeklyChangeGoalKg))) {
     weeklyField.value = profile.weeklyChangeGoalKg || "";
   }
-  deadlineField.value = profile.goalDeadlineMonths
-    ? Number(profile.goalDeadlineMonths).toFixed(1)
-    : "";
+  if (sourceName !== "goalDeadlineMonths" && document.activeElement !== deadlineField) {
+    deadlineField.value = profile.goalDeadlineMonths
+      ? Number(profile.goalDeadlineMonths).toFixed(1)
+      : "";
+  }
   document.getElementById("onboarding-deadline-help").textContent = deadlineMode === "custom"
     ? "O prazo será mantido e o ritmo semanal será recalculado."
     : "Calculado pelo peso final e pelo ritmo semanal.";
@@ -359,6 +363,7 @@ export function bindOnboarding(context) {
   const heightField = document.getElementById("onboarding-height");
   const goalWeightField = document.getElementById("onboarding-goal-weight");
   let goalWeightWasEdited = false;
+  let goalPlannerTimer = null;
   const updateHipRequirement = () => {
     if (!hipField) return;
     hipField.required = sexField?.value === "female";
@@ -394,7 +399,16 @@ export function bindOnboarding(context) {
       applyGoalSuggestion();
       return;
     }
-    updateOnboardingGoalPlanner(userForm);
+    if (["weeklyChangeGoalKg", "goalDeadlineMonths"].includes(event.target.name)) {
+      const sourceName = event.target.name;
+      window.clearTimeout(goalPlannerTimer);
+      goalPlannerTimer = window.setTimeout(
+        () => updateOnboardingGoalPlanner(userForm, sourceName),
+        180
+      );
+      return;
+    }
+    updateOnboardingGoalPlanner(userForm, event.target.name);
   });
   updateOnboardingGoalPlanner(userForm);
   userForm?.addEventListener("submit", async (event) => {
