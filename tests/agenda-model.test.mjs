@@ -97,6 +97,29 @@ test("compromisso é exclusivo por padrão e coletivo aceita capacidade", () => 
   assert.equal(group.capacity, 12);
 });
 
+test("cancelamento preserva o compromisso e registra seu motivo", () => {
+  const existing = normalizeAgendaEvent({
+    type: "appointment",
+    title: "Avaliação",
+    date: "2026-07-24",
+    startTime: "10:00",
+    durationMinutes: 60,
+    patientId: "patient-1",
+    patientName: "Paciente",
+    status: "confirmed"
+  }, "professional-1");
+  const cancelled = normalizeAgendaEvent({
+    ...existing,
+    status: "cancelled",
+    cancellationReason: "Imprevisto profissional"
+  }, "professional-1", { id: "event-1", ...existing });
+
+  assert.equal(cancelled.type, "appointment");
+  assert.equal(cancelled.status, "cancelled");
+  assert.equal(cancelled.cancellationReason, "Imprevisto profissional");
+  assert.equal(cancelled.blocksAvailability, true);
+});
+
 test("bloqueio aceita dia inteiro e recorrência semanal", () => {
   const event = normalizeAgendaEvent({
     type: "block",

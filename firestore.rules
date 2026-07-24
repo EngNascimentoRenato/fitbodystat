@@ -242,6 +242,7 @@ service cloud.firestore {
       allow update: if ownsAgenda()
         && resource.data.professionalId == professionalId
         && resource.data.createdBy == professionalId
+        && request.resource.data.type == resource.data.type
         && validAgendaEvent();
 
       allow delete: if ownsAgenda();

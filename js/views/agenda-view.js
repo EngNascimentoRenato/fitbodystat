@@ -14,6 +14,7 @@ import {
   weekDays
 } from "../models/agenda-model.js";
 import {
+  cancelAgendaAppointment,
   deleteAgendaEvent,
   listAgendaEvents,
   loadAgendaAvailability,
@@ -40,12 +41,21 @@ const modalityLabels = {
   other: "Outro"
 };
 
+const bookingModeLabels = {
+  exclusive: "Exclusivo",
+  group: "Coletivo",
+  informational: "Informativo"
+};
+
 const weekDayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
 const agendaUi = {
   view: "week",
   anchor: todayISO(),
   filters: { status: "", patient: "", location: "" },
+  detailOpen: false,
+  detailEventId: null,
+  cancelOpen: false,
   editorOpen: false,
   draft: null,
   availabilityOpen: false,
@@ -263,7 +273,39 @@ function renderFilters(events, patients) {
           ).join("")}
         </select>
       </div>
-      <button class="button text-button agenda-clear-filters" id="agenda-clear-filters" type="button">Limpar filtros</button>
+      <button class="button text-button agenda-clear-filters" data-clear-agenda-filters type="button">Limpar filtros</button>
+    </div>
+  `;
+}
+
+function activeFilterLabels(patients) {
+  const labels = [];
+  if (agendaUi.filters.status) {
+    labels.push(statusLabels[agendaUi.filters.status] || agendaUi.filters.status);
+  }
+  if (agendaUi.filters.patient) {
+    const patient = patients.find((item) => patientId(item) === agendaUi.filters.patient);
+    labels.push(agendaUi.filters.patient === "__guest"
+      ? "Pessoas avulsas"
+      : `Paciente: ${patient?.name || patient?.email || "Selecionado"}`);
+  }
+  if (agendaUi.filters.location) labels.push(`Local: ${agendaUi.filters.location}`);
+  return labels;
+}
+
+function renderActiveFilters(patients, resultCount) {
+  const labels = activeFilterLabels(patients);
+  if (!labels.length) return "";
+  return `
+    <div class="agenda-active-filters" role="status">
+      <div>
+        <strong>Filtros ativos</strong>
+        <span class="agenda-filter-chips">
+          ${labels.map((label) => `<span>${escapeHtml(label)}</span>`).join("")}
+        </span>
+        <small>${resultCount} ${resultCount === 1 ? "item encontrado" : "itens encontrados"} neste período</small>
+      </div>
+      <button class="button text-button" data-clear-agenda-filters type="button">Limpar filtros</button>
     </div>
   `;
 }
@@ -320,10 +362,18 @@ function renderEditor(patients) {
           <button class="icon-button" id="close-agenda-dialog" type="button" aria-label="Fechar">×</button>
         </header>
 
-        <div class="agenda-type-switch" role="group" aria-label="Tipo de item">
-          <label><input type="radio" name="type" value="appointment" ${!isBlock ? "checked" : ""} /><span>Compromisso</span></label>
-          <label><input type="radio" name="type" value="block" ${isBlock ? "checked" : ""} /><span>Indisponibilidade</span></label>
-        </div>
+        ${isEdit ? `
+          <input type="hidden" name="type" value="${isBlock ? "block" : "appointment"}" />
+          <p class="agenda-fixed-type">
+            <strong>Tipo do registro:</strong> ${isBlock ? "Indisponibilidade" : "Compromisso"}
+            <small>O tipo é preservado para manter o histórico da agenda.</small>
+          </p>
+        ` : `
+          <div class="agenda-type-switch" role="group" aria-label="Tipo de item">
+            <label><input type="radio" name="type" value="appointment" ${!isBlock ? "checked" : ""} /><span>Compromisso</span></label>
+            <label><input type="radio" name="type" value="block" ${isBlock ? "checked" : ""} /><span>Indisponibilidade</span></label>
+          </div>
+        `}
 
         <div class="form-grid">
           <div class="field">
@@ -379,11 +429,18 @@ function renderEditor(patients) {
           </div>
           <div class="field">
             <label for="agenda-status">Estado</label>
-            <select id="agenda-status" name="status">
-              ${Object.entries(statusLabels).filter(([value]) => value !== "blocked").map(([value, label]) =>
-                `<option value="${value}" ${event.status === value ? "selected" : ""}>${label}</option>`
-              ).join("")}
-            </select>
+            ${event.status === "cancelled" ? `
+              <input type="hidden" name="status" value="cancelled" />
+              <p class="agenda-readonly-value">${renderStatusBadge("cancelled")}</p>
+            ` : `
+              <select id="agenda-status" name="status">
+                ${Object.entries(statusLabels)
+                  .filter(([value]) => !["blocked", "cancelled"].includes(value))
+                  .map(([value, label]) =>
+                    `<option value="${value}" ${event.status === value ? "selected" : ""}>${label}</option>`
+                  ).join("")}
+              </select>
+            `}
           </div>
           </div>
 
@@ -477,6 +534,113 @@ function renderEditor(patients) {
   `;
 }
 
+function detailValue(label, value, options = {}) {
+  if (!value && !options.showEmpty) return "";
+  return `
+    <div class="${options.wide ? "wide" : ""}">
+      <dt>${escapeHtml(label)}</dt>
+      <dd>${options.html ? value : escapeHtml(value || "Não informado")}</dd>
+    </div>
+  `;
+}
+
+function renderEventDetails(event, patients) {
+  if (!event) return "";
+  const patient = selectedPatient(event, patients);
+  const isBlock = event.type === "block";
+  const person = agendaEventPerson(event);
+  const timeLabel = event.allDay
+    ? "Dia inteiro"
+    : `${event.startTime} às ${event.endTime}`;
+  const recurrenceLabel = event.recurrence?.frequency === "weekly"
+    ? `Semanal até ${formatDate(event.recurrence.untilDate)}`
+    : "Não se repete";
+  return `
+    <dialog class="agenda-dialog agenda-details-dialog" id="agenda-details-dialog">
+      <article>
+        <header class="agenda-dialog-header">
+          <div>
+            <p class="eyebrow">${isBlock ? "Indisponibilidade" : "Compromisso"}</p>
+            <h2>${escapeHtml(event.title)}</h2>
+          </div>
+          <button class="icon-button" id="close-agenda-details" type="button" aria-label="Fechar">×</button>
+        </header>
+
+        <div class="agenda-detail-heading">
+          ${renderStatusBadge(event.status)}
+          <strong>${escapeHtml(formatDate(event.date))} · ${escapeHtml(timeLabel)}</strong>
+        </div>
+
+        <dl class="agenda-detail-grid">
+          ${isBlock ? "" : detailValue("Paciente", person, { showEmpty: true })}
+          ${detailValue("Modalidade", isBlock ? "" : modalityLabels[event.modality])}
+          ${detailValue("Local ou link", isBlock ? "" : event.location)}
+          ${detailValue("Ocupação", isBlock ? "" : bookingModeLabels[event.bookingMode] || "Exclusivo")}
+          ${event.bookingMode === "group" ? detailValue("Capacidade", `${event.capacity} participantes`) : ""}
+          ${isBlock ? detailValue("Repetição", recurrenceLabel) : ""}
+          ${patient?.phone ? detailValue(
+            "Telefone",
+            `<a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>`,
+            { html: true }
+          ) : ""}
+          ${event.status === "cancelled"
+            ? detailValue("Motivo do cancelamento", event.cancellationReason, { wide: true, showEmpty: true })
+            : ""}
+          ${detailValue("Observações privadas", event.privateNotes, { wide: true })}
+        </dl>
+
+        <footer class="agenda-dialog-actions">
+          ${!isBlock && !["cancelled", "completed"].includes(event.status)
+            ? `<button class="button danger" id="open-cancel-agenda-event" type="button">Cancelar compromisso</button>`
+            : "<span></span>"}
+          <div class="button-row">
+            <button class="button" id="close-agenda-details-secondary" type="button">Fechar</button>
+            <button class="button primary" id="edit-agenda-event" type="button">Editar</button>
+          </div>
+        </footer>
+      </article>
+    </dialog>
+  `;
+}
+
+function renderCancellationDialog(event) {
+  if (!event || event.type !== "appointment") return "";
+  return `
+    <dialog class="agenda-dialog agenda-cancel-dialog" id="agenda-cancel-dialog">
+      <form class="form" id="agenda-cancel-form">
+        <header class="agenda-dialog-header">
+          <div>
+            <p class="eyebrow">Cancelar compromisso</p>
+            <h2>${escapeHtml(event.title)}</h2>
+          </div>
+          <button class="icon-button" id="close-cancel-agenda" type="button" aria-label="Fechar">×</button>
+        </header>
+        <p class="muted">
+          O compromisso continuará no histórico como cancelado.
+        </p>
+        <div class="field">
+          <label for="agenda-cancellation-reason">Motivo do cancelamento <span class="muted">(opcional)</span></label>
+          <textarea id="agenda-cancellation-reason" name="reason" maxlength="500"></textarea>
+        </div>
+        <label class="consent-option agenda-cancel-block-option">
+          <input type="checkbox" name="blockSlot" value="true" checked />
+          <span>
+            <strong>Bloquear este horário na agenda</strong>
+            <small>Cria uma indisponibilidade separada em ${escapeHtml(formatDate(event.date))}, das ${escapeHtml(event.startTime)} às ${escapeHtml(event.endTime)}.</small>
+          </span>
+        </label>
+        <footer class="agenda-dialog-actions">
+          <span></span>
+          <div class="button-row">
+            <button class="button" id="cancel-cancellation" type="button">Voltar</button>
+            <button class="button danger" type="submit">Confirmar cancelamento</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+  `;
+}
+
 function blankAvailability() {
   return {
     slotIntervalMinutes: 30,
@@ -558,6 +722,7 @@ export function renderAgenda(authState) {
   const groups = eventsByDate(visibleEvents);
   const appointmentCount = visibleEvents.filter((event) => event.type === "appointment").length;
   const blockCount = visibleEvents.filter((event) => event.type === "block").length;
+  const detailEvent = events.find((event) => event.id === agendaUi.detailEventId) || null;
   const availabilityConfigured = Object.values(authState.agendaAvailability?.weekly || {})
     .some((intervals) => intervals.length);
 
@@ -600,6 +765,7 @@ export function renderAgenda(authState) {
           </span>
         </p>
         ${renderFilters(events, patients)}
+        ${renderActiveFilters(patients, visibleEvents.length)}
       </section>
 
       <section class="agenda-calendar" aria-busy="${authState.agendaEvents === null}">
@@ -608,6 +774,8 @@ export function renderAgenda(authState) {
           : calendar}
       </section>
     </div>
+    ${agendaUi.detailOpen ? renderEventDetails(detailEvent, patients) : ""}
+    ${agendaUi.cancelOpen ? renderCancellationDialog(detailEvent) : ""}
     ${agendaUi.editorOpen ? renderEditor(patients) : ""}
     ${agendaUi.availabilityOpen ? renderAvailabilityEditor() : ""}
   `;
@@ -633,6 +801,8 @@ async function refreshAgenda(context) {
 
 function openEditor(context, event = null, type = "appointment", date = agendaUi.anchor) {
   agendaUi.draft = event ? { ...event } : blankDraft(type, date);
+  agendaUi.detailOpen = false;
+  agendaUi.cancelOpen = false;
   agendaUi.editorOpen = true;
   context.render();
 }
@@ -641,6 +811,27 @@ function closeEditor() {
   agendaUi.editorOpen = false;
   agendaUi.draft = null;
   document.getElementById("agenda-dialog")?.close();
+}
+
+function openEventDetails(context, event) {
+  agendaUi.detailEventId = event.id;
+  agendaUi.detailOpen = true;
+  agendaUi.cancelOpen = false;
+  context.render();
+}
+
+function closeEventDetails() {
+  agendaUi.detailOpen = false;
+  agendaUi.cancelOpen = false;
+  agendaUi.detailEventId = null;
+  document.getElementById("agenda-details-dialog")?.close();
+  document.getElementById("agenda-cancel-dialog")?.close();
+}
+
+function returnToEventDetails(context) {
+  agendaUi.cancelOpen = false;
+  agendaUi.detailOpen = true;
+  context.render();
 }
 
 function openAvailabilityEditor(context) {
@@ -800,7 +991,7 @@ export function bindAgenda(context) {
   document.querySelectorAll("[data-agenda-event]").forEach((button) => {
     button.addEventListener("click", () => {
       const event = (context.authState.agendaEvents || []).find((item) => item.id === button.dataset.agendaEvent);
-      if (event) openEditor(context, event);
+      if (event) openEventDetails(context, event);
     });
   });
 
@@ -814,11 +1005,73 @@ export function bindAgenda(context) {
       context.render();
     });
   });
-  document.getElementById("agenda-clear-filters")?.addEventListener("click", () => {
-    agendaUi.filters = { status: "", patient: "", location: "" };
-    context.render();
+  document.querySelectorAll("[data-clear-agenda-filters]").forEach((button) => {
+    button.addEventListener("click", () => {
+      agendaUi.filters = { status: "", patient: "", location: "" };
+      context.render();
+    });
   });
   document.getElementById("refresh-agenda")?.addEventListener("click", () => refreshAgenda(context));
+
+  const detailsDialog = document.getElementById("agenda-details-dialog");
+  if (detailsDialog) {
+    if (!detailsDialog.open) detailsDialog.showModal();
+    detailsDialog.addEventListener("cancel", closeEventDetails);
+  }
+  document.getElementById("close-agenda-details")?.addEventListener("click", closeEventDetails);
+  document.getElementById("close-agenda-details-secondary")?.addEventListener("click", closeEventDetails);
+  document.getElementById("edit-agenda-event")?.addEventListener("click", () => {
+    const event = (context.authState.agendaEvents || [])
+      .find((item) => item.id === agendaUi.detailEventId);
+    if (event) openEditor(context, event);
+  });
+  document.getElementById("open-cancel-agenda-event")?.addEventListener("click", () => {
+    agendaUi.detailOpen = false;
+    agendaUi.cancelOpen = true;
+    context.render();
+  });
+
+  const cancellationDialog = document.getElementById("agenda-cancel-dialog");
+  if (cancellationDialog) {
+    if (!cancellationDialog.open) cancellationDialog.showModal();
+    cancellationDialog.addEventListener("cancel", () => returnToEventDetails(context));
+  }
+  document.getElementById("close-cancel-agenda")?.addEventListener("click", () => returnToEventDetails(context));
+  document.getElementById("cancel-cancellation")?.addEventListener("click", () => returnToEventDetails(context));
+  document.getElementById("agenda-cancel-form")?.addEventListener("submit", async (submitEvent) => {
+    submitEvent.preventDefault();
+    const form = submitEvent.currentTarget;
+    const submit = form.querySelector('button[type="submit"]');
+    const source = (context.authState.agendaEvents || [])
+      .find((item) => item.id === agendaUi.detailEventId);
+    if (!source) {
+      showToast("Compromisso não encontrado.");
+      closeEventDetails();
+      context.render();
+      return;
+    }
+    submit.disabled = true;
+    try {
+      const result = await cancelAgendaAppointment(context.authState.user.uid, source, {
+        reason: form.elements.reason.value,
+        blockSlot: form.elements.blockSlot.checked
+      });
+      context.authState.agendaEvents = (context.authState.agendaEvents || [])
+        .map((item) => item.id === source.id ? result.appointment : item);
+      if (result.block) context.authState.agendaEvents.push(result.block);
+      context.authState.agendaEvents.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+      agendaUi.detailOpen = false;
+      agendaUi.cancelOpen = false;
+      agendaUi.detailEventId = null;
+      showToast(result.block
+        ? "Compromisso cancelado e horário bloqueado."
+        : "Compromisso cancelado.");
+      context.render();
+    } catch (error) {
+      submit.disabled = false;
+      showToast(`Não foi possível cancelar: ${error.message}`);
+    }
+  });
 
   const dialog = document.getElementById("agenda-dialog");
   if (dialog) {
@@ -915,6 +1168,7 @@ export function bindAgenda(context) {
     try {
       const input = eventInputFromForm(form, context.authState.patients || []);
       const existing = (context.authState.agendaEvents || []).find((item) => item.id === input.eventId) || null;
+      if (existing) input.type = existing.type;
       const candidate = normalizeAgendaEvent(
         { ...input, timeZone: existing?.timeZone },
         context.authState.user.uid,

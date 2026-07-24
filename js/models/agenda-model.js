@@ -169,6 +169,10 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
     capacity,
     blocksAvailability: type === "block" || bookingMode !== "informational",
     privateNotes: cleanText(input.privateNotes),
+    cancellationReason: status === "cancelled"
+      ? cleanText(input.cancellationReason, existing.cancellationReason)
+      : "",
+    relatedEventId: cleanText(input.relatedEventId, existing.relatedEventId) || null,
     visibility: "private",
     confirmationStatus: existing.confirmationStatus || "not_requested",
     recurrence: normalizeRecurrence(input, date, type),
@@ -342,4 +346,3 @@ export function eventIsWithinAvailability(event, availability) {
     && end <= minutesFromTime(interval.endTime)
   );
 }
-
