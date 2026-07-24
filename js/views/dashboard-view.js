@@ -15,7 +15,7 @@ import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/numbe
 import { formatDate } from "../utils/date-utils.js";
 import { weeklyActivityCard } from "../components/activity-summary.js";
 
-export function renderDashboard(state, routePrefix = "") {
+export function renderDashboard(state, routePrefix = "", options = {}) {
   const { profile, entries } = state;
   const enriched = enrichEntries(profile, entries);
   const latest = getLatestEntry(profile, entries);
@@ -41,6 +41,7 @@ export function renderDashboard(state, routePrefix = "") {
       x: daysFromStart(entry.date)
     }));
   const plannedWaist = generatePlannedSeries(profile, "waist");
+  const evolutionOnly = options.presentationMode === "evolution";
 
   return `
     <div class="view-stack">
@@ -54,22 +55,24 @@ export function renderDashboard(state, routePrefix = "") {
         ${progressRing(progress, "da meta")}
       </section>
 
-      <section class="grid four">
+      ${evolutionOnly ? "" : `<section class="grid four">
         ${statCard("Peso atual", formatKg(latest?.weightKg), `${formatKg(latest?.accumulatedLoss || 0)} de diferença`)}
         ${statCard("IMC", formatDecimal(latest?.bmi, 1), latest?.bmiClass || "Sem dados")}
         ${statCard("Cintura", formatCm(latest?.waistCm), `Inicial: ${formatCm(profile.startWaistCm)}`)}
         ${statCard("Gordura corporal", formatPercent(latest?.bodyFat), latest?.bodyFatClass || "Por medidas ou medidor")}
-      </section>
+      </section>`}
 
       ${weeklyActivityCard(profile, state.activities || [], routePrefix)}
 
-      <div class="split">
+      ${evolutionOnly
+        ? lineChart({ title: "Peso real vs planejado", description: "A linha planejada cobre todo o prazo da meta.", actual: actualWeight, planned: plannedWeight, unit: "kg" })
+        : `<div class="split">
         ${lineChart({ title: "Peso real vs planejado", description: "A linha planejada cobre todo o prazo da meta.", actual: actualWeight, planned: plannedWeight, unit: "kg" })}
         <section class="card">
           <h2>Metas</h2>
           ${milestoneList(getMilestones(profile, latest))}
         </section>
-      </div>
+      </div>`}
 
       ${lineChart({ title: "Cintura real vs planejada", description: "Acompanhe tendência de cintura junto da mudança de peso.", actual: actualWaist, planned: plannedWaist, unit: "cm" })}
     </div>

@@ -201,8 +201,38 @@ export async function updateOwnDirectoryName(userId, name) {
   });
 }
 
+export async function completeUserOnboarding(userId, role = "user") {
+  const completion = {
+    onboardingCompleted: true,
+    onboardingCompletedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+  if (role === "professional") {
+    completion.professionalOnboardingCompleted = true;
+    completion.professionalOnboardingCompletedAt = serverTimestamp();
+  }
+  await updateDoc(doc(db, "users", userId), completion);
+}
+
+export async function loadProfessionalProfile(userId) {
+  const snapshot = await getDoc(doc(db, "professionalProfiles", userId));
+  return snapshot.exists() ? withoutMetadata(snapshot.data()) : null;
+}
+
+export async function saveProfessionalProfile(userId, profile, actor = {}) {
+  await setDoc(doc(db, "professionalProfiles", userId), {
+    ...(profile || {}),
+    ...auditData(userId, actor)
+  }, { merge: true });
+}
+
 export async function listUsers() {
   const snapshot = await getDocs(collection(db, "users"));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+export async function listProfessionalRegistrations() {
+  const snapshot = await getDocs(collection(db, "professionalRegistrations"));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 

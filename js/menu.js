@@ -1,6 +1,7 @@
 import { escapeHtml } from "./utils/html-utils.js";
 
 export const routes = [
+  { path: "/primeiro-acesso", title: "Primeiro acesso", eyebrow: "Configuração inicial", label: "Concluir cadastro", icon: "1" },
   { path: "/atividades", title: "Atividades", eyebrow: "Frequência de atividades", label: "Atividades", icon: "A" },
   { path: "/me/atividades", title: "Minhas atividades", eyebrow: "Meu espaço", label: "Minhas atividades", icon: "A", roles: ["professional", "admin"] },
   { path: "/dashboard", title: "Dashboard", eyebrow: "Acompanhamento pessoal", label: "Dashboard", icon: "D" },
@@ -22,12 +23,14 @@ export const routes = [
   { path: "/admin/vinculos", title: "Vínculos", eyebrow: "Administração", label: "Vínculos", icon: "V", roles: ["admin"] },
   { path: "/admin/convites", title: "Convites pendentes", eyebrow: "Administração", label: "Convites pendentes", icon: "C", roles: ["admin"] },
   { path: "/conta", title: "Conta", eyebrow: "Identidade e acesso", label: "Conta", icon: "C" },
-  { path: "/configuracoes", title: "Configurações", eyebrow: "Dados e PWA", label: "Configurações", icon: "S" }
+  { path: "/configuracoes", title: "Configurações", eyebrow: "Dados e privacidade", label: "Configurações", icon: "S" },
+  { path: "/metodos", title: "Métodos e cálculos", eyebrow: "Critérios e referências", label: "Métodos e cálculos", icon: "i" }
 ];
 
 const personalPaths = ["/me/dashboard", "/me/registro", "/me/historico", "/me/atividades", "/me/metas", "/me/perfil", "/me/vinculos"];
 
 function routeIsAllowed(route, authState) {
+  if (authState?.needsOnboarding && !["/primeiro-acesso", "/conta"].includes(route.path)) return false;
   if (authState?.needsName && !["/perfil", "/conta"].includes(route.path)) return false;
   if (!route.roles) return true;
   return route.roles.includes(authState?.role || "user");
@@ -70,6 +73,13 @@ function personalSubmenu(currentPath, activePatient) {
 
 export function renderMenu(currentPath, authState) {
   const menu = document.getElementById("main-menu");
+  if (authState?.needsOnboarding) {
+    menu.innerHTML = navSection("Primeiro acesso", [
+      navLink("/primeiro-acesso", "Concluir cadastro", "1", currentPath),
+      navLink("/conta", "Conta", "C", currentPath)
+    ].join(""));
+    return;
+  }
   if (authState?.needsName) {
     menu.innerHTML = navSection("Complete seu cadastro", [
       navLink("/perfil", "Preencher perfil", "P", currentPath),
@@ -80,7 +90,8 @@ export function renderMenu(currentPath, authState) {
 
   const accountLinks = [
     navLink("/conta", "Conta", "C", currentPath),
-    navLink("/configuracoes", "Configurações", "S", currentPath)
+    navLink("/configuracoes", "Configurações", "S", currentPath),
+    navLink("/metodos", "Métodos e cálculos", "i", currentPath)
   ].join("");
 
   if (authState.role === "user") {
@@ -101,7 +112,8 @@ export function renderMenu(currentPath, authState) {
 
   if (authState.role === "professional") {
     const patient = authState.activePatient;
-    const patientLinks = patient ? navSection(`Paciente: ${escapeHtml(patient.name)}`, [
+    const patientLabel = authState.presentationMode === "off" ? patient?.name : "Identidade protegida";
+    const patientLinks = patient ? navSection(`Paciente: ${escapeHtml(patientLabel)}`, [
       navLink("/dashboard", "Dashboard do paciente", "D", currentPath),
       navLink("/atividades", "Atividades do paciente", "A", currentPath),
       navLink("/registro", "Novo registro do paciente", "+", currentPath),

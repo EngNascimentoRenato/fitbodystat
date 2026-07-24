@@ -127,6 +127,60 @@
   border-radius: var(--radius);
 }
 
+.radio-card span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.radio-card small {
+  color: var(--muted);
+}
+
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-steps li {
+  display: flex;
+  min-width: 0;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.65rem;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.onboarding-steps li span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  color: var(--surface);
+  background: var(--primary);
+  border-radius: 50%;
+}
+
+.onboarding-insight {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background: var(--primary-soft);
+  border-left: 3px solid var(--primary);
+}
+
+.onboarding-submit {
+  justify-content: flex-end;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -187,6 +241,10 @@ tr:last-child td {
 
 @media (max-width: 720px) {
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-steps {
     grid-template-columns: 1fr;
   }
 }

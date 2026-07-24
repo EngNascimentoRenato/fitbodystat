@@ -7,7 +7,9 @@ service cloud.firestore {
     }
 
     function currentRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return "role" in request.auth.token
+        ? request.auth.token.role
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function accountIsActive() {
@@ -107,7 +109,6 @@ service cloud.firestore {
     match /contacts/{userId} {
       allow read: if accountIsActive()
         && (request.auth.uid == userId
-          || isAdmin()
           || (activeProfessionalLink(userId)
             && get(professionalLink(userId)).data.permissions.sharePhone == true)
           || (get(/databases/$(database)/documents/users/$(userId)).data.role == "professional"
@@ -120,6 +121,24 @@ service cloud.firestore {
 
       allow delete: if isAdmin()
         || (accountIsActive() && request.auth.uid == userId);
+    }
+
+    match /professionalProfiles/{userId} {
+      allow read: if accountIsActive()
+        && (request.auth.uid == userId || isAdmin());
+
+      allow create, update: if isAdmin()
+        || (accountIsActive()
+          && request.auth.uid == userId
+          && request.resource.data.ownerId == userId);
+
+      allow delete: if isAdmin()
+        || (accountIsActive() && request.auth.uid == userId);
+    }
+
+    match /professionalRegistrations/{registrationId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
     }
 
     match /careInvitations/{invitationId} {

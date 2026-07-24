@@ -14,6 +14,10 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - Convites profissionais confirmados pelo paciente.
 - Dashboard do paciente acessível somente ao profissional vinculado.
 - Administração de cadastros, níveis, situação das contas, convites e vínculos.
+- Pré-cadastro de profissionais por e-mail, sem envio de convite.
+- Primeiro acesso orientado conforme o tipo de conta.
+- Guia de medidas, metodologia, limitações e referências.
+- Modo temporário de apresentação e privacidade do Dashboard.
 - PWA instalável com cache offline básico.
 
 ## Perfis de acesso
@@ -22,7 +26,7 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - `professional`: acessa somente pacientes com vínculo ativo e mantém seus dados pessoais em `Meu espaço`.
 - `admin`: administra cadastros e relações, sem acesso a dados corporais de terceiros.
 
-Novas contas são criadas como `user`. A promoção para `professional` ou `admin` é feita por um administrador. Contas podem ser suspensas sem apagar seus documentos.
+Novas contas são criadas como `user`. O administrador pode pré-autorizar um e-mail profissional. No primeiro acesso verificado, uma Cloud Function associa o `uid`, atualiza o documento da conta e grava a custom claim `professional`. Alterações posteriores de nível também passam pelo backend.
 
 ## Estrutura no Firestore
 
@@ -32,6 +36,10 @@ users/{uid}/measurements/{measurementId}
 profiles/{uid}
 plans/{uid}
 settings/{uid}
+contacts/{uid}
+professionalProfiles/{uid}
+professionalRegistrations/{emailHash}
+users/{uid}/activities/{activityId}
 careInvitations/{invitationId}
 careLinks/{professionalId_patientId}
 ```
@@ -56,9 +64,27 @@ Com a Firebase CLI instalada:
 firebase deploy --only firestore:rules
 ```
 
+## Publicar o backend de acesso
+
+Instale as dependências uma vez:
+
+```powershell
+cd functions
+npm install
+cd ..
+```
+
+Publique Functions e regras em conjunto:
+
+```powershell
+firebase deploy --only functions,firestore:rules
+```
+
+As funções `registerProfessional`, `activateProfessionalAccess`, `setUserRole` e `cancelProfessionalRegistration` impedem que o navegador atribua papéis privilegiados diretamente.
+
 ## Tecnologias
 
 - HTML5, CSS3 e JavaScript Vanilla com ES Modules
-- Firebase Authentication e Cloud Firestore
+- Firebase Authentication, Cloud Firestore e Cloud Functions
 - LocalStorage como cache local por usuário
 - Service Worker e Web App Manifest

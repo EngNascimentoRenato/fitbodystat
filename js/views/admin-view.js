@@ -2,17 +2,29 @@ import {
   cancelCareInvitation,
   listAllCareInvitations,
   listAllCareLinks,
+  listProfessionalRegistrations,
   listUsers,
   revokeCareLink,
-  updateUserRole,
   updateUserStatus
 } from "../data/firestore-store.js";
+import {
+  cancelProfessionalRegistration,
+  registerProfessional,
+  setUserRole
+} from "../services/role-service.js";
 import { confirmAction } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 
 const roleOptions = ["user", "professional", "admin"];
 const roleLabels = { user: "Usuário", professional: "Profissional", admin: "Administrador" };
+const registrationStatusLabels = {
+  awaiting_registration: "Aguardando cadastro",
+  awaiting_validation: "Aguardando validação",
+  active: "Ativo",
+  cancelled: "Cancelado",
+  revoked: "Revogado"
+};
 
 function userName(users, userId) {
   const user = users.find((item) => (item.uid || item.id) === userId);
@@ -91,6 +103,62 @@ function usersTable(users, currentUserId, onlyProfessionals = false) {
   `;
 }
 
+function professionalsView(users, registrations, currentUserId) {
+  return `
+    <div class="view-stack">
+      <section class="card">
+        <div class="chart-header">
+          <div>
+            <h2>Pré-cadastrar profissional</h2>
+            <p class="muted">Autorize um e-mail. A ativação ocorrerá automaticamente após o primeiro acesso com o endereço verificado.</p>
+          </div>
+          <button class="button" id="refresh-admin" type="button">Atualizar</button>
+        </div>
+        <form class="form" id="professional-registration-form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="professional-name">Nome</label>
+              <input id="professional-name" name="name" autocomplete="name" minlength="2" required />
+            </div>
+            <div class="field">
+              <label for="professional-email">E-mail autorizado</label>
+              <input id="professional-email" name="email" type="email" autocomplete="email" required />
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="button primary" type="submit">Adicionar profissional</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Pré-cadastros</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Situação</th><th></th></tr></thead>
+            <tbody>
+              ${registrations.map((registration) => `
+                <tr>
+                  <td>${escapeHtml(registration.name || "Nome pendente")}</td>
+                  <td>${escapeHtml(registration.emailLower || "-")}</td>
+                  <td><span class="badge ${registration.status === "active" ? "" : "warning"}">${registrationStatusLabels[registration.status] || escapeHtml(registration.status)}</span></td>
+                  <td>
+                    ${!["active", "cancelled", "revoked"].includes(registration.status)
+                      ? `<button class="button" data-cancel-professional-registration="${escapeAttribute(registration.id)}" type="button">Cancelar</button>`
+                      : ""}
+                  </td>
+                </tr>
+              `).join("") || `<tr><td colspan="4">Nenhum profissional pré-cadastrado.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      ${usersTable(users, currentUserId, true)}
+    </div>
+  `;
+}
+
 function linksTable(users, links) {
   const activeLinks = links.filter((item) => item.status === "active");
   return `
@@ -146,8 +214,9 @@ export function renderAdmin(state, authState, section = "overview") {
   const users = authState.adminUsers || [];
   const links = authState.adminLinks || [];
   const invitations = authState.adminInvitations || [];
+  const registrations = authState.adminProfessionalRegistrations || [];
   if (section === "users") return usersTable(users, authState.user.uid);
-  if (section === "professionals") return usersTable(users, authState.user.uid, true);
+  if (section === "professionals") return professionalsView(users, registrations, authState.user.uid);
   if (section === "links") return linksTable(users, links);
   if (section === "invitations") return invitationsTable(users, invitations);
   return overview(users, links, invitations);
@@ -156,14 +225,16 @@ export function renderAdmin(state, authState, section = "overview") {
 export function bindAdmin(context) {
   const refresh = async () => {
     try {
-      const [users, links, invitations] = await Promise.all([
+      const [users, links, invitations, registrations] = await Promise.all([
         listUsers(),
         listAllCareLinks(),
-        listAllCareInvitations()
+        listAllCareInvitations(),
+        listProfessionalRegistrations()
       ]);
       context.authState.adminUsers = users;
       context.authState.adminLinks = links;
       context.authState.adminInvitations = invitations;
+      context.authState.adminProfessionalRegistrations = registrations;
       context.render();
     } catch (error) {
       showToast(`Não foi possível carregar a administração: ${error.message}`);
@@ -172,12 +243,50 @@ export function bindAdmin(context) {
 
   document.getElementById("refresh-admin")?.addEventListener("click", refresh);
 
+  document.getElementById("professional-registration-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      const result = await registerProfessional({
+        name: data.get("name"),
+        email: data.get("email")
+      });
+      const messages = {
+        awaiting_registration: "Pré-cadastro criado. O acesso será ativado no primeiro login.",
+        awaiting_validation: "Conta localizada. A ativação aguarda a verificação do e-mail.",
+        active: "Profissional localizado e ativado."
+      };
+      showToast(messages[result.status] || "Pré-cadastro atualizado.");
+      event.currentTarget.reset();
+      await refresh();
+    } catch (error) {
+      showToast(`Não foi possível pré-cadastrar: ${error.message}`);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.querySelectorAll("[data-cancel-professional-registration]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!confirmAction("Cancelar este pré-cadastro profissional?")) return;
+      try {
+        await cancelProfessionalRegistration(button.dataset.cancelProfessionalRegistration);
+        showToast("Pré-cadastro cancelado.");
+        await refresh();
+      } catch (error) {
+        showToast(`Não foi possível cancelar: ${error.message}`);
+      }
+    });
+  });
+
   document.querySelectorAll("[data-save-role]").forEach((button) => {
     button.addEventListener("click", async () => {
       const userId = button.dataset.saveRole;
       const role = document.querySelector(`[data-role-user="${userId}"]`)?.value;
       try {
-        await updateUserRole(userId, role);
+        await setUserRole(userId, role);
         showToast("Nível de acesso atualizado.");
         await refresh();
       } catch (error) {
@@ -229,5 +338,8 @@ export function bindAdmin(context) {
     });
   });
 
-  if (!context.authState.adminUsers || !context.authState.adminLinks || !context.authState.adminInvitations) refresh();
+  if (!context.authState.adminUsers
+    || !context.authState.adminLinks
+    || !context.authState.adminInvitations
+    || !context.authState.adminProfessionalRegistrations) refresh();
 }

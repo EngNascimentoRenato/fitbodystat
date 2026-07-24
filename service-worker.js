@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbodystat-v14";
+const CACHE_NAME = "fitbodystat-v15";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -35,6 +35,7 @@ const APP_SHELL = [
   "./js/services/firebase-core.js",
   "./js/services/auth-service.js",
   "./js/services/activity-service.js",
+  "./js/services/role-service.js",
   "./js/views/dashboard-view.js",
   "./js/views/profile-view.js",
   "./js/views/entry-view.js",
@@ -46,6 +47,8 @@ const APP_SHELL = [
   "./js/views/patients-view.js",
   "./js/views/connections-view.js",
   "./js/views/activities-view.js",
+  "./js/views/onboarding-view.js",
+  "./js/views/methods-view.js",
   "./js/components/stat-card.js",
   "./js/components/progress-ring.js",
   "./js/components/progress-bar.js",
@@ -56,6 +59,7 @@ const APP_SHELL = [
   "./js/components/toast.js",
   "./js/components/activity-picker.js",
   "./js/components/activity-summary.js",
+  "./js/components/measurement-guide.js",
   "./js/components/modal.js",
   "./js/utils/date-utils.js",
   "./js/utils/number-utils.js",

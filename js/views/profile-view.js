@@ -13,6 +13,7 @@ import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../u
 import { escapeAttribute } from "../utils/html-utils.js";
 import { preferredActivityPicker } from "../components/activity-picker.js";
 import { formatPhone, normalizePhone, phoneIsValid } from "../utils/phone-utils.js";
+import { measurementHelpButton } from "../components/measurement-guide.js";
 
 function renderProfileInsight(profile) {
   const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
@@ -195,15 +196,15 @@ export function renderProfile(state, options = {}) {
             <input id="startWeightKg" name="startWeightKg" inputmode="decimal" required ${baselineDisabled} value="${escapeAttribute(p.startWeightKg ?? "")}" />
           </div>
           <div class="field">
-            <label for="startWaistCm">Cintura inicial (cm)</label>
+            <label for="startWaistCm">Cintura inicial (cm) ${measurementHelpButton("waist")}</label>
             <input id="startWaistCm" name="startWaistCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startWaistCm ?? "")}" />
           </div>
           <div class="field">
-            <label for="startNeckCm">Pescoço inicial (cm)</label>
+            <label for="startNeckCm">Pescoço inicial (cm) ${measurementHelpButton("neck")}</label>
             <input id="startNeckCm" name="startNeckCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startNeckCm ?? "")}" />
           </div>
           <div class="field">
-            <label for="startHipCm">Quadril inicial (cm)</label>
+            <label for="startHipCm">Quadril inicial (cm) ${measurementHelpButton("hip")}</label>
             <input id="startHipCm" name="startHipCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startHipCm ?? "")}" />
             <span class="help-text">Necessário para cálculo feminino pelo método da Marinha e opcional para acompanhamento geral.</span>
           </div>

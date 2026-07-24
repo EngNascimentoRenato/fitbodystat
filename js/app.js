@@ -2,14 +2,17 @@ import { createBlankState, loadState, normalizeState, saveState } from "./data/l
 import {
   deleteActivity,
   deleteMeasurement,
+  completeUserOnboarding,
   ensureUserDocument,
   getUser,
+  loadProfessionalProfile,
   loadCloudState,
   saveCloudState,
   saveActivity,
   saveContact,
   saveMeasurement,
   saveMeasurementAndProfile,
+  saveProfessionalProfile,
   saveProfileAndPlan,
   saveSettings,
   updateOwnDirectoryName
@@ -19,6 +22,7 @@ import {
   signOutUser,
   updateCurrentUserName
 } from "./services/auth-service.js";
+import { activateProfessionalAccess } from "./services/role-service.js";
 import { registerServiceWorker } from "./services/pwa-service.js";
 import { renderRoute } from "./router.js";
 import { escapeAttribute, escapeHtml } from "./utils/html-utils.js";
@@ -38,10 +42,14 @@ let authState = {
   role: "user",
   status: "active",
   needsName: false,
+  needsOnboarding: false,
+  professionalProfile: null,
+  presentationMode: sessionStorage.getItem("fitbodystat-presentation-mode") || "off",
   syncStatus: "Verificando login...",
   adminUsers: null,
   adminLinks: null,
   adminInvitations: null,
+  adminProfessionalRegistrations: null,
   patients: null,
   sentInvitations: null,
   invitations: null,
@@ -57,6 +65,18 @@ function usesGoogle(user) {
 
 function applyTheme() {
   document.documentElement.dataset.theme = personalState.settings?.theme || "light";
+}
+
+function setPresentationMode(mode, shouldRender = true) {
+  const allowedModes = new Set(["off", "identity", "evolution"]);
+  authState.presentationMode = allowedModes.has(mode) ? mode : "off";
+  document.body.dataset.presentationMode = authState.presentationMode;
+  if (authState.presentationMode === "off") {
+    sessionStorage.removeItem("fitbodystat-presentation-mode");
+  } else {
+    sessionStorage.setItem("fitbodystat-presentation-mode", authState.presentationMode);
+  }
+  if (shouldRender) render();
 }
 
 function saveChangeToCloud(userId, stateToSave, change) {
@@ -169,12 +189,13 @@ function renderPatientContext() {
   const container = document.getElementById("patient-context");
   const patient = authState.activePatient;
   container.hidden = !patient;
+  const protectIdentity = authState.presentationMode !== "off";
   container.innerHTML = patient ? `
     <div>
       <span>Acompanhando</span>
-      <strong>${escapeHtml(patient.name)}</strong>
-      <small>${escapeHtml(patient.email)}</small>
-      ${patient.phone ? `<a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>` : ""}
+      <strong>${protectIdentity ? "Paciente protegido" : escapeHtml(patient.name)}</strong>
+      ${protectIdentity ? "" : `<small>${escapeHtml(patient.email)}</small>`}
+      ${!protectIdentity && patient.phone ? `<a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>` : ""}
     </div>
     <button class="button" id="close-patient" type="button">Encerrar visualização</button>
   ` : "";
@@ -183,7 +204,10 @@ function renderPatientContext() {
 
 function renderSidebarUser() {
   const container = document.getElementById("sidebar-user");
-  const name = personalState.profile?.name || authState.user?.displayName || authState.user?.email || "Usuário";
+  const protectIdentity = authState.presentationMode !== "off";
+  const name = protectIdentity
+    ? "Identidade protegida"
+    : personalState.profile?.name || authState.user?.displayName || authState.user?.email || "Usuário";
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   container.innerHTML = `
     <span class="user-avatar" aria-hidden="true">${escapeHtml(initials || "U")}</span>
@@ -200,6 +224,9 @@ function renderSidebarUser() {
 
 function render() {
   applyTheme();
+  document.body.dataset.presentationMode = authState.presentationMode;
+  const presentationIndicator = document.getElementById("presentation-indicator");
+  presentationIndicator.hidden = authState.presentationMode === "off";
   renderSidebarUser();
   renderRoute({
     state,
@@ -212,7 +239,9 @@ function render() {
     replacePersonalState,
     openPatient,
     closePatient,
-    leavePatientContext
+    leavePatientContext,
+    completeOnboarding,
+    setPresentationMode
   });
   renderPatientContext();
 }
@@ -243,13 +272,43 @@ document.querySelector(".sidebar")?.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeMobileMenu();
 });
+document.getElementById("presentation-indicator")?.addEventListener("click", () => {
+  setPresentationMode("off");
+});
 
 window.addEventListener("hashchange", render);
 registerServiceWorker();
 
+async function completeOnboarding(payload) {
+  const profile = { ...personalState.profile, ...(payload.profile || {}) };
+  personalState.profile = profile;
+  personalState.contact = { ...personalState.contact, ...(payload.contact || {}) };
+  if (payload.goalPlan) personalState.goalPlan = payload.goalPlan;
+  state = personalState;
+
+  const actor = { uid: authState.user.uid, role: authState.role };
+  await saveCloudState(authState.user.uid, personalState, actor);
+  if (authState.role === "professional" && payload.professionalProfile) {
+    await saveProfessionalProfile(authState.user.uid, payload.professionalProfile, actor);
+    authState.professionalProfile = payload.professionalProfile;
+  }
+  await completeUserOnboarding(authState.user.uid, authState.role);
+  await Promise.all([
+    updateOwnDirectoryName(authState.user.uid, profile.name),
+    updateCurrentUserName(profile.name)
+  ]);
+  saveState(personalState, authState.user.uid);
+  authState.needsOnboarding = false;
+  authState.needsName = false;
+  authState.syncStatus = "Cadastro concluído e sincronizado.";
+  location.hash = authState.role === "professional" ? "#/pacientes" : "#/dashboard";
+  render();
+}
+
 observeAuth(async (user) => {
   authState.user = user;
   if (!user) {
+    setPresentationMode("off", false);
     location.replace(authRedirect);
     return;
   }
@@ -265,7 +324,15 @@ observeAuth(async (user) => {
     authState.syncStatus = "Carregando dados da nuvem...";
     render();
 
-    const userDoc = await ensureUserDocument(user);
+    let userDoc = await ensureUserDocument(user);
+    try {
+      const activation = await activateProfessionalAccess();
+      if (activation?.role && activation.role !== userDoc.role) {
+        userDoc = await getUser(user.uid) || { ...userDoc, role: activation.role };
+      }
+    } catch (error) {
+      if (!["functions/not-found", "functions/unavailable"].includes(error.code)) throw error;
+    }
     authState.role = userDoc.role || "user";
     authState.status = userDoc.status || "active";
     if (authState.status === "suspended") {
@@ -277,11 +344,15 @@ observeAuth(async (user) => {
     authState.adminUsers = null;
     authState.adminLinks = null;
     authState.adminInvitations = null;
+    authState.adminProfessionalRegistrations = null;
     authState.patients = null;
     authState.sentInvitations = null;
     authState.invitations = null;
     authState.professionals = null;
     authState.activePatient = null;
+    authState.professionalProfile = authState.role === "professional"
+      ? await loadProfessionalProfile(user.uid)
+      : null;
 
     const cloudState = await loadCloudState(user.uid);
     isApplyingCloudState = true;
@@ -299,6 +370,21 @@ observeAuth(async (user) => {
     const accountName = user.displayName || userDoc.name || "";
     if (!personalState.profile.name && accountName) personalState.profile.name = accountName;
     authState.needsName = !String(personalState.profile.name || "").trim();
+    const hasPersonalBaseline = Boolean(
+      personalState.profile.name
+      && personalState.profile.sex
+      && personalState.profile.heightCm
+      && personalState.profile.startWeightKg
+    );
+    const hasProfessionalRegistration = Boolean(
+      authState.professionalProfile?.name
+      && authState.professionalProfile?.professionType
+    );
+    authState.needsOnboarding = authState.role === "professional"
+      ? !hasProfessionalRegistration
+      : authState.role !== "admin"
+        && userDoc.onboardingCompleted !== true
+        && !hasPersonalBaseline;
     if (!authState.needsName && user.displayName !== personalState.profile.name) {
       await updateCurrentUserName(personalState.profile.name);
       await updateOwnDirectoryName(user.uid, personalState.profile.name);
@@ -315,7 +401,9 @@ observeAuth(async (user) => {
     isApplyingCloudState = false;
 
     if (!location.hash) {
-      location.hash = authState.needsName
+      location.hash = authState.needsOnboarding
+        ? "#/primeiro-acesso"
+        : authState.needsName
         ? "#/perfil"
         : authState.role === "professional" ? "#/pacientes"
           : authState.role === "admin" ? "#/admin" : "#/dashboard";

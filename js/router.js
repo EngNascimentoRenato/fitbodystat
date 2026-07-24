@@ -10,6 +10,9 @@ import { renderAdmin, bindAdmin } from "./views/admin-view.js";
 import { renderPatients, bindPatients } from "./views/patients-view.js";
 import { renderConnections, bindConnections } from "./views/connections-view.js";
 import { renderActivities, bindActivities } from "./views/activities-view.js";
+import { renderOnboarding, bindOnboarding } from "./views/onboarding-view.js";
+import { renderMethods } from "./views/methods-view.js";
+import { bindMeasurementHelp } from "./components/measurement-guide.js";
 
 const patientDataPaths = ["/dashboard", "/perfil", "/registro", "/historico", "/atividades", "/metas"];
 const personalDataPaths = ["/me/dashboard", "/me/perfil", "/me/registro", "/me/historico", "/me/atividades", "/me/metas"];
@@ -20,6 +23,7 @@ export function currentPath() {
 }
 
 function fallbackPath(authState) {
+  if (authState.needsOnboarding) return "/primeiro-acesso";
   if (authState.needsName) return "/perfil";
   if (authState.role === "professional") return "/pacientes";
   if (authState.role === "admin") return "/admin";
@@ -68,14 +72,15 @@ export function renderRoute(context) {
   renderMenu(activeRoute.path, context.authState);
 
   const viewMap = {
-    "/dashboard": () => renderDashboard(context.state),
+    "/dashboard": () => renderDashboard(context.state, "", { presentationMode: context.authState.presentationMode }),
+    "/primeiro-acesso": () => renderOnboarding(context.personalState, context.authState),
     "/perfil": () => renderProfile(context.state, { canEditContact: !context.authState.activePatient }),
     "/registro": () => renderEntry(context.state),
     "/historico": () => renderHistory(context.state),
     "/atividades": () => renderActivities(context.state),
     "/metas": () => renderGoals(context.state),
     "/vinculos": () => renderConnections(context.authState, context.personalState),
-    "/me/dashboard": () => renderDashboard(context.personalState, "/me"),
+    "/me/dashboard": () => renderDashboard(context.personalState, "/me", { presentationMode: context.authState.presentationMode }),
     "/me/perfil": () => renderProfile(context.personalState, { canEditContact: true }),
     "/me/registro": () => renderEntry(context.personalState),
     "/me/historico": () => renderHistory(context.personalState),
@@ -89,11 +94,13 @@ export function renderRoute(context) {
     "/admin/vinculos": () => renderAdmin(context.state, context.authState, "links"),
     "/admin/convites": () => renderAdmin(context.state, context.authState, "invitations"),
     "/conta": () => renderAccount(context.personalState, context.authState),
-    "/configuracoes": () => renderSettings(context.personalState, context.authState)
+    "/configuracoes": () => renderSettings(context.personalState, context.authState),
+    "/metodos": () => renderMethods()
   };
 
   app.innerHTML = (viewMap[activeRoute.path] || viewMap[fallbackPath(context.authState)])();
 
+  if (activeRoute.path === "/primeiro-acesso") bindOnboarding(context);
   if (activeRoute.path === "/perfil") bindProfile(context.state, context.persist, context.render);
   if (activeRoute.path === "/registro") bindEntry(context.state, context.persist, context.render);
   if (activeRoute.path === "/historico") bindHistory(context.state, context.persist, context.render);
@@ -107,7 +114,17 @@ export function renderRoute(context) {
   if (activeRoute.path === "/pacientes") bindPatients(context);
   if (activeRoute.path.startsWith("/admin")) bindAdmin(context);
   if (activeRoute.path === "/conta") bindAccount(context);
-  if (activeRoute.path === "/configuracoes") bindSettings(context.personalState, context.persistPersonal, context.render, context.replacePersonalState, context.authState);
+  if (activeRoute.path === "/configuracoes") {
+    bindSettings(
+      context.personalState,
+      context.persistPersonal,
+      context.render,
+      context.replacePersonalState,
+      context.authState,
+      context.setPresentationMode
+    );
+  }
 
+  bindMeasurementHelp();
   document.body.classList.remove("menu-open");
 }

@@ -22,6 +22,26 @@ export function renderSettings(state, authState = {}) {
         </div>
       </section>
       <section class="card">
+        <h2>Apresentação e privacidade</h2>
+        <p class="muted">Use temporariamente ao mostrar o Dashboard para outra pessoa. O modo é encerrado ao sair da conta.</p>
+        <form class="form" id="presentation-mode-form">
+          <div class="radio-row">
+            <label class="radio-card">
+              <input type="radio" name="presentationMode" value="identity" ${authState.presentationMode === "identity" ? "checked" : ""} />
+              <span><strong>Ocultar identificação</strong><small>Esconde nome, e-mail e telefone.</small></span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="presentationMode" value="evolution" ${authState.presentationMode === "evolution" ? "checked" : ""} />
+              <span><strong>Somente evolução</strong><small>Também remove os cards de medidas atuais e metas detalhadas.</small></span>
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="button primary" type="submit">${authState.presentationMode === "off" ? "Ativar modo de apresentação" : "Atualizar modo"}</button>
+            ${authState.presentationMode !== "off" ? `<button class="button" id="disable-presentation-mode" type="button">Encerrar apresentação</button>` : ""}
+          </div>
+        </form>
+      </section>
+      <section class="card">
         <h2>Dados e backup</h2>
         <p class="muted">Os dados ficam salvos neste navegador e, com login, também no Firestore.</p>
         <div class="button-row">
@@ -38,13 +58,30 @@ export function renderSettings(state, authState = {}) {
   `;
 }
 
-export function bindSettings(state, persist, render, replaceState, authState) {
+export function bindSettings(state, persist, render, replaceState, authState, setPresentationMode) {
   document.getElementById("theme-toggle").addEventListener("click", () => {
     state.settings = state.settings || {};
     state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";
     persist({ type: "settings" });
     showToast("Tema atualizado.");
     render();
+  });
+
+  document.getElementById("presentation-mode-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const mode = new FormData(event.currentTarget).get("presentationMode");
+    if (!mode) {
+      showToast("Escolha como deseja apresentar o Dashboard.");
+      return;
+    }
+    setPresentationMode(mode);
+    showToast("Modo de apresentação ativado.");
+    location.hash = authState.role === "user" ? "#/dashboard" : "#/me/dashboard";
+  });
+
+  document.getElementById("disable-presentation-mode")?.addEventListener("click", () => {
+    setPresentationMode("off");
+    showToast("Modo de apresentação encerrado.");
   });
 
   document.getElementById("export-csv").addEventListener("click", () => {

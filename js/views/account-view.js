@@ -7,6 +7,8 @@ import {
 } from "../services/auth-service.js";
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+import { saveProfessionalProfile } from "../data/firestore-store.js";
+import { formatPhone, normalizePhone, phoneIsValid } from "../utils/phone-utils.js";
 
 const roleLabels = {
   user: "Usuário",
@@ -18,6 +20,59 @@ function passwordIsStrong(password) {
   return password.length >= 8 && /[A-Za-zÀ-ÿ]/.test(password) && /\d/.test(password);
 }
 
+function professionalProfileEditor(state, authState) {
+  if (authState.role !== "professional") return "";
+  const profile = authState.professionalProfile || {};
+  const professionOptions = [
+    ["nutritionist", "Nutricionista"],
+    ["personal-trainer", "Personal trainer"],
+    ["physician", "Médico"],
+    ["physical-therapist", "Fisioterapeuta"],
+    ["physical-educator", "Profissional de educação física"],
+    ["other", "Outra"]
+  ];
+  return `
+    <section class="card">
+      <h2>Perfil profissional</h2>
+      <form class="form" id="professional-profile-form">
+        <div class="form-grid">
+          <div class="field">
+            <label for="account-professional-name">Nome de exibição</label>
+            <input id="account-professional-name" name="name" autocomplete="name" minlength="2" required
+              value="${escapeAttribute(profile.name || state.profile?.name || "")}" />
+          </div>
+          <div class="field">
+            <label for="account-profession-type">Área profissional</label>
+            <select id="account-profession-type" name="professionType" required>
+              ${professionOptions.map(([value, label]) =>
+                `<option value="${value}" ${profile.professionType === value ? "selected" : ""}>${label}</option>`
+              ).join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label for="account-registration-number">Registro profissional</label>
+            <input id="account-registration-number" name="registrationNumber" maxlength="40"
+              value="${escapeAttribute(profile.registrationNumber || "")}" />
+          </div>
+          <div class="field">
+            <label for="account-professional-phone">Telefone</label>
+            <input id="account-professional-phone" name="phone" type="tel" autocomplete="tel"
+              value="${escapeAttribute(formatPhone(state.contact?.phone || profile.phone || ""))}" />
+          </div>
+          <div class="field">
+            <label for="account-specialties">Especialidades</label>
+            <input id="account-specialties" name="specialties" maxlength="160"
+              value="${escapeAttribute((profile.specialties || []).join(", "))}" />
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="button primary" type="submit">Salvar perfil profissional</button>
+        </div>
+      </form>
+    </section>
+  `;
+}
+
 export function renderAccount(state, authState) {
   const user = authState?.user;
   if (!user) return `<section class="card empty-state"><h2>Login necessário</h2></section>`;
@@ -25,7 +80,11 @@ export function renderAccount(state, authState) {
   const providers = getProviderIds(user);
   const hasGoogle = providers.has("google.com");
   const hasPassword = providers.has("password");
-  const name = user.displayName || state.profile?.name || "Nome não informado";
+  const protectIdentity = authState.presentationMode !== "off";
+  const name = protectIdentity
+    ? "Oculto durante a apresentação"
+    : user.displayName || state.profile?.name || "Nome não informado";
+  const email = protectIdentity ? "Oculto durante a apresentação" : user.email || "-";
 
   return `
     <div class="view-stack">
@@ -39,7 +98,7 @@ export function renderAccount(state, authState) {
           </article>
           <article class="mini-stat">
             <span>E-mail</span>
-            <strong>${escapeHtml(user.email || "-")}</strong>
+            <strong>${escapeHtml(email)}</strong>
             <small>${user.emailVerified ? "E-mail verificado" : "Verificação pendente"}</small>
           </article>
           <article class="mini-stat">
@@ -49,6 +108,8 @@ export function renderAccount(state, authState) {
           </article>
         </div>
       </section>
+
+      ${professionalProfileEditor(state, authState)}
 
       <section class="card">
         <h2>Métodos de entrada</h2>
@@ -100,6 +161,43 @@ export function renderAccount(state, authState) {
 }
 
 export function bindAccount(context) {
+  document.getElementById("professional-profile-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    if (!phoneIsValid(data.get("phone"))) {
+      showToast("Informe um telefone válido, com DDD.");
+      return;
+    }
+    const professionalProfile = {
+      name: String(data.get("name") || "").trim(),
+      professionType: data.get("professionType"),
+      registrationNumber: String(data.get("registrationNumber") || "").trim(),
+      specialties: String(data.get("specialties") || "").split(",").map((item) => item.trim()).filter(Boolean),
+      phone: normalizePhone(data.get("phone"))
+    };
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      await saveProfessionalProfile(
+        context.authState.user.uid,
+        professionalProfile,
+        { uid: context.authState.user.uid, role: context.authState.role }
+      );
+      context.authState.professionalProfile = professionalProfile;
+      context.personalState.profile.name = professionalProfile.name;
+      context.personalState.contact = {
+        ...context.personalState.contact,
+        phone: professionalProfile.phone
+      };
+      context.persistPersonal({ type: "profile-plan" });
+      showToast("Perfil profissional atualizado.");
+      context.render();
+    } catch (error) {
+      showToast(`Não foi possível salvar o perfil profissional: ${error.message}`);
+      button.disabled = false;
+    }
+  });
+
   document.getElementById("show-add-password")?.addEventListener("click", () => {
     const form = document.getElementById("add-password-form");
     form.hidden = false;
@@ -148,6 +246,7 @@ export function bindAccount(context) {
 
   document.getElementById("sign-out")?.addEventListener("click", async () => {
     try {
+      context.setPresentationMode?.("off", false);
       await signOutUser();
       location.replace("login.html");
     } catch (error) {
