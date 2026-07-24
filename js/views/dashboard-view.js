@@ -10,8 +10,8 @@ import {
   getMaintenanceStatus,
   getMilestones,
   getProgressMode,
-  goalProgress,
-  nextMilestone
+  nextMilestone,
+  nextMilestoneProgress
 } from "../services/progress-service.js";
 import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
 import { formatDate } from "../utils/date-utils.js";
@@ -48,11 +48,17 @@ function dashboardSummary(profile, latest, activities) {
   }
 
   const next = nextMilestone(profile, latest);
+  const milestoneProgress = nextMilestoneProgress(profile, latest);
+  const milestoneDetail = milestoneProgress.total
+    ? `${formatDecimal(milestoneProgress.completed, 1)} de ${formatDecimal(milestoneProgress.total, 1)} ${milestoneProgress.unit} concluídos nesta etapa.`
+    : "";
   return {
     title: latest ? `Último registro em ${formatDate(latest.date)}` : "Comece pelo primeiro registro",
-    detail: next ? `Próximo marco: ${next.title}.` : "Todas as principais metas foram alcançadas.",
-    progress: goalProgress(profile, latest),
-    ringLabel: "da meta"
+    detail: next
+      ? `Próximo marco: ${next.title}. ${milestoneDetail}`
+      : "Todas as principais metas foram alcançadas.",
+    progress: milestoneProgress.value,
+    ringLabel: "do próximo marco"
   };
 }
 

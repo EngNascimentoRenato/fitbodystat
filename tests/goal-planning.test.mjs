@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   getSuggestedGoalWeight,
+  nextMilestone,
+  nextMilestoneProgress,
   resolveGoalTiming
 } from "../js/services/progress-service.js";
 import { createDefaultMonthlyPlan } from "../js/data/seed-plan.js";
@@ -91,4 +93,37 @@ test("planejamento mensal mantém doze meses e expande quando necessário", () =
   assert.ok(plan.length > 13);
   assert.equal(plan[0].weightKg, 89.8);
   assert.equal(plan.at(-1).weightKg, 70);
+});
+
+test("resumo calcula o progresso até o próximo marco", () => {
+  const profile = {
+    goalType: "weight-loss",
+    heightCm: 165,
+    startWeightKg: 89.8,
+    goalWeightKg: 74.8
+  };
+  const latest = { weightKg: 89 };
+  const next = nextMilestone(profile, latest);
+  const progress = nextMilestoneProgress(profile, latest);
+
+  assert.equal(next.title, "Perda de 5% do peso");
+  assert.equal(progress.value, 18);
+  assert.ok(Math.abs(progress.completed - 0.8) < 0.001);
+  assert.ok(Math.abs(progress.total - 4.49) < 0.001);
+});
+
+test("progresso reinicia ao avançar para a etapa seguinte", () => {
+  const profile = {
+    goalType: "weight-loss",
+    heightCm: 165,
+    startWeightKg: 89.8,
+    goalWeightKg: 74.8
+  };
+  const latest = { weightKg: 84.8 };
+  const next = nextMilestone(profile, latest);
+  const progress = nextMilestoneProgress(profile, latest);
+
+  assert.equal(next.title, "Sair da obesidade");
+  assert.equal(progress.value, 13);
+  assert.ok(Math.abs(progress.completed - 0.51) < 0.001);
 });

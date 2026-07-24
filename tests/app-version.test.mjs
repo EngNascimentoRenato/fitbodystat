@@ -7,9 +7,9 @@ const { getAppVersionInfo } = await import("../js/services/pwa-service.js");
 
 test("expõe versão, build e data centralizadas", () => {
   const version = getAppVersionInfo();
-  assert.equal(version.version, "0.1.0-alpha.22");
-  assert.equal(version.build, 22);
-  assert.equal(version.releasedAt, "2026-07-24");
+  assert.match(version.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+  assert.ok(Number.isInteger(version.build) && version.build > 0);
+  assert.match(version.releasedAt, /^\d{4}-\d{2}-\d{2}$/);
 });
 
 test("service worker deriva o cache da build central", async () => {

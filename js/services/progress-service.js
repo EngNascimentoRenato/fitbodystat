@@ -354,6 +354,57 @@ export function nextMilestone(profile, latest) {
   return getMilestones(profile, latest).find((milestone) => !milestone.reached) || null;
 }
 
+export function nextMilestoneProgress(profile, latest) {
+  const milestones = getMilestones(profile, latest);
+  const nextIndex = milestones.findIndex((milestone) => !milestone.reached);
+  if (nextIndex === -1) {
+    return { value: 100, completed: 0, total: 0, unit: "kg" };
+  }
+
+  const next = milestones[nextIndex];
+  if (next.mode === "waist") {
+    const start = finiteNumber(profile.startWaistCm);
+    const current = finiteNumber(latest?.waistCm) ?? start;
+    if (start === null || current === null || !Number.isFinite(next.waistTarget)) {
+      return { value: 0, completed: 0, total: 0, unit: "cm" };
+    }
+    const total = Math.abs(start - next.waistTarget);
+    const completed = Math.min(Math.max(start - current, 0), total);
+    return {
+      value: total ? Math.round((completed / total) * 100) : 100,
+      completed,
+      total,
+      unit: "cm"
+    };
+  }
+
+  const startWeight = finiteNumber(profile.startWeightKg);
+  const current = finiteNumber(latest?.weightKg) ?? startWeight;
+  if (startWeight === null || current === null || !Number.isFinite(next.target)) {
+    return { value: 0, completed: 0, total: 0, unit: "kg" };
+  }
+
+  const previous = milestones
+    .slice(0, nextIndex)
+    .filter((milestone) =>
+      milestone.mode === next.mode
+      && milestone.reached
+      && Number.isFinite(milestone.target)
+    )
+    .at(-1);
+  const stageStart = previous?.target ?? startWeight;
+  const total = Math.abs(next.target - stageStart);
+  const change = next.mode === "gain" ? current - stageStart : stageStart - current;
+  const completed = Math.min(Math.max(change, 0), total);
+
+  return {
+    value: total ? Math.round((completed / total) * 100) : 100,
+    completed,
+    total,
+    unit: "kg"
+  };
+}
+
 export function goalProgress(profile, latest) {
   const goal = getGoalWeight(profile);
   if (!profile.startWeightKg || !goal || !latest?.weightKg) return 0;
