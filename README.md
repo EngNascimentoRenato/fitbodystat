@@ -13,6 +13,8 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - Recuperação de senha e central de métodos de acesso.
 - Convites profissionais confirmados pelo paciente.
 - Dashboard do paciente acessível somente ao profissional vinculado.
+- Agenda profissional privada com visualizações diária, semanal e mensal.
+- Compromissos, indisponibilidades, filtros, pacientes vinculados e pessoas avulsas.
 - Administração de cadastros, níveis, situação das contas, convites e vínculos.
 - Pré-cadastro de profissionais por e-mail, sem envio de convite.
 - Primeiro acesso orientado conforme o tipo de conta.
@@ -42,6 +44,7 @@ professionalRegistrations/{emailNormalizado}
 users/{uid}/activities/{activityId}
 careInvitations/{invitationId}
 careLinks/{professionalId_patientId}
+professionalAgendas/{professionalId}/events/{eventId}
 ```
 
 Perfil, planejamento, configurações e medições possuem regras independentes. Administradores não recebem permissão sobre esses dados quando pertencem a outro usuário.
@@ -70,7 +73,7 @@ A versão funcional, a build e a data da publicação ficam centralizadas em
 `js/config/app-version.js`. Atualize os três valores com:
 
 ```powershell
-node scripts/set-version.mjs 0.1.0-alpha.23 23
+node scripts/set-version.mjs 0.2.0-alpha.1 24
 ```
 
 Ao iniciar outra fase, a revisão da fase pode reiniciar e a build deve continuar

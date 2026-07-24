@@ -1,7 +1,7 @@
 (function defineFitBodyStatVersion(scope) {
   scope.FITBODYSTAT_VERSION = Object.freeze({
-    version: "0.1.0-alpha.23",
-    build: 23,
+    version: "0.2.0-alpha.1",
+    build: 24,
     releasedAt: "2026-07-24"
   });
 }(globalThis));

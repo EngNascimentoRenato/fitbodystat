@@ -12,6 +12,7 @@ import { renderConnections, bindConnections } from "./views/connections-view.js"
 import { renderActivities, bindActivities } from "./views/activities-view.js";
 import { renderOnboarding, bindOnboarding } from "./views/onboarding-view.js";
 import { renderMethods } from "./views/methods-view.js";
+import { renderAgenda, bindAgenda } from "./views/agenda-view.js";
 import { bindMeasurementHelp } from "./components/measurement-guide.js";
 
 const patientDataPaths = ["/dashboard", "/perfil", "/registro", "/historico", "/atividades", "/metas"];
@@ -89,6 +90,7 @@ export function renderRoute(context) {
     "/me/metas": () => renderGoals(context.personalState),
     "/me/vinculos": () => renderConnections(context.authState, context.personalState),
     "/pacientes": () => renderPatients(context.state, context.authState),
+    "/agenda": () => renderAgenda(context.authState),
     "/admin": () => renderAdmin(context.state, context.authState, "overview"),
     "/admin/usuarios": () => renderAdmin(context.state, context.authState, "users"),
     "/admin/profissionais": () => renderAdmin(context.state, context.authState, "professionals"),
@@ -113,6 +115,7 @@ export function renderRoute(context) {
   if (activeRoute.path === "/me/atividades") bindActivities(context.personalState, context.persistPersonal, context.render);
   if (activeRoute.path === "/me/vinculos") bindConnections(context);
   if (activeRoute.path === "/pacientes") bindPatients(context);
+  if (activeRoute.path === "/agenda") bindAgenda(context);
   if (activeRoute.path.startsWith("/admin")) bindAdmin(context);
   if (activeRoute.path === "/conta") bindAccount(context);
   if (activeRoute.path === "/configuracoes") {

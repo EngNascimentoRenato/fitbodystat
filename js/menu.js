@@ -17,6 +17,7 @@ export const routes = [
   { path: "/me/perfil", title: "Meu perfil", eyebrow: "Meu espaço", label: "Meu perfil", icon: "P", roles: ["professional", "admin"] },
   { path: "/me/vinculos", title: "Meus profissionais", eyebrow: "Meu espaço", label: "Meus profissionais", icon: "V", roles: ["professional", "admin"] },
   { path: "/pacientes", title: "Pacientes", eyebrow: "Acompanhamento profissional", label: "Pacientes", icon: "P", roles: ["professional"] },
+  { path: "/agenda", title: "Agenda", eyebrow: "Organização profissional", label: "Agenda", icon: "G", roles: ["professional"] },
   { path: "/admin", title: "Visão geral", eyebrow: "Administração", label: "Visão geral", icon: "A", roles: ["admin"] },
   { path: "/admin/usuarios", title: "Usuários", eyebrow: "Administração", label: "Usuários", icon: "U", roles: ["admin"] },
   { path: "/admin/profissionais", title: "Profissionais", eyebrow: "Administração", label: "Profissionais", icon: "P", roles: ["admin"] },
@@ -123,7 +124,10 @@ export function renderMenu(currentPath, authState) {
     ].join("")) : "";
     menu.innerHTML = [
       patientLinks,
-      navSection("Área profissional", navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "P", currentPath)),
+      navSection("Área profissional", [
+        navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "P", currentPath),
+        navLink("/agenda", "Agenda", "G", currentPath)
+      ].join("")),
       personalSubmenu(currentPath, patient),
       navSection("Conta", accountLinks)
     ].join("");

@@ -52,6 +52,7 @@ let authState = {
   adminProfessionalRegistrations: null,
   patients: null,
   sentInvitations: null,
+  agendaEvents: null,
   invitations: null,
   professionals: null,
   activePatient: null
@@ -349,6 +350,7 @@ observeAuth(async (user) => {
     authState.adminProfessionalRegistrations = null;
     authState.patients = null;
     authState.sentInvitations = null;
+    authState.agendaEvents = null;
     authState.invitations = null;
     authState.professionals = null;
     authState.activePatient = null;

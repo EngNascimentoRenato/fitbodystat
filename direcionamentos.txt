@@ -5,49 +5,12 @@ A ordem das etapas considera valor para o usuário, potencial comercial, depend�
 técnicas e afinidade entre os ajustes.
 
 
-ETAPA 1 - AGENDA PROFISSIONAL: PRIMEIRA VERSÃO PRIORITÁRIA
+ETAPA 1 - EVOLUÇÕES DA AGENDA PROFISSIONAL
 
-Objetivo: aproximar o aplicativo de uma solução comercial para profissionais sem
-implementar, neste primeiro momento, agendamentos iniciados pelo paciente.
+Objetivo: ampliar a agenda já disponível com participação do paciente, automações e
+integrações externas.
 
-1. Acesso e privacidade
-   - Disponibilizar a agenda apenas para contas profissionais.
-   - Permitir que somente o profissional crie e altere compromissos nesta versão.
-   - Impedir que a administração visualize detalhes pessoais da agenda.
-   - Reservar ao administrador apenas funções administrativas e de diagnóstico.
-
-2. Visualização
-   - Oferecer visualizações diária, semanal e mensal.
-   - Permitir navegação rápida entre períodos e retorno à data atual.
-   - Exibir compromissos e bloqueios de horário de maneira distinta.
-
-3. Compromissos
-   - Criar, editar e excluir compromissos.
-   - Registrar data, horário inicial, duração, modalidade e local.
-   - Permitir associar um paciente vinculado.
-   - Permitir compromisso avulso com uma pessoa ainda não cadastrada.
-   - Incluir observações privadas do profissional.
-   - Permitir cores por tipo de compromisso.
-
-4. Estados do compromisso
-   - Utilizar estados como agendado, confirmado, concluído, cancelado e falta.
-   - Permitir filtros por paciente, local e estado.
-
-5. Indisponibilidade
-   - Permitir bloqueios de horários e períodos indisponíveis.
-
-6. Contato do paciente
-   - Exibir telefone somente quando estiver preenchido e compartilhado com o profissional.
-
-7. Modelo preparado para evolução
-   - Estruturar os registros com proprietário da agenda, criador, paciente opcional,
-     participantes, início, término, fuso horário, local, modalidade e visibilidade.
-   - Prever estados de solicitação e confirmação sem exibi-los na primeira versão.
-   - Reservar suporte futuro para recorrência, lembretes, atendimento on-line e
-     consentimento associado ao agendamento.
-   - Tratar datas e horários de forma consistente com o fuso do usuário.
-
-8. Evoluções posteriores da agenda
+1. Evoluções posteriores da agenda
    - Cadastro de disponibilidade e compromissos recorrentes.
    - Visualização da agenda pelo paciente.
    - Solicitação de pré-agendamento pelo paciente.

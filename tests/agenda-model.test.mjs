@@ -1,0 +1,99 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  agendaEventPerson,
+  agendaPeriodLabel,
+  agendaViewDays,
+  filterAgendaEvents,
+  moveAgendaAnchor,
+  normalizeAgendaEvent,
+  startOfWeek
+} from "../js/models/agenda-model.js";
+
+test("normaliza compromisso com paciente e horário absoluto", () => {
+  const event = normalizeAgendaEvent({
+    type: "appointment",
+    title: "Avaliação",
+    date: "2026-07-27",
+    startTime: "09:30",
+    durationMinutes: 60,
+    patientId: "patient-1",
+    patientName: "Paciente Teste",
+    modality: "in-person",
+    location: "Consultório",
+    status: "confirmed",
+    color: "#25636f"
+  }, "professional-1");
+
+  assert.equal(event.professionalId, "professional-1");
+  assert.equal(event.patientId, "patient-1");
+  assert.deepEqual(event.participants, ["professional-1", "patient-1"]);
+  assert.equal(event.status, "confirmed");
+  assert.equal(new Date(event.endsAt).getTime() - new Date(event.startsAt).getTime(), 60 * 60 * 1000);
+});
+
+test("permite pessoa avulsa e exige sua identificação", () => {
+  const event = normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-07-27",
+    startTime: "10:00",
+    durationMinutes: 45,
+    guestName: "Pessoa avulsa",
+    modality: "online"
+  }, "professional-1");
+
+  assert.equal(agendaEventPerson(event), "Pessoa avulsa");
+  assert.equal(event.patientId, null);
+  assert.throws(() => normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-07-27",
+    startTime: "10:00",
+    durationMinutes: 45
+  }, "professional-1"), /Selecione um paciente/);
+});
+
+test("bloqueio remove dados de paciente e usa estado próprio", () => {
+  const event = normalizeAgendaEvent({
+    type: "block",
+    title: "Almoço",
+    date: "2026-07-27",
+    startTime: "12:00",
+    durationMinutes: 60,
+    patientId: "patient-1",
+    patientName: "Paciente Teste"
+  }, "professional-1");
+
+  assert.equal(event.status, "blocked");
+  assert.equal(event.patientId, null);
+  assert.equal(event.modality, "");
+  assert.deepEqual(event.participants, ["professional-1"]);
+});
+
+test("gera períodos de dia, semana e mês", () => {
+  assert.equal(startOfWeek("2026-07-29"), "2026-07-27");
+  assert.deepEqual(agendaViewDays("2026-07-29", "week"), [
+    "2026-07-27",
+    "2026-07-28",
+    "2026-07-29",
+    "2026-07-30",
+    "2026-07-31",
+    "2026-08-01",
+    "2026-08-02"
+  ]);
+  assert.equal(agendaViewDays("2026-07-29", "month").length, 42);
+  assert.equal(moveAgendaAnchor("2026-07-29", "week", 1), "2026-08-05");
+  assert.match(agendaPeriodLabel("2026-07-29", "month"), /julho de 2026/i);
+});
+
+test("filtra por estado, paciente e local", () => {
+  const events = [
+    { status: "confirmed", patientId: "p1", location: "Sala 1" },
+    { status: "scheduled", patientId: null, location: "On-line" }
+  ];
+
+  assert.equal(filterAgendaEvents(events, { status: "confirmed" }).length, 1);
+  assert.equal(filterAgendaEvents(events, { patient: "__guest" }).length, 1);
+  assert.equal(filterAgendaEvents(events, { patient: "p1", location: "Sala 1" }).length, 1);
+});
+
