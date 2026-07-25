@@ -24,9 +24,15 @@ export function currentPath() {
 }
 
 function fallbackPath(authState) {
-  if (authState.needsOnboarding) return "/primeiro-acesso";
-  if (authState.needsName) return "/perfil";
-  if (authState.role === "professional") return "/pacientes";
+  if (authState.needsOnboarding || authState.needsPersonalOnboarding) return "/primeiro-acesso";
+  if (authState.needsName) {
+    return authState.role === "professional" && authState.activeWorkspace === "professional"
+      ? "/conta"
+      : "/perfil";
+  }
+  if (authState.role === "professional") {
+    return authState.activeWorkspace === "personal" ? "/dashboard" : "/agenda";
+  }
   if (authState.role === "admin") return "/admin";
   return "/dashboard";
 }
@@ -38,7 +44,9 @@ function configureTopbar(activeRoute, authState) {
   action.href = activeRoute.path.startsWith("/me/") ? "#/me/registro" : "#/registro";
   action.textContent = authState.activePatient
     ? "Novo registro do paciente"
-    : authState.role === "user" ? "Novo registro" : "Meu novo registro";
+    : authState.role === "user" || authState.activeWorkspace === "personal"
+      ? "Novo registro"
+      : "Meu novo registro";
 
   if (!authState.activePatient || !patientDataPaths.includes(activeRoute.path)) return;
   const patientTitles = {
@@ -66,6 +74,9 @@ export function renderRoute(context) {
   const activeRoute = canAccessRoute(requestedRoute, context.authState)
     ? requestedRoute
     : getRoute(fallbackPath(context.authState));
+  if (requestedPath !== activeRoute.path) {
+    history.replaceState(null, "", `#${activeRoute.path}`);
+  }
   if (!["/registro", "/me/registro"].includes(activeRoute.path)) resetEntryMode();
 
   document.getElementById("route-title").textContent = activeRoute.title;

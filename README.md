@@ -21,6 +21,8 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - Estado atualizado diretamente no resumo do compromisso.
 - Cores automáticas por estado e formulário de compromisso organizado por contexto.
 - Locais de atendimento reutilizáveis cadastrados no perfil profissional.
+- Inclusão, edição e exclusão confirmada dos locais em um fluxo independente.
+- Ambientes profissional e pessoal separados, com preferência mantida por dispositivo.
 - Cancelamento com histórico preservado e bloqueio opcional ou personalizado.
 - Reabertura controlada com remoção opcional do bloqueio associado.
 - Administração de cadastros, níveis, situação das contas, convites e vínculos.
@@ -33,7 +35,7 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 ## Perfis de acesso
 
 - `user`: acessa e edita apenas os próprios dados, além de aceitar ou remover vínculos.
-- `professional`: acessa somente pacientes com vínculo ativo e mantém seus dados pessoais em `Meu espaço`.
+- `professional`: trabalha com pacientes e agenda no ambiente profissional e pode habilitar um ambiente pessoal separado.
 - `admin`: administra cadastros e relações, sem acesso a dados corporais de terceiros.
 
 Novas contas são criadas como `user`. O administrador pode pré-autorizar um e-mail profissional. No primeiro acesso verificado, uma transação atômica associa o `uid` e solicita a promoção para `professional`. As regras do Firestore conferem o e-mail, a verificação da conta e o pré-cadastro antes de aceitar a alteração.
@@ -82,7 +84,7 @@ A versão funcional, a build e a data da publicação ficam centralizadas em
 `js/config/app-version.js`. Atualize os três valores com:
 
 ```powershell
-node scripts/set-version.mjs 0.2.0-alpha.5 28
+node scripts/set-version.mjs 0.2.0-alpha.6 29
 ```
 
 Ao iniciar outra fase, a revisão da fase pode reiniciar e a build deve continuar

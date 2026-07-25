@@ -232,7 +232,7 @@ function professionalOnboarding(authState) {
 }
 
 export function renderOnboarding(state, authState) {
-  return authState.role === "professional"
+  return authState.role === "professional" && authState.activeWorkspace !== "personal"
     ? professionalOnboarding(authState)
     : userOnboarding(state, authState);
 }
@@ -507,7 +507,9 @@ export function bindOnboarding(context) {
           professionType: data.get("professionType"),
           registrationNumber: String(data.get("registrationNumber") || "").trim(),
           specialties: String(data.get("specialties") || "").split(",").map((item) => item.trim()).filter(Boolean),
-          phone: normalizePhone(data.get("phone"))
+          phone: normalizePhone(data.get("phone")),
+          personalWorkspaceEnabled: false,
+          locations: []
         }
       });
       showToast("Cadastro profissional concluído.");

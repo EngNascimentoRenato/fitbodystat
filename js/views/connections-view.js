@@ -14,7 +14,9 @@ export function renderConnections(authState, personalState) {
   const pending = (authState.invitations || []).filter((item) => item.status === "pending");
   const professionals = authState.professionals || [];
   const ownPhone = personalState?.contact?.phone || "";
-  const profilePath = authState.role === "user" ? "#/perfil" : "#/me/perfil";
+  const profilePath = authState.role === "user" || authState.activeWorkspace === "personal"
+    ? "#/perfil"
+    : "#/me/perfil";
 
   return `
     <div class="view-stack">

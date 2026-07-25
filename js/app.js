@@ -24,6 +24,12 @@ import {
 } from "./services/auth-service.js";
 import { activateProfessionalAccess } from "./services/role-service.js";
 import { registerServiceWorker } from "./services/pwa-service.js";
+import {
+  clearDeviceWorkspace,
+  loadDeviceWorkspace,
+  personalWorkspaceEnabled,
+  saveDeviceWorkspace
+} from "./services/workspace-service.js";
 import { renderRoute } from "./router.js";
 import { escapeAttribute, escapeHtml } from "./utils/html-utils.js";
 import { formatPhone } from "./utils/phone-utils.js";
@@ -43,6 +49,8 @@ let authState = {
   status: "active",
   needsName: false,
   needsOnboarding: false,
+  needsPersonalOnboarding: false,
+  activeWorkspace: "personal",
   professionalProfile: null,
   presentationMode: sessionStorage.getItem("fitbodystat-presentation-mode") || "off",
   syncStatus: "Verificando login...",
@@ -153,7 +161,7 @@ function replacePersonalState(nextState) {
 }
 
 async function openPatient(patientOrId) {
-  if (!authState.user || authState.role !== "professional") return;
+  if (!authState.user || authState.role !== "professional" || authState.activeWorkspace !== "professional") return;
   const patient = typeof patientOrId === "string" ? await getUser(patientOrId) : patientOrId;
   if (!patient) throw new Error("Usuário não encontrado.");
 
@@ -185,6 +193,37 @@ function closePatient() {
   leavePatientContext();
   location.hash = "#/pacientes";
   render();
+}
+
+function hasPersonalBaseline() {
+  return Boolean(
+    personalState.profile.name
+    && personalState.profile.sex
+    && personalState.profile.heightCm
+    && personalState.profile.startWeightKg
+  );
+}
+
+function setActiveWorkspace(workspace, shouldNavigate = true) {
+  if (authState.role !== "professional") return;
+  const next = workspace === "personal" && personalWorkspaceEnabled(authState)
+    ? "personal"
+    : "professional";
+  leavePatientContext();
+  authState.activeWorkspace = next;
+  authState.needsPersonalOnboarding = next === "personal" && !hasPersonalBaseline();
+  state = personalState;
+  saveDeviceWorkspace(authState.user?.uid, next);
+  if (shouldNavigate) {
+    location.hash = next === "personal"
+      ? authState.needsPersonalOnboarding ? "#/primeiro-acesso" : "#/dashboard"
+      : "#/agenda";
+  }
+  render();
+}
+
+function clearWorkspacePreference() {
+  clearDeviceWorkspace(authState.user?.uid);
 }
 
 function renderPatientContext() {
@@ -220,8 +259,40 @@ function renderSidebarUser() {
   `;
   container.title = `${name} · ${roleLabels[authState.role] || "Usuário"}`;
   document.getElementById("brand-home").href = authState.role === "professional"
-    ? "#/pacientes"
+    ? authState.activeWorkspace === "personal" ? "#/dashboard" : "#/agenda"
     : authState.role === "admin" ? "#/admin" : "#/dashboard";
+}
+
+function renderWorkspaceSwitch() {
+  const container = document.getElementById("workspace-switch");
+  const indicator = document.getElementById("workspace-indicator");
+  const enabled = personalWorkspaceEnabled(authState);
+  const professional = authState.role === "professional";
+  if (indicator) {
+    indicator.hidden = !professional;
+    indicator.textContent = authState.activeWorkspace === "personal"
+      ? "Ambiente pessoal"
+      : "Ambiente profissional";
+  }
+  if (!container) return;
+  container.hidden = !professional || !enabled;
+  if (container.hidden) {
+    container.innerHTML = "";
+    return;
+  }
+  const personal = authState.activeWorkspace === "personal";
+  container.innerHTML = `
+    <button class="workspace-switch-button" id="switch-workspace" type="button">
+      <span>
+        <strong>${personal ? "Ambiente pessoal" : "Ambiente profissional"}</strong>
+        <small>Trocar para ${personal ? "profissional" : "pessoal"}</small>
+      </span>
+      <span aria-hidden="true">⇄</span>
+    </button>
+  `;
+  document.getElementById("switch-workspace")?.addEventListener("click", () => {
+    setActiveWorkspace(personal ? "professional" : "personal");
+  });
 }
 
 function render() {
@@ -230,6 +301,7 @@ function render() {
   const presentationIndicator = document.getElementById("presentation-indicator");
   presentationIndicator.hidden = authState.presentationMode === "off";
   renderSidebarUser();
+  renderWorkspaceSwitch();
   renderRoute({
     state,
     personalState,
@@ -243,7 +315,9 @@ function render() {
     closePatient,
     leavePatientContext,
     completeOnboarding,
-    setPresentationMode
+    setPresentationMode,
+    setActiveWorkspace,
+    clearWorkspacePreference
   });
   renderPatientContext();
 }
@@ -301,9 +375,12 @@ async function completeOnboarding(payload) {
   ]);
   saveState(personalState, authState.user.uid);
   authState.needsOnboarding = false;
+  authState.needsPersonalOnboarding = false;
   authState.needsName = false;
   authState.syncStatus = "Cadastro concluído e sincronizado.";
-  location.hash = authState.role === "professional" ? "#/pacientes" : "#/dashboard";
+  location.hash = authState.role === "professional"
+    ? authState.activeWorkspace === "personal" ? "#/dashboard" : "#/agenda"
+    : "#/dashboard";
   render();
 }
 
@@ -359,6 +436,9 @@ observeAuth(async (user) => {
     authState.professionalProfile = authState.role === "professional"
       ? await loadProfessionalProfile(user.uid)
       : null;
+    authState.activeWorkspace = authState.role === "professional"
+      ? loadDeviceWorkspace(user.uid, personalWorkspaceEnabled(authState))
+      : authState.role === "admin" ? "admin" : "personal";
 
     const cloudState = await loadCloudState(user.uid);
     isApplyingCloudState = true;
@@ -376,7 +456,7 @@ observeAuth(async (user) => {
     const accountName = user.displayName || userDoc.name || "";
     if (!personalState.profile.name && accountName) personalState.profile.name = accountName;
     authState.needsName = !String(personalState.profile.name || "").trim();
-    const hasPersonalBaseline = Boolean(
+    const personalBaselineReady = Boolean(
       personalState.profile.name
       && personalState.profile.sex
       && personalState.profile.heightCm
@@ -386,11 +466,15 @@ observeAuth(async (user) => {
       authState.professionalProfile?.name
       && authState.professionalProfile?.professionType
     );
+    authState.needsPersonalOnboarding = authState.role === "professional"
+      && authState.activeWorkspace === "personal"
+      && hasProfessionalRegistration
+      && !personalBaselineReady;
     authState.needsOnboarding = authState.role === "professional"
-      ? !hasProfessionalRegistration
+      ? !hasProfessionalRegistration || authState.needsPersonalOnboarding
       : authState.role !== "admin"
         && userDoc.onboardingCompleted !== true
-        && !hasPersonalBaseline;
+        && !personalBaselineReady;
     if (!authState.needsName && user.displayName !== personalState.profile.name) {
       await updateCurrentUserName(personalState.profile.name);
       await updateOwnDirectoryName(user.uid, personalState.profile.name);
@@ -411,7 +495,8 @@ observeAuth(async (user) => {
         ? "#/primeiro-acesso"
         : authState.needsName
         ? "#/perfil"
-        : authState.role === "professional" ? "#/pacientes"
+        : authState.role === "professional"
+          ? authState.activeWorkspace === "personal" ? "#/dashboard" : "#/agenda"
           : authState.role === "admin" ? "#/admin" : "#/dashboard";
     }
   } catch (error) {

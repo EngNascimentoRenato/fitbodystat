@@ -31,8 +31,19 @@ export const routes = [
 const personalPaths = ["/me/dashboard", "/me/registro", "/me/historico", "/me/atividades", "/me/metas", "/me/perfil", "/me/vinculos"];
 
 function routeIsAllowed(route, authState) {
-  if (authState?.needsOnboarding && !["/primeiro-acesso", "/conta"].includes(route.path)) return false;
+  if ((authState?.needsOnboarding || authState?.needsPersonalOnboarding)
+    && !["/primeiro-acesso", "/conta"].includes(route.path)) return false;
   if (authState?.needsName && !["/perfil", "/conta"].includes(route.path)) return false;
+  if (authState?.role === "professional") {
+    const common = ["/conta", "/configuracoes", "/metodos", "/primeiro-acesso"];
+    const personal = ["/dashboard", "/atividades", "/registro", "/historico", "/metas", "/perfil", "/vinculos"];
+    const professional = ["/agenda", "/pacientes"];
+    if (common.includes(route.path)) return true;
+    if (authState.activeWorkspace === "personal") return personal.includes(route.path);
+    if (professional.includes(route.path)) return true;
+    return Boolean(authState.activePatient)
+      && ["/dashboard", "/atividades", "/registro", "/historico", "/metas", "/perfil"].includes(route.path);
+  }
   if (!route.roles) return true;
   return route.roles.includes(authState?.role || "user");
 }
@@ -72,9 +83,24 @@ function personalSubmenu(currentPath, activePatient) {
   `;
 }
 
+function standardPersonalMenu(currentPath, accountLinks) {
+  return [
+    navSection("Minha evolução", [
+      navLink("/dashboard", "Dashboard", "D", currentPath),
+      navLink("/atividades", "Atividades", "A", currentPath),
+      navLink("/registro", "Novo registro", "+", currentPath),
+      navLink("/historico", "Histórico", "H", currentPath),
+      navLink("/metas", "Metas", "M", currentPath),
+      navLink("/perfil", "Perfil", "P", currentPath)
+    ].join("")),
+    navSection("Relacionamentos", navLink("/vinculos", "Meus profissionais", "V", currentPath)),
+    navSection("Conta", accountLinks)
+  ].join("");
+}
+
 export function renderMenu(currentPath, authState) {
   const menu = document.getElementById("main-menu");
-  if (authState?.needsOnboarding) {
+  if (authState?.needsOnboarding || authState?.needsPersonalOnboarding) {
     menu.innerHTML = navSection("Primeiro acesso", [
       navLink("/primeiro-acesso", "Concluir cadastro", "1", currentPath),
       navLink("/conta", "Conta", "C", currentPath)
@@ -82,8 +108,11 @@ export function renderMenu(currentPath, authState) {
     return;
   }
   if (authState?.needsName) {
+    const profilePath = authState.role === "professional" && authState.activeWorkspace === "professional"
+      ? "/conta"
+      : "/perfil";
     menu.innerHTML = navSection("Complete seu cadastro", [
-      navLink("/perfil", "Preencher perfil", "P", currentPath),
+      navLink(profilePath, "Preencher perfil", "P", currentPath),
       navLink("/conta", "Conta", "C", currentPath)
     ].join(""));
     return;
@@ -96,22 +125,15 @@ export function renderMenu(currentPath, authState) {
   ].join("");
 
   if (authState.role === "user") {
-    menu.innerHTML = [
-      navSection("Minha evolução", [
-        navLink("/dashboard", "Dashboard", "D", currentPath),
-        navLink("/atividades", "Atividades", "A", currentPath),
-        navLink("/registro", "Novo registro", "+", currentPath),
-        navLink("/historico", "Histórico", "H", currentPath),
-        navLink("/metas", "Metas", "M", currentPath),
-        navLink("/perfil", "Perfil", "P", currentPath)
-      ].join("")),
-      navSection("Relacionamentos", navLink("/vinculos", "Meus profissionais", "V", currentPath)),
-      navSection("Conta", accountLinks)
-    ].join("");
+    menu.innerHTML = standardPersonalMenu(currentPath, accountLinks);
     return;
   }
 
   if (authState.role === "professional") {
+    if (authState.activeWorkspace === "personal") {
+      menu.innerHTML = standardPersonalMenu(currentPath, accountLinks);
+      return;
+    }
     const patient = authState.activePatient;
     const patientLabel = authState.presentationMode === "off" ? patient?.name : "Identidade protegida";
     const patientLinks = patient ? navSection(`Paciente: ${escapeHtml(patientLabel)}`, [
@@ -125,10 +147,9 @@ export function renderMenu(currentPath, authState) {
     menu.innerHTML = [
       patientLinks,
       navSection("Área profissional", [
-        navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "P", currentPath),
-        navLink("/agenda", "Agenda", "G", currentPath)
+        navLink("/agenda", "Agenda", "G", currentPath),
+        navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "P", currentPath)
       ].join("")),
-      personalSubmenu(currentPath, patient),
       navSection("Conta", accountLinks)
     ].join("");
     return;

@@ -79,6 +79,43 @@ body.menu-collapsed .nav-submenu summary span:last-child {
   border-bottom: 1px solid var(--border);
 }
 
+.workspace-switch {
+  margin: -0.4rem 0 1rem;
+}
+
+.workspace-switch-button {
+  display: flex;
+  width: 100%;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.7rem;
+  color: var(--text);
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.workspace-switch-button > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.workspace-switch-button small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+body.menu-collapsed .workspace-switch-button {
+  justify-content: center;
+  padding-inline: 0.4rem;
+}
+
+body.menu-collapsed .workspace-switch-button > span:first-child {
+  display: none;
+}
+
 .user-avatar {
   display: grid;
   width: 36px;
@@ -218,13 +255,28 @@ body.menu-collapsed .nav-submenu-content {
 
 .topbar {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr) minmax(160px, 1fr);
+  grid-template-columns: minmax(52px, 1fr) minmax(0, 2fr) auto minmax(160px, 1fr);
   gap: 1rem;
   align-items: center;
   padding: 1rem clamp(1rem, 4vw, 2rem);
   background: rgba(245, 241, 232, 0.78);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(18px);
+}
+
+.workspace-indicator {
+  width: max-content;
+  padding: 0.25rem 0.5rem;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.topbar-action {
+  justify-self: end;
 }
 
 .topbar-title {
@@ -344,6 +396,17 @@ body.menu-collapsed .nav-submenu-content {
   white-space: nowrap;
 }
 
+@media (max-width: 760px) {
+  .topbar {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+  }
+
+  .topbar-action {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
 @media (max-width: 900px) {
   body.menu-open {
     overflow: hidden;
@@ -415,6 +478,15 @@ body.menu-collapsed .nav-submenu-content {
     display: grid;
   }
 
+  body.menu-collapsed .workspace-switch-button {
+    justify-content: space-between;
+    padding: 0.6rem 0.7rem;
+  }
+
+  body.menu-collapsed .workspace-switch-button > span:first-child {
+    display: grid;
+  }
+
   body.menu-collapsed .nav-submenu-content {
     display: grid;
   }
@@ -440,6 +512,11 @@ body.menu-collapsed .nav-submenu-content {
 
   .topbar-title {
     text-align: left;
+  }
+
+  .workspace-indicator {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .topbar-action {

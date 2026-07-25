@@ -6,9 +6,11 @@ import {
   signOutUser
 } from "../services/auth-service.js";
 import { showToast } from "../components/toast.js";
+import { confirmAction } from "../components/modal.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { saveProfessionalProfile } from "../data/firestore-store.js";
 import { normalizeProfessionalLocations } from "../models/professional-profile-model.js";
+import { personalWorkspaceEnabled } from "../services/workspace-service.js";
 import { formatPhone, normalizePhone, phoneIsValid } from "../utils/phone-utils.js";
 
 const roleLabels = {
@@ -17,37 +19,72 @@ const roleLabels = {
   admin: "Administrador"
 };
 
+let locationEditorOpen = false;
+let editingLocationId = null;
+
 function passwordIsStrong(password) {
   return password.length >= 8 && /[A-Za-zÀ-ÿ]/.test(password) && /\d/.test(password);
 }
 
-function professionalLocationRow(location = {}, index = 0) {
+function professionalLocationItem(location) {
   return `
-    <div class="professional-location-row" data-professional-location>
-      <input type="hidden" name="locationId" value="${escapeAttribute(location.id || `location-${index + 1}`)}" />
-      <div class="field">
-        <label for="professional-location-name-${index}">Nome do local</label>
-        <input id="professional-location-name-${index}" name="locationName" maxlength="80" required
-          placeholder="Ex.: Consultório Centro" value="${escapeAttribute(location.name || "")}" />
+    <article class="professional-location-item">
+      <div>
+        <strong>${escapeHtml(location.name)}</strong>
+        ${location.address ? `<span>${escapeHtml(location.address)}</span>` : ""}
+        ${location.contact ? `<small>${escapeHtml(location.contact)}</small>` : ""}
       </div>
-      <div class="field">
-        <label for="professional-location-address-${index}">Endereço <span class="muted">(opcional)</span></label>
-        <input id="professional-location-address-${index}" name="locationAddress" maxlength="220"
-          value="${escapeAttribute(location.address || "")}" />
+      <div class="button-row">
+        <button class="button" type="button" data-edit-professional-location="${escapeAttribute(location.id)}">Editar</button>
+        <button class="button danger" type="button" data-delete-professional-location="${escapeAttribute(location.id)}">
+          Excluir
+        </button>
       </div>
-      <div class="field">
-        <label for="professional-location-contact-${index}">Contato <span class="muted">(opcional)</span></label>
-        <input id="professional-location-contact-${index}" name="locationContact" maxlength="120"
-          value="${escapeAttribute(location.contact || "")}" />
-      </div>
-      <button class="icon-button professional-location-remove" type="button"
-        data-remove-professional-location aria-label="Remover local">×</button>
-    </div>
+    </article>
+  `;
+}
+
+function professionalLocationDialog(profile) {
+  if (!locationEditorOpen) return "";
+  const location = (profile.locations || []).find((item) => item.id === editingLocationId) || {};
+  const editing = Boolean(location.id);
+  return `
+    <dialog class="account-dialog" id="professional-location-dialog">
+      <form class="form" id="professional-location-form">
+        <input type="hidden" name="id" value="${escapeAttribute(location.id || "")}" />
+        <header class="account-dialog-header">
+          <div>
+            <p class="eyebrow">Perfil profissional</p>
+            <h2>${editing ? "Editar local" : "Novo local de atendimento"}</h2>
+          </div>
+          <button class="icon-button" id="close-professional-location" type="button" aria-label="Fechar">×</button>
+        </header>
+        <div class="field">
+          <label for="professional-location-name">Nome do local</label>
+          <input id="professional-location-name" name="name" maxlength="80" minlength="2" required
+            placeholder="Ex.: Consultório Centro" value="${escapeAttribute(location.name || "")}" />
+        </div>
+        <div class="field">
+          <label for="professional-location-address">Endereço <span class="muted">(opcional)</span></label>
+          <input id="professional-location-address" name="address" maxlength="220"
+            value="${escapeAttribute(location.address || "")}" />
+        </div>
+        <div class="field">
+          <label for="professional-location-contact">Contato <span class="muted">(opcional)</span></label>
+          <input id="professional-location-contact" name="contact" maxlength="120"
+            value="${escapeAttribute(location.contact || "")}" />
+        </div>
+        <footer class="account-dialog-actions">
+          <button class="button" id="cancel-professional-location" type="button">Cancelar</button>
+          <button class="button primary" type="submit">${editing ? "Salvar alterações" : "Salvar local"}</button>
+        </footer>
+      </form>
+    </dialog>
   `;
 }
 
 function professionalProfileEditor(state, authState) {
-  if (authState.role !== "professional") return "";
+  if (authState.role !== "professional" || authState.activeWorkspace === "personal") return "";
   const profile = authState.professionalProfile || {};
   const professionOptions = [
     ["nutritionist", "Nutricionista"],
@@ -92,19 +129,53 @@ function professionalProfileEditor(state, authState) {
               value="${escapeAttribute((profile.specialties || []).join(", "))}" />
           </div>
         </div>
-        <fieldset class="professional-locations">
-          <legend>Locais de atendimento</legend>
-          <p class="muted">Cadastre os locais usados com frequência para selecioná-los rapidamente na agenda.</p>
-          <div class="professional-location-list" id="professional-location-list">
-            ${locations.map((location, index) => professionalLocationRow(location, index)).join("")}
-            <p class="professional-location-empty muted" ${locations.length ? "hidden" : ""}>Nenhum local cadastrado.</p>
-          </div>
-          <button class="button" id="add-professional-location" type="button">Adicionar local</button>
-        </fieldset>
         <div class="button-row">
           <button class="button primary" type="submit">Salvar perfil profissional</button>
         </div>
       </form>
+      <div class="professional-locations">
+        <div class="professional-locations-heading">
+          <div>
+            <h3>Locais de atendimento</h3>
+            <p class="muted">Locais usados com frequência na agenda.</p>
+          </div>
+          <button class="button" id="add-professional-location" type="button">+ Adicionar local</button>
+        </div>
+        <div class="professional-location-list">
+          ${locations.map(professionalLocationItem).join("")
+            || `<p class="professional-location-empty muted">Nenhum local cadastrado.</p>`}
+        </div>
+      </div>
+      ${professionalLocationDialog(profile)}
+    </section>
+  `;
+}
+
+function professionalWorkspaceSettings(authState) {
+  if (authState.role !== "professional") return "";
+  const enabled = personalWorkspaceEnabled(authState);
+  const personal = authState.activeWorkspace === "personal";
+  return `
+    <section class="card">
+      <h2>Ambientes da conta</h2>
+      <label class="consent-option workspace-account-option">
+        <input id="personal-workspace-enabled" type="checkbox" ${enabled ? "checked" : ""} />
+        <span>
+          <strong>Usar o FitBodyStat também para meu acompanhamento pessoal</strong>
+          <small>Libera um ambiente separado para suas próprias métricas, atividades e metas. Desativar não exclui dados.</small>
+        </span>
+      </label>
+      ${enabled ? `
+        <div class="workspace-account-status">
+          <span>
+            <small>Ambiente atual neste dispositivo</small>
+            <strong>${personal ? "Pessoal" : "Profissional"}</strong>
+          </span>
+          <button class="button" id="account-switch-workspace" type="button">
+            Trocar para ${personal ? "profissional" : "pessoal"}
+          </button>
+        </div>
+      ` : ""}
     </section>
   `;
 }
@@ -130,7 +201,9 @@ export function renderAccount(state, authState) {
           <article class="mini-stat">
             <span>Nome</span>
             <strong>${escapeHtml(name)}</strong>
-            <small>Alterável no Meu perfil</small>
+            <small>${authState.role === "professional" && authState.activeWorkspace !== "personal"
+              ? "Alterável no perfil profissional"
+              : "Alterável no Perfil"}</small>
           </article>
           <article class="mini-stat">
             <span>E-mail</span>
@@ -146,6 +219,7 @@ export function renderAccount(state, authState) {
       </section>
 
       ${professionalProfileEditor(state, authState)}
+      ${professionalWorkspaceSettings(authState)}
 
       <section class="card">
         <h2>Métodos de entrada</h2>
@@ -197,30 +271,108 @@ export function renderAccount(state, authState) {
 }
 
 export function bindAccount(context) {
-  const bindLocationRemoval = (button) => {
-    button.addEventListener("click", () => {
-      button.closest("[data-professional-location]")?.remove();
-      const list = document.getElementById("professional-location-list");
-      list?.querySelector(".professional-location-empty")
-        ?.toggleAttribute("hidden", Boolean(list.querySelector("[data-professional-location]")));
-    });
+  const closeLocationEditor = () => {
+    locationEditorOpen = false;
+    editingLocationId = null;
+    context.render();
   };
-  document.querySelectorAll("[data-remove-professional-location]").forEach(bindLocationRemoval);
   document.getElementById("add-professional-location")?.addEventListener("click", () => {
-    const list = document.getElementById("professional-location-list");
-    if (!list) return;
-    const count = list.querySelectorAll("[data-professional-location]").length;
-    if (count >= 20) {
+    if ((context.authState.professionalProfile?.locations || []).length >= 20) {
       showToast("O limite é de 20 locais de atendimento.");
       return;
     }
-    const index = Date.now();
-    const id = globalThis.crypto?.randomUUID?.() || `location-${index}`;
-    list.querySelector(".professional-location-empty")?.setAttribute("hidden", "");
-    list.insertAdjacentHTML("beforeend", professionalLocationRow({ id }, index));
-    const row = list.lastElementChild;
-    bindLocationRemoval(row.querySelector("[data-remove-professional-location]"));
-    row.querySelector('input[name="locationName"]')?.focus();
+    editingLocationId = null;
+    locationEditorOpen = true;
+    context.render();
+  });
+  document.querySelectorAll("[data-edit-professional-location]").forEach((button) => {
+    button.addEventListener("click", () => {
+      editingLocationId = button.dataset.editProfessionalLocation;
+      locationEditorOpen = true;
+      context.render();
+    });
+  });
+  document.querySelectorAll("[data-delete-professional-location]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const profile = context.authState.professionalProfile || {};
+      const location = (profile.locations || [])
+        .find((item) => item.id === button.dataset.deleteProfessionalLocation);
+      if (!location || !confirmAction(
+        `Excluir "${location.name}"? Compromissos já registrados continuarão exibindo este local.`
+      )) return;
+      button.disabled = true;
+      try {
+        const locations = (profile.locations || []).filter((item) => item.id !== location.id);
+        await saveProfessionalProfile(
+          context.authState.user.uid,
+          { ...profile, locations },
+          { uid: context.authState.user.uid, role: context.authState.role }
+        );
+        context.authState.professionalProfile = { ...profile, locations };
+        showToast("Local de atendimento excluído.");
+        context.render();
+      } catch (error) {
+        button.disabled = false;
+        showToast(`Não foi possível excluir o local: ${error.message}`);
+      }
+    });
+  });
+
+  const locationDialog = document.getElementById("professional-location-dialog");
+  if (locationDialog) {
+    if (!locationDialog.open) locationDialog.showModal();
+    locationDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeLocationEditor();
+    });
+  }
+  document.getElementById("close-professional-location")?.addEventListener("click", closeLocationEditor);
+  document.getElementById("cancel-professional-location")?.addEventListener("click", closeLocationEditor);
+  document.getElementById("professional-location-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const profile = context.authState.professionalProfile || {};
+    const id = data.get("id")
+      || globalThis.crypto?.randomUUID?.()
+      || `location-${Date.now()}`;
+    let locations;
+    try {
+      const location = {
+        id,
+        name: data.get("name"),
+        address: data.get("address"),
+        contact: data.get("contact")
+      };
+      const current = profile.locations || [];
+      locations = normalizeProfessionalLocations(
+        current.some((item) => item.id === id)
+          ? current.map((item) => item.id === id ? location : item)
+          : [...current, location]
+      );
+    } catch (error) {
+      showToast(error.message);
+      return;
+    }
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      await saveProfessionalProfile(
+        context.authState.user.uid,
+        { ...profile, locations },
+        { uid: context.authState.user.uid, role: context.authState.role }
+      );
+      context.authState.professionalProfile = { ...profile, locations };
+      locationEditorOpen = false;
+      editingLocationId = null;
+      showToast(data.get("id")
+        ? "Local de atendimento atualizado."
+        : "Local de atendimento adicionado.");
+      context.render();
+    } catch (error) {
+      button.disabled = false;
+      showToast(`Não foi possível salvar o local: ${error.message}`);
+    }
   });
 
   document.getElementById("professional-profile-form")?.addEventListener("submit", async (event) => {
@@ -230,27 +382,15 @@ export function bindAccount(context) {
       showToast("Informe um telefone válido, com DDD.");
       return;
     }
-    let professionalProfile;
-    try {
-      professionalProfile = {
-        name: String(data.get("name") || "").trim(),
-        professionType: data.get("professionType"),
-        registrationNumber: String(data.get("registrationNumber") || "").trim(),
-        specialties: String(data.get("specialties") || "").split(",").map((item) => item.trim()).filter(Boolean),
-        phone: normalizePhone(data.get("phone")),
-        locations: normalizeProfessionalLocations(
-          [...event.currentTarget.querySelectorAll("[data-professional-location]")].map((row) => ({
-            id: row.querySelector('[name="locationId"]').value,
-            name: row.querySelector('[name="locationName"]').value,
-            address: row.querySelector('[name="locationAddress"]').value,
-            contact: row.querySelector('[name="locationContact"]').value
-          }))
-        )
-      };
-    } catch (error) {
-      showToast(error.message);
-      return;
-    }
+    const professionalProfile = {
+      ...(context.authState.professionalProfile || {}),
+      name: String(data.get("name") || "").trim(),
+      professionType: data.get("professionType"),
+      registrationNumber: String(data.get("registrationNumber") || "").trim(),
+      specialties: String(data.get("specialties") || "").split(",").map((item) => item.trim()).filter(Boolean),
+      phone: normalizePhone(data.get("phone")),
+      locations: context.authState.professionalProfile?.locations || []
+    };
     const button = event.currentTarget.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
@@ -272,6 +412,45 @@ export function bindAccount(context) {
       showToast(`Não foi possível salvar o perfil profissional: ${error.message}`);
       button.disabled = false;
     }
+  });
+
+  document.getElementById("personal-workspace-enabled")?.addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+    const enabled = input.checked;
+    if (!enabled && !confirmAction(
+      "Desativar o ambiente pessoal? Seus dados serão preservados e poderão ser acessados ao ativá-lo novamente."
+    )) {
+      input.checked = true;
+      return;
+    }
+    input.disabled = true;
+    const profile = context.authState.professionalProfile || {};
+    try {
+      const nextProfile = { ...profile, personalWorkspaceEnabled: enabled };
+      await saveProfessionalProfile(
+        context.authState.user.uid,
+        nextProfile,
+        { uid: context.authState.user.uid, role: context.authState.role }
+      );
+      context.authState.professionalProfile = nextProfile;
+      showToast(enabled
+        ? "Ambiente pessoal habilitado."
+        : "Ambiente pessoal desabilitado. Seus dados foram preservados.");
+      if (!enabled && context.authState.activeWorkspace === "personal") {
+        context.setActiveWorkspace("professional");
+      } else {
+        context.render();
+      }
+    } catch (error) {
+      input.checked = !enabled;
+      input.disabled = false;
+      showToast(`Não foi possível atualizar os ambientes: ${error.message}`);
+    }
+  });
+  document.getElementById("account-switch-workspace")?.addEventListener("click", () => {
+    context.setActiveWorkspace(
+      context.authState.activeWorkspace === "personal" ? "professional" : "personal"
+    );
   });
 
   document.getElementById("show-add-password")?.addEventListener("click", () => {
@@ -323,6 +502,7 @@ export function bindAccount(context) {
   document.getElementById("sign-out")?.addEventListener("click", async () => {
     try {
       context.setPresentationMode?.("off", false);
+      context.clearWorkspacePreference?.();
       await signOutUser();
       location.replace("login.html");
     } catch (error) {

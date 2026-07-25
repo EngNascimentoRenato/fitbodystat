@@ -43,6 +43,7 @@ const APP_SHELL = [
   "./js/services/activity-service.js",
   "./js/services/agenda-service.js",
   "./js/services/role-service.js",
+  "./js/services/workspace-service.js",
   "./js/views/dashboard-view.js",
   "./js/views/profile-view.js",
   "./js/views/entry-view.js",

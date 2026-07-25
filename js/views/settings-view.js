@@ -132,7 +132,9 @@ export function bindSettings(state, persist, render, replaceState, authState, se
     }
     setPresentationMode(mode);
     showToast("Modo de apresentação ativado.");
-    location.hash = authState.role === "user" ? "#/dashboard" : "#/me/dashboard";
+    location.hash = authState.role === "user" || authState.activeWorkspace === "personal"
+      ? "#/dashboard"
+      : "#/me/dashboard";
   });
 
   document.getElementById("disable-presentation-mode")?.addEventListener("click", () => {
