@@ -100,6 +100,29 @@ test("inicia novo ciclo somente quando não existe outro ativo", () => {
   assert.equal(next.profile.baselineLocked, false);
 });
 
+test("preserva referência corporal e altura dentro do ciclo", () => {
+  const state = startNewCycle({
+    profile: { name: "Paciente", sex: "", heightCm: null },
+    cycles: [],
+    entries: [],
+    activeCycleId: null
+  }, {
+    name: "Projeto acompanhado",
+    startDate: "2027-02-01",
+    sex: "female",
+    heightCm: 165,
+    startWeightKg: 80,
+    goalType: "weight-loss",
+    goalWeightKg: 68,
+    weeklyChangeGoalKg: 0.5
+  });
+
+  assert.equal(activeCycle(state).sex, "female");
+  assert.equal(activeCycle(state).heightCm, 165);
+  assert.equal(state.profile.sex, "female");
+  assert.equal(state.profile.heightCm, 165);
+});
+
 test("cálculos do ciclo ativo não misturam medições anteriores", () => {
   const state = ensureCycleState({ profile, cycles: [], entries: [] });
   const closed = closeActiveCycle(state, "completed");

@@ -15,7 +15,7 @@ export function getSuggestedGoalWeight(profile) {
   if (profile.goalType === "weight-loss") {
     if (!bmi || bmi < 25) return null;
     const target = finiteNumber(profile.targetBmi) ?? 24.9;
-    const calculated = weightForBmi(height, Math.min(target, 24.9));
+    const calculated = weightForBmi(height, target);
     return calculated ? Number(calculated.toFixed(1)) : null;
   }
   if (["weight-gain", "muscle-gain", "recovery"].includes(profile.goalType)) {

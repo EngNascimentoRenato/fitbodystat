@@ -1,4 +1,6 @@
 const CYCLE_FIELDS = [
+  "sex",
+  "heightCm",
   "startDate",
   "startWeightKg",
   "startWaistCm",

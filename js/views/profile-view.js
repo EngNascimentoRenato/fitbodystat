@@ -39,6 +39,8 @@ let profileHasPendingChanges = false;
 let profileEditMode = false;
 let cycleDialogMode = null;
 let selectedCycleId = null;
+let newCycleStep = 1;
+let newCycleDraft = null;
 
 const sexLabels = {
   male: "Masculino",
@@ -189,6 +191,56 @@ function profileValue(label, value) {
   `;
 }
 
+function renderNewCycleBaselinePreview(profile) {
+  const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
+  const bodyFat = resolveProfileBodyFat(profile);
+  const estimated = bodyFatMethodIsEstimated(profile.startBodyFatMethod);
+  return `
+    <div class="grid two">
+      <article class="mini-stat">
+        <span>IMC inicial</span>
+        <strong>${formatDecimal(bmi, 1)}</strong>
+        <small>${escapeHtml(classifyBmi(bmi))}</small>
+      </article>
+      <article class="mini-stat">
+        <span>Gordura corporal</span>
+        <strong>${formatPercent(bodyFat)}</strong>
+        <small>${bodyFat
+          ? escapeHtml(estimated ? "Estimativa por circunferências" : bodyFatMethodLabel(profile.startBodyFatMethod))
+          : "Complete os dados necessários"}</small>
+      </article>
+    </div>
+    <p class="muted">${estimated
+      ? "A estimativa usa as circunferências e a referência corporal selecionada. Ela não substitui uma avaliação profissional."
+      : "O percentual informado será utilizado no lugar da estimativa por circunferências."}</p>
+  `;
+}
+
+function initialNewCycleDraft(state) {
+  const latest = [...(state.entries || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const reference = latest || state.profile;
+  return {
+    name: "",
+    startDate: todayISO(),
+    sex: state.profile.sex || "",
+    heightCm: state.profile.heightCm ?? null,
+    startWeightKg: reference.weightKg ?? reference.startWeightKg ?? null,
+    startWaistCm: reference.waistCm ?? reference.startWaistCm ?? null,
+    startNeckCm: reference.neckCm ?? reference.startNeckCm ?? null,
+    startHipCm: reference.hipCm ?? reference.startHipCm ?? null,
+    startBodyFatMethod: normalizeBodyFatMethod(reference.bodyFatMethod || reference.startBodyFatMethod),
+    startBodyFatManual: reference.bodyFatManual ?? reference.startBodyFatManual ?? null,
+    goalType: "weight-loss",
+    customGoalLabel: "",
+    targetBmi: 24.9,
+    goalWeightKg: null,
+    weeklyChangeGoalKg: 0.5,
+    weeklyLossGoalKg: 0.5,
+    goalDeadlineMonths: null,
+    goalDeadlineMode: "auto"
+  };
+}
+
 function renderCycleDialog(state) {
   if (!cycleDialogMode) return "";
   if (cycleDialogMode === "view") {
@@ -254,69 +306,167 @@ function renderCycleDialog(state) {
     `;
   }
 
-  const latest = [...(state.entries || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const reference = latest || state.profile;
+  const draft = newCycleDraft || initialNewCycleDraft(state);
+  if (newCycleStep === 2) {
+    const preview = resolveGoalTiming({
+      ...draft,
+      goalWeightKg: draft.goalWeightKg ?? getSuggestedGoalWeight(draft)
+    });
+    return `
+      <dialog class="account-dialog new-cycle-dialog" id="cycle-dialog">
+        <form id="new-cycle-goal-form">
+          <div class="account-dialog-header">
+            <div>
+              <p class="eyebrow">Etapa 2 de 2</p>
+              <h2>Objetivo e planejamento</h2>
+            </div>
+            <button class="icon-button" data-close-cycle-dialog type="button" aria-label="Fechar">×</button>
+          </div>
+          <p class="muted">Defina a meta a partir da linha de base informada. O peso sugerido continua livre para ajuste.</p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="cycle-goal-type">Objetivo principal</label>
+              <select id="cycle-goal-type" name="goalType" required>
+                ${Object.entries(goalTypeLabels).map(([value, label]) =>
+                  `<option value="${value}" ${preview.goalType === value ? "selected" : ""}>${label}</option>`
+                ).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label for="cycle-custom-goal">Descrição personalizada</label>
+              <input id="cycle-custom-goal" name="customGoalLabel" maxlength="80"
+                value="${escapeAttribute(preview.customGoalLabel || "")}" />
+            </div>
+            <div class="field">
+              <label for="cycle-target-bmi">IMC de referência</label>
+              <input id="cycle-target-bmi" name="targetBmi" inputmode="decimal"
+                value="${escapeAttribute(preview.targetBmi ?? 24.9)}" />
+              <span class="help-text">24,9 corresponde ao limite superior da faixa normal de IMC.</span>
+            </div>
+            <div class="field">
+              <label for="cycle-goal-weight">Peso final desejado (kg)</label>
+              <input id="cycle-goal-weight" name="goalWeightKg" inputmode="decimal"
+                value="${escapeAttribute(preview.goalWeightKg ?? "")}" />
+              <button class="button text-button field-action" id="cycle-apply-goal-suggestion" type="button">Usar peso sugerido pelo IMC</button>
+            </div>
+            <div class="field">
+              <label for="cycle-weekly-change">Mudança semanal desejada (kg)</label>
+              <input id="cycle-weekly-change" name="weeklyChangeGoalKg" inputmode="decimal"
+                value="${escapeAttribute(preview.weeklyChangeGoalKg ?? 0.5)}" />
+            </div>
+            <div class="field">
+              <label for="cycle-goal-deadline">Prazo da meta (meses)</label>
+              <input id="cycle-goal-deadline" name="goalDeadlineMonths" inputmode="decimal"
+                value="${escapeAttribute(preview.goalDeadlineMonths ? Number(preview.goalDeadlineMonths).toFixed(1) : "")}" />
+            </div>
+            <fieldset class="field goal-mode-field">
+              <legend>Como deseja planejar?</legend>
+              <div class="radio-row">
+                <label class="radio-card">
+                  <input type="radio" name="goalDeadlineMode" value="auto"
+                    ${preview.goalDeadlineMode !== "custom" ? "checked" : ""} />
+                  <span><strong>Calcular prazo</strong><small>Prioriza o ritmo semanal.</small></span>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="goalDeadlineMode" value="custom"
+                    ${preview.goalDeadlineMode === "custom" ? "checked" : ""} />
+                  <span><strong>Definir prazo</strong><small>Recalcula o ritmo necessário.</small></span>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="goal-preview" id="new-cycle-goal-preview">
+            ${renderProfileInsight(preview)}
+          </div>
+          <div class="account-dialog-actions">
+            <button class="button" id="new-cycle-back" type="button">Voltar</button>
+            <button class="button primary" type="submit">Criar projeto</button>
+          </div>
+          <div id="new-cycle-plan-preview">
+            ${renderPlanEditor(preview)}
+          </div>
+        </form>
+      </dialog>
+    `;
+  }
+
   return `
-    <dialog class="account-dialog" id="cycle-dialog">
-      <form id="new-cycle-form">
+    <dialog class="account-dialog new-cycle-dialog" id="cycle-dialog">
+      <form id="new-cycle-baseline-form">
         <div class="account-dialog-header">
-          <h2>Iniciar novo projeto</h2>
+          <div>
+            <p class="eyebrow">Etapa 1 de 2</p>
+            <h2>Linha de base do projeto</h2>
+          </div>
           <button class="icon-button" data-close-cycle-dialog type="button" aria-label="Fechar">×</button>
         </div>
-        <p class="muted">Revise a nova linha de base. Projetos anteriores continuarão disponíveis.</p>
+        <p class="muted">Esses dados permitem calcular IMC e, quando escolhido, estimar gordura corporal pelas circunferências.</p>
         <div class="form-grid">
           <div class="field">
             <label for="cycle-name">Nome do projeto</label>
-            <input id="cycle-name" name="name" maxlength="80" placeholder="Ex.: Manutenção 2027" required />
+            <input id="cycle-name" name="name" maxlength="80" placeholder="Ex.: Acompanhamento inicial"
+              value="${escapeAttribute(draft.name || "")}" required />
           </div>
           <div class="field">
             <label for="cycle-start-date">Data inicial</label>
-            <input id="cycle-start-date" name="startDate" type="date" max="${todayISO()}" value="${todayISO()}" required />
+            <input id="cycle-start-date" name="startDate" type="date" max="${todayISO()}"
+              value="${escapeAttribute(draft.startDate || todayISO())}" required />
+          </div>
+          <div class="field">
+            <label for="cycle-height">Altura (cm)</label>
+            <input id="cycle-height" name="heightCm" inputmode="decimal"
+              value="${escapeAttribute(draft.heightCm ?? "")}" required />
+          </div>
+          <div class="field">
+            <label for="cycle-sex">Referência corporal para estimativa</label>
+            <select id="cycle-sex" name="sex">
+              <option value="" ${!draft.sex ? "selected" : ""}>Não utilizar estimativa por circunferências</option>
+              <option value="male" ${draft.sex === "male" ? "selected" : ""}>Equação masculina</option>
+              <option value="female" ${draft.sex === "female" ? "selected" : ""}>Equação feminina</option>
+            </select>
+            <span class="help-text">Usada somente para selecionar a equação corporal; não precisa representar a identidade de gênero.</span>
           </div>
           <div class="field">
             <label for="cycle-start-weight">Peso inicial (kg)</label>
             <input id="cycle-start-weight" name="startWeightKg" inputmode="decimal"
-              value="${escapeAttribute(reference.weightKg ?? reference.startWeightKg ?? "")}" required />
+              value="${escapeAttribute(draft.startWeightKg ?? "")}" required />
           </div>
           <div class="field">
             <label for="cycle-start-waist">Cintura inicial (cm)</label>
             <input id="cycle-start-waist" name="startWaistCm" inputmode="decimal"
-              value="${escapeAttribute(reference.waistCm ?? reference.startWaistCm ?? "")}" />
+              value="${escapeAttribute(draft.startWaistCm ?? "")}" />
           </div>
           <div class="field">
             <label for="cycle-start-neck">Pescoço inicial (cm)</label>
             <input id="cycle-start-neck" name="startNeckCm" inputmode="decimal"
-              value="${escapeAttribute(reference.neckCm ?? reference.startNeckCm ?? "")}" />
+              value="${escapeAttribute(draft.startNeckCm ?? "")}" />
           </div>
           <div class="field">
             <label for="cycle-start-hip">Quadril inicial (cm)</label>
             <input id="cycle-start-hip" name="startHipCm" inputmode="decimal"
-              value="${escapeAttribute(reference.hipCm ?? reference.startHipCm ?? "")}" />
+              value="${escapeAttribute(draft.startHipCm ?? "")}" />
           </div>
           <div class="field">
-            <label for="cycle-goal-type">Objetivo</label>
-            <select id="cycle-goal-type" name="goalType" required>
-              <option value="weight-loss">Emagrecimento</option>
-              <option value="weight-gain">Ganho de peso</option>
-              <option value="muscle-gain">Ganho de massa muscular</option>
-              <option value="maintenance">Manutenção</option>
-              <option value="recovery">Recuperação de peso</option>
-              <option value="other">Outro</option>
+            <label for="cycle-body-fat-method">Origem da gordura corporal</label>
+            <select id="cycle-body-fat-method" name="startBodyFatMethod">
+              ${bodyFatMethods.map((method) => `
+                <option value="${method.value}" ${method.value === normalizeBodyFatMethod(draft.startBodyFatMethod) ? "selected" : ""}>${method.label}</option>
+              `).join("")}
             </select>
           </div>
-          <div class="field">
-            <label for="cycle-goal-weight">Peso final desejado (kg)</label>
-            <input id="cycle-goal-weight" name="goalWeightKg" inputmode="decimal"
-              value="${escapeAttribute(reference.weightKg ?? reference.startWeightKg ?? "")}" required />
+          <div class="field" data-new-cycle-body-fat-value>
+            <label for="cycle-body-fat-manual">Percentual de gordura informado (%)</label>
+            <input id="cycle-body-fat-manual" name="startBodyFatManual" inputmode="decimal"
+              value="${escapeAttribute(draft.startBodyFatManual ?? "")}" />
+            <span class="help-text">Quando preenchido por método externo, este valor substitui a estimativa pelas circunferências.</span>
           </div>
-          <div class="field">
-            <label for="cycle-weekly-change">Mudança semanal desejada (kg)</label>
-            <input id="cycle-weekly-change" name="weeklyChangeGoalKg" inputmode="decimal" value="0.5" required />
-          </div>
+        </div>
+        <div class="goal-preview" id="new-cycle-baseline-preview">
+          ${renderNewCycleBaselinePreview(draft)}
         </div>
         <div class="account-dialog-actions">
           <button class="button" data-close-cycle-dialog type="button">Cancelar</button>
-          <button class="button primary" type="submit">Iniciar projeto</button>
+          <button class="button primary" type="submit">Continuar para objetivo</button>
         </div>
       </form>
     </dialog>
@@ -667,12 +817,13 @@ export function renderProfile(state, options = {}) {
             </div>
           ` : ""}
           <div class="field">
-            <label for="sex">Sexo</label>
-            <select id="sex" name="sex" required ${baselineDisabled}>
-              <option value="" ${!p.sex ? "selected" : ""}>Selecione</option>
-              <option value="male" ${p.sex === "male" ? "selected" : ""}>Masculino</option>
-              <option value="female" ${p.sex === "female" ? "selected" : ""}>Feminino</option>
+            <label for="sex">Referência corporal para estimativa</label>
+            <select id="sex" name="sex" ${baselineDisabled}>
+              <option value="" ${!p.sex ? "selected" : ""}>Não utilizar estimativa por circunferências</option>
+              <option value="male" ${p.sex === "male" ? "selected" : ""}>Equação masculina</option>
+              <option value="female" ${p.sex === "female" ? "selected" : ""}>Equação feminina</option>
             </select>
+            <span class="help-text">Usada somente para selecionar a equação corporal.</span>
           </div>
           <div class="field">
             <label for="birthDate">Data de nascimento</label>
@@ -835,7 +986,7 @@ export function renderProfile(state, options = {}) {
 function configureProfileSectionEditor(form) {
   const editor = form.dataset.profileEditor;
   const baselineFields = new Set([
-    "startDate", "startWeightKg", "startWaistCm", "startNeckCm",
+    "sex", "heightCm", "startDate", "startWeightKg", "startWaistCm", "startNeckCm",
     "startHipCm", "startBodyFatMethod", "startBodyFatManual"
   ]);
   const goalFields = new Set([
@@ -944,11 +1095,17 @@ export function bindProfile(state, persist, render) {
     });
     const openCycleDialog = (mode) => {
       cycleDialogMode = mode;
+      if (mode === "new") {
+        newCycleStep = 1;
+        newCycleDraft = initialNewCycleDraft(state);
+      }
       render();
     };
     const closeCycleDialog = () => {
       cycleDialogMode = null;
       selectedCycleId = null;
+      newCycleStep = 1;
+      newCycleDraft = null;
       render();
     };
     document.getElementById("start-new-cycle")?.addEventListener("click", () => openCycleDialog("new"));
@@ -987,40 +1144,168 @@ export function bindProfile(state, persist, render) {
       showToast("Projeto encerrado.");
       render();
     });
-    document.getElementById("new-cycle-form")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const data = new FormData(event.currentTarget);
-      const startWeightKg = toNumber(data.get("startWeightKg"));
-      const goalWeightKg = toNumber(data.get("goalWeightKg"));
-      const weeklyChangeGoalKg = toNumber(data.get("weeklyChangeGoalKg"));
-      if (![startWeightKg, goalWeightKg, weeklyChangeGoalKg].every(Number.isFinite)) {
-        showToast("Revise peso inicial, peso final e mudança semanal.");
-        return;
-      }
-      if (data.get("goalType") === "weight-loss" && goalWeightKg >= startWeightKg) {
-        showToast("Para emagrecimento, o peso final deve ser menor que o peso inicial.");
-        return;
-      }
-      if (["weight-gain", "recovery"].includes(data.get("goalType")) && goalWeightKg <= startWeightKg) {
-        showToast("Para ganho ou recuperação, o peso final deve ser maior que o peso inicial.");
-        return;
-      }
-      const next = startNewCycle(state, {
-        name: data.get("name"),
+    const baselineForm = document.getElementById("new-cycle-baseline-form");
+    const readBaselineDraft = () => {
+      const data = new FormData(baselineForm);
+      return {
+        ...(newCycleDraft || initialNewCycleDraft(state)),
+        name: String(data.get("name") || "").trim(),
         startDate: data.get("startDate"),
-        startWeightKg,
+        sex: data.get("sex"),
+        heightCm: toNumber(data.get("heightCm")),
+        startWeightKg: toNumber(data.get("startWeightKg")),
         startWaistCm: toNumber(data.get("startWaistCm")),
         startNeckCm: toNumber(data.get("startNeckCm")),
         startHipCm: toNumber(data.get("startHipCm")),
-        startBodyFatMethod: "circumference",
-        startBodyFatManual: null,
-        goalType: data.get("goalType"),
-        goalWeightKg,
-        weeklyChangeGoalKg,
-        weeklyLossGoalKg: weeklyChangeGoalKg,
-        goalDeadlineMode: "auto",
-        goalDeadlineMonths: null
+        startBodyFatMethod: normalizeBodyFatMethod(data.get("startBodyFatMethod")),
+        startBodyFatManual: bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+          ? null
+          : toNumber(data.get("startBodyFatManual"))
+      };
+    };
+    const updateBaselinePreview = () => {
+      if (!baselineForm) return;
+      const draft = readBaselineDraft();
+      const estimated = bodyFatMethodIsEstimated(draft.startBodyFatMethod);
+      const valueField = baselineForm.querySelector("[data-new-cycle-body-fat-value]");
+      const valueInput = baselineForm.elements.startBodyFatManual;
+      if (valueField) valueField.hidden = estimated;
+      if (valueInput) {
+        valueInput.disabled = estimated;
+        valueInput.required = !estimated;
+      }
+      document.getElementById("new-cycle-baseline-preview").innerHTML =
+        renderNewCycleBaselinePreview(draft);
+    };
+    baselineForm?.addEventListener("input", updateBaselinePreview);
+    baselineForm?.elements.startBodyFatMethod?.addEventListener("change", updateBaselinePreview);
+    updateBaselinePreview();
+    baselineForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const heightField = baselineForm.elements.heightCm;
+      if (!await resolveHeightInput(heightField)) return;
+      const draft = readBaselineDraft();
+      const estimated = bodyFatMethodIsEstimated(draft.startBodyFatMethod);
+      if (estimated && !draft.sex) {
+        showToast("Selecione a equação masculina ou feminina para usar a estimativa por circunferências.");
+        return;
+      }
+      const validation = await validateNumericFields(baselineForm, {
+        heightCm: { rule: "heightCm", label: "Altura", required: true },
+        startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
+        startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: estimated },
+        startNeckCm: { rule: "circumferenceCm", label: "Pescoço inicial", required: estimated },
+        startHipCm: {
+          rule: "circumferenceCm",
+          label: "Quadril inicial",
+          required: estimated && draft.sex === "female"
+        },
+        startBodyFatManual: {
+          rule: "bodyFatPercent",
+          label: "Gordura corporal",
+          required: !estimated
+        }
       });
+      if (!validation.valid) {
+        showToast("Revise os dados da linha de base.");
+        return;
+      }
+      newCycleDraft = {
+        ...draft,
+        goalWeightKg: draft.goalWeightKg ?? getSuggestedGoalWeight(draft)
+      };
+      newCycleStep = 2;
+      render();
+    });
+
+    const goalForm = document.getElementById("new-cycle-goal-form");
+    let newCycleGoalTimer = null;
+    const readGoalDraft = (sourceName = "") => {
+      const data = new FormData(goalForm);
+      const rawDraft = {
+        ...newCycleDraft,
+        goalType: data.get("goalType"),
+        customGoalLabel: String(data.get("customGoalLabel") || "").trim(),
+        targetBmi: toNumber(data.get("targetBmi")) || 24.9,
+        goalWeightKg: toNumber(data.get("goalWeightKg")),
+        weeklyChangeGoalKg: toNumber(data.get("weeklyChangeGoalKg")),
+        weeklyLossGoalKg: toNumber(data.get("weeklyChangeGoalKg")),
+        goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
+        goalDeadlineMode: data.get("goalDeadlineMode") === "custom" ? "custom" : "auto"
+      };
+      const draft = rawDraft.goalDeadlineMode === "custom"
+        && !(Number(rawDraft.goalDeadlineMonths) > 0)
+        ? rawDraft
+        : resolveGoalTiming(rawDraft);
+      const weekly = goalForm.elements.weeklyChangeGoalKg;
+      const deadline = goalForm.elements.goalDeadlineMonths;
+      const maintenance = getProgressMode(draft) === "maintain";
+      const custom = draft.goalDeadlineMode === "custom";
+      weekly.readOnly = custom || maintenance;
+      deadline.readOnly = !custom || maintenance;
+      if (sourceName !== "weeklyChangeGoalKg" && document.activeElement !== weekly) {
+        weekly.value = draft.weeklyChangeGoalKg || "";
+      }
+      if (sourceName !== "goalDeadlineMonths" && document.activeElement !== deadline) {
+        deadline.value = draft.goalDeadlineMonths ? Number(draft.goalDeadlineMonths).toFixed(1) : "";
+      }
+      return draft;
+    };
+    const updateNewCycleGoal = (sourceName = "") => {
+      if (!goalForm) return;
+      const draft = readGoalDraft(sourceName);
+      document.getElementById("new-cycle-goal-preview").innerHTML = renderProfileInsight(draft);
+      document.getElementById("new-cycle-plan-preview").innerHTML = renderPlanEditor(draft);
+    };
+    const applyNewCycleSuggestion = () => {
+      const data = new FormData(goalForm);
+      const suggestion = getSuggestedGoalWeight({
+        ...newCycleDraft,
+        goalType: data.get("goalType"),
+        targetBmi: toNumber(data.get("targetBmi")) || 24.9
+      });
+      goalForm.elements.goalWeightKg.value = suggestion !== null ? suggestion.toFixed(1) : "";
+      updateNewCycleGoal("goalWeightKg");
+    };
+    document.getElementById("cycle-apply-goal-suggestion")?.addEventListener("click", applyNewCycleSuggestion);
+    goalForm?.elements.goalType?.addEventListener("change", applyNewCycleSuggestion);
+    goalForm?.addEventListener("input", (event) => {
+      window.clearTimeout(newCycleGoalTimer);
+      newCycleGoalTimer = window.setTimeout(() => updateNewCycleGoal(event.target.name), 180);
+    });
+    document.getElementById("new-cycle-back")?.addEventListener("click", () => {
+      newCycleDraft = readGoalDraft();
+      newCycleStep = 1;
+      render();
+    });
+    updateNewCycleGoal();
+    goalForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const draft = readGoalDraft();
+      const maintenance = getProgressMode(draft) === "maintain";
+      const validation = await validateNumericFields(goalForm, {
+        targetBmi: { rule: "targetBmi", label: "IMC de referência", required: true },
+        goalWeightKg: { rule: "weightKg", label: "Peso final", required: true },
+        weeklyChangeGoalKg: {
+          rule: "weeklyChangeKg",
+          label: "Mudança semanal",
+          required: draft.goalDeadlineMode === "auto" && !maintenance
+        },
+        goalDeadlineMonths: {
+          rule: "deadlineMonths",
+          label: "Prazo",
+          required: draft.goalDeadlineMode === "custom" && !maintenance
+        }
+      });
+      if (!validation.valid) {
+        showToast("Revise o objetivo e o planejamento.");
+        return;
+      }
+      if (!goalDirectionIsValid(draft, goalForm.elements.goalWeightKg)) {
+        showToast("Revise a direção da meta.");
+        return;
+      }
+      const next = startNewCycle(state, draft);
       const resolvedProfile = resolveGoalTiming(next.profile);
       Object.assign(state, {
         ...next,
@@ -1028,6 +1313,8 @@ export function bindProfile(state, persist, render) {
         goalPlan: createDefaultMonthlyPlan(resolvedProfile)
       });
       cycleDialogMode = null;
+      newCycleStep = 1;
+      newCycleDraft = null;
       persist({ type: "profile-plan" });
       showToast("Novo projeto iniciado.");
       render();
@@ -1179,6 +1466,11 @@ export function bindProfile(state, persist, render) {
 
     const deadlineMode = data.get("goalDeadlineMode") === "custom" ? "custom" : "auto";
     const maintenanceGoal = data.get("goalType") === "maintenance";
+    if (bodyFatMethodIsEstimated(data.get("startBodyFatMethod")) && !data.get("sex")) {
+      showToast("Selecione uma referência corporal ou escolha outro método para a gordura corporal.");
+      form.elements.sex?.focus();
+      return;
+    }
     const validation = await validateNumericFields(form, {
       heightCm: { rule: "heightCm", label: "Altura", required: true },
       startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
@@ -1238,4 +1530,6 @@ export function resetProfileMode() {
   profileEditMode = false;
   cycleDialogMode = null;
   selectedCycleId = null;
+  newCycleStep = 1;
+  newCycleDraft = null;
 }

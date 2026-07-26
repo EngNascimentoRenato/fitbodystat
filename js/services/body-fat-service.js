@@ -12,6 +12,7 @@ export function calculateBodyFatByNavy({ sex, heightCm, waistCm, neckCm, hipCm }
 
 export function classifyBodyFat(sex, bodyFat) {
   if (!bodyFat) return "Sem dados";
+  if (!["male", "female"].includes(sex)) return "Referência não informada";
   if (sex === "female") {
     if (bodyFat < 14) return "Gordura essencial";
     if (bodyFat < 21) return "Atleta";

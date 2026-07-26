@@ -484,6 +484,14 @@
   box-shadow: var(--shadow);
 }
 
+.new-cycle-dialog {
+  width: min(920px, calc(100vw - 2rem));
+}
+
+.new-cycle-dialog .goal-preview {
+  margin-top: 1rem;
+}
+
 .account-dialog::backdrop {
   background: rgba(16, 22, 21, 0.58);
 }

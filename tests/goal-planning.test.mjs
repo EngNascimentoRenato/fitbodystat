@@ -27,6 +27,16 @@ test("sugere o limite superior do IMC normal para emagrecimento", () => {
   assert.equal(weight, 67.8);
 });
 
+test("respeita o IMC de referência personalizado na sugestão", () => {
+  const weight = getSuggestedGoalWeight({
+    goalType: "weight-loss",
+    heightCm: 165,
+    startWeightKg: 89.8,
+    targetBmi: 27
+  });
+  assert.equal(weight, 73.5);
+});
+
 test("não impõe sugestão de emagrecimento dentro da faixa normal", () => {
   const weight = getSuggestedGoalWeight({
     goalType: "weight-loss",

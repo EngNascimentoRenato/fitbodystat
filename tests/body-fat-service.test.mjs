@@ -8,6 +8,7 @@ import {
 } from "../js/models/goal-model.js";
 import {
   calculateBodyFatByNavy,
+  classifyBodyFat,
   resolveBodyFat,
   resolveProfileBodyFat
 } from "../js/services/body-fat-service.js";
@@ -16,6 +17,10 @@ test("normaliza registros antigos do método por circunferências", () => {
   assert.equal(normalizeBodyFatMethod("navy"), "circumference");
   assert.equal(bodyFatMethodIsEstimated("navy"), true);
   assert.equal(bodyFatMethodLabel("navy"), "Estimativa por medidas corporais");
+});
+
+test("não aplica classificação masculina sem referência corporal", () => {
+  assert.equal(classifyBodyFat("", 22), "Referência não informada");
 });
 
 test("prioriza percentual informado sobre a estimativa por medidas", () => {

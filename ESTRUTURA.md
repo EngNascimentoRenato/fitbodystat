@@ -42,9 +42,14 @@ O estado pessoal também mantém ciclos de acompanhamento. A coleção
 `users/{userId}/cycles` armazena linha de base, objetivo e planejamento de cada
 projeto. Durante a transição, o ciclo ativo continua projetado no perfil para
 compatibilidade com as telas existentes, e cada medição recebe um `cycleId`.
+Altura e referência corporal usadas nos cálculos também são preservadas no ciclo.
 O ciclo pode ser encerrado como concluído, abandonado ou expirado. Um novo ciclo
 só pode ser iniciado quando não houver outro ativo, e seus cálculos consideram
 somente as medições associadas ao projeto atual.
+
+A criação de projeto utiliza duas etapas temporárias: linha de base e objetivo.
+Os dados não são persistidos entre as etapas; o ciclo ativo somente é criado
+depois da confirmação final do planejamento.
 
 Convites e vínculos permanecem entidades separadas. `originInvitationId` registra
 a origem do relacionamento, enquanto `accessBenefit` pertence a cada documento
