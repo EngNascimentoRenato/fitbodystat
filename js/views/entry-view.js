@@ -8,6 +8,7 @@ import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { showToast } from "../components/toast.js";
 import { mergeDailyActivity } from "../services/activity-service.js";
 import { validateNumericFields } from "../utils/validation-utils.js";
+import { confirmAction } from "../components/modal.js";
 
 let activeEntryMode = "activity";
 let selectedActivityDate = todayISO();
@@ -85,6 +86,10 @@ function renderActivityForm(state) {
         <textarea id="activityNotes" name="notes">${escapeHtml(activity.notes || "")}</textarea>
       </div>
       <div class="button-row">
+        ${isEditing ? `
+          <button class="button" id="cancel-activity-edit" type="button">Cancelar</button>
+          <button class="button danger" id="delete-activity-edit" data-activity-id="${escapeAttribute(existingActivity.id)}" type="button">Excluir</button>
+        ` : ""}
         <button class="button primary" type="submit">${isEditing ? "Atualizar atividade" : "Registrar atividade"}</button>
       </div>
     </form>
@@ -159,6 +164,25 @@ function bindMeasurementForm(state, persist, render) {
 }
 
 function bindActivityForm(state, persist, render) {
+  const activityRoute = () => location.hash.includes("/me/") ? "#/me/atividades" : "#/atividades";
+
+  document.getElementById("cancel-activity-edit")?.addEventListener("click", () => {
+    editingActivityDate = null;
+    location.hash = activityRoute();
+    render();
+  });
+
+  document.getElementById("delete-activity-edit")?.addEventListener("click", (event) => {
+    if (!confirmAction("Excluir esta atividade?")) return;
+    const activityId = event.currentTarget.dataset.activityId;
+    state.activities = state.activities.filter((activity) => activity.id !== activityId);
+    persist({ type: "activity-delete", activityId });
+    editingActivityDate = null;
+    showToast("Atividade excluída.");
+    location.hash = activityRoute();
+    render();
+  });
+
   document.getElementById("activityDate")?.addEventListener("change", (event) => {
     selectedActivityDate = event.currentTarget.value || todayISO();
     editingActivityDate = null;
@@ -208,7 +232,7 @@ function bindActivityForm(state, persist, render) {
     showToast(isEditing
       ? "Atividade atualizada."
       : existingActivity ? "Atividade acrescentada ao registro do dia." : "Atividade registrada.");
-    location.hash = location.hash.includes("/me/") ? "#/me/atividades" : "#/atividades";
+    location.hash = activityRoute();
     render();
   });
 }

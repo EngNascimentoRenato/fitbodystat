@@ -795,6 +795,10 @@
   width: min(820px, calc(100vw - 2rem));
 }
 
+.availability-dialog > form {
+  padding: 1rem;
+}
+
 .availability-slot-field {
   max-width: 320px;
 }

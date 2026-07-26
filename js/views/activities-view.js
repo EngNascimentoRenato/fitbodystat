@@ -10,8 +10,6 @@ import {
 import { formatDate, todayISO } from "../utils/date-utils.js";
 import { formatDecimal } from "../utils/number-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
-import { confirmAction } from "../components/modal.js";
-import { showToast } from "../components/toast.js";
 
 let visibleMonth = todayISO().slice(0, 7);
 
@@ -32,7 +30,7 @@ function renderCalendar(activities) {
   const cells = monthCalendar(visibleMonth, activities);
   const today = todayISO();
   return `
-    <section class="card">
+    <section class="card" data-activity-calendar>
       <div class="calendar-toolbar">
         <button class="icon-button" data-calendar-shift="-1" type="button" aria-label="Mês anterior">‹</button>
         <h2>${monthLabel(visibleMonth)}</h2>
@@ -98,7 +96,7 @@ function renderRecentWeeks(activities, goalDays, targetMinutes) {
   `;
 }
 
-function renderHistory(activities) {
+function renderHistory(activities, showDuration) {
   const rows = [...activities].sort((a, b) => b.date.localeCompare(a.date));
   return `
     <section class="card">
@@ -110,27 +108,27 @@ function renderHistory(activities) {
       </div>
       ${rows.length ? `
         <div class="activity-history-list">
-          <div class="activity-history-header" aria-hidden="true">
+          <div class="activity-history-header ${showDuration ? "" : "without-duration"}" aria-hidden="true">
             <span>Data</span>
             <span>Atividade</span>
-            <span>Duração</span>
+            ${showDuration ? "<span>Duração</span>" : ""}
             <span>Intensidade</span>
             <span>Observações</span>
-            <span>Ações</span>
+            <span>Ação</span>
           </div>
           ${rows.map((activity) => `
-            <article class="activity-history-row">
+            <article class="activity-history-row ${showDuration ? "" : "without-duration"}">
               <strong>${formatDate(activity.date)}</strong>
               <div class="activity-row-main">
                 <p>${escapeHtml(activityNames(activity))}</p>
                 <small>${escapeHtml(activity.notes || "")}</small>
               </div>
-              <span>${activity.durationMinutes ? `${activity.durationMinutes} min` : "-"}</span>
+              ${showDuration ? `<span>${activity.durationMinutes ? `${activity.durationMinutes} min` : "-"}</span>` : ""}
               <span>${intensityLabels[activity.intensity] || "-"}</span>
               <span>${escapeHtml(activity.notes || "-")}</span>
               <div class="table-actions">
-                <button class="button" data-edit-activity="${escapeAttribute(activity.date)}" type="button">Editar</button>
-                <button class="button danger" data-delete-activity="${escapeAttribute(activity.id)}" type="button">Excluir</button>
+                <button class="icon-button activity-edit-button" data-edit-activity="${escapeAttribute(activity.date)}"
+                  type="button" aria-label="Editar atividade de ${escapeAttribute(formatDate(activity.date))}" title="Editar atividade">✎</button>
               </div>
             </article>
           `).join("")}
@@ -170,7 +168,7 @@ export function renderActivities(state) {
       </section>
       ${renderCalendar(activities)}
       ${renderRecentWeeks(activities, goalDays, targetMinutes)}
-      ${renderHistory(activities)}
+      ${renderHistory(activities, Boolean(targetMinutes))}
     </div>
   `;
 }
@@ -183,6 +181,23 @@ export function bindActivities(state, persist, render) {
     });
   });
 
+  const calendar = document.querySelector("[data-activity-calendar]");
+  let swipeStart = null;
+  calendar?.addEventListener("touchstart", (event) => {
+    const touch = event.changedTouches[0];
+    swipeStart = { x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  calendar?.addEventListener("touchend", (event) => {
+    if (!swipeStart) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - swipeStart.x;
+    const deltaY = touch.clientY - swipeStart.y;
+    swipeStart = null;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    visibleMonth = shiftMonth(visibleMonth, deltaX < 0 ? 1 : -1);
+    render();
+  }, { passive: true });
+
   document.querySelectorAll("[data-edit-activity]").forEach((button) => {
     button.addEventListener("click", () => {
       sessionStorage.setItem("fitbodystat-edit-activity-date", button.dataset.editActivity);
@@ -190,14 +205,4 @@ export function bindActivities(state, persist, render) {
     });
   });
 
-  document.querySelectorAll("[data-delete-activity]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (!confirmAction("Excluir esta atividade?")) return;
-      const activityId = button.dataset.deleteActivity;
-      state.activities = state.activities.filter((activity) => activity.id !== activityId);
-      persist({ type: "activity-delete", activityId });
-      showToast("Atividade excluída.");
-      render();
-    });
-  });
 }

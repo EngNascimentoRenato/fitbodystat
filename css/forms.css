@@ -280,6 +280,71 @@
   justify-content: flex-end;
 }
 
+.profile-summary .chart-header h2,
+.profile-summary .chart-header p {
+  margin-bottom: 0;
+}
+
+.profile-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.profile-summary-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0.8rem 0.8rem 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-summary-grid dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.profile-summary-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.toggle-option {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  min-height: 42px;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.toggle-option input {
+  width: 1rem;
+  min-height: 1rem;
+  flex: 0 0 1rem;
+  margin-top: 0.15rem;
+}
+
+.toggle-option span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.toggle-option small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.activity-duration-goal[hidden] {
+  display: none;
+}
+
 .mobile-save-bar {
   display: none;
 }
@@ -475,6 +540,10 @@ tr:last-child td {
 @media (max-width: 720px) {
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .profile-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .onboarding-steps {

@@ -55,6 +55,8 @@ export function renderGoals(state) {
         <article class="card">
           <h2>Ritmo sustentável</h2>
           <dl class="goal-summary-list">
+            <div><dt>Início do acompanhamento</dt><dd>${formatDate(state.profile.startDate)}</dd></div>
+            <div><dt>Peso inicial</dt><dd>${formatKg(state.profile.startWeightKg)}</dd></div>
             <div><dt>Objetivo</dt><dd>${escapeHtml(goalLabel(state.profile))}</dd></div>
             <div><dt>${progressMode === "maintain" ? "Faixa de manutenção" : "Peso final desejado"}</dt><dd>${progressMode === "maintain" && maintenance
               ? `${formatKg(maintenance.minimum)} a ${formatKg(maintenance.maximum)}`
@@ -87,7 +89,7 @@ export function renderGoals(state) {
               <tr>
                 <th>Prazo</th>
                 <th class="number">Meta peso</th>
-                <th class="number">Diferença acum.</th>
+                <th class="number plan-difference"><span class="wide-label">Diferença acumulada</span><span class="compact-label">Dif. acum.</span></th>
                 <th class="number">IMC</th>
                 <th class="number">Cintura</th>
                 <th>Classificação</th>
@@ -98,7 +100,7 @@ export function renderGoals(state) {
                 <tr>
                   <td>${escapeHtml(item.label)}</td>
                   <td class="number">${formatKg(item.weightKg)}</td>
-                  <td class="number">${formatKg(item.lossKg)}</td>
+                  <td class="number plan-difference">${formatKg(item.lossKg)}</td>
                   <td class="number">${formatDecimal(item.bmi, 1)}</td>
                   <td class="number">${formatCm(item.waistCm)}</td>
                   <td>${escapeHtml(item.status)}</td>

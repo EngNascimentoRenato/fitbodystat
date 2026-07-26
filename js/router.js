@@ -1,6 +1,6 @@
 import { canAccessRoute, getRoute, renderMenu } from "./menu.js";
 import { renderDashboard } from "./views/dashboard-view.js";
-import { renderProfile, bindProfile } from "./views/profile-view.js";
+import { renderProfile, bindProfile, resetProfileMode } from "./views/profile-view.js";
 import { renderEntry, bindEntry, resetEntryMode } from "./views/entry-view.js";
 import { renderHistory, bindHistory } from "./views/history-view.js";
 import { renderGoals } from "./views/goals-view.js";
@@ -78,6 +78,7 @@ export function renderRoute(context) {
     history.replaceState(null, "", `#${activeRoute.path}`);
   }
   if (!["/registro", "/me/registro"].includes(activeRoute.path)) resetEntryMode();
+  if (!["/perfil", "/me/perfil"].includes(activeRoute.path)) resetProfileMode();
 
   document.getElementById("route-title").textContent = activeRoute.title;
   document.getElementById("route-eyebrow").textContent = activeRoute.eyebrow;
@@ -87,14 +88,22 @@ export function renderRoute(context) {
   const viewMap = {
     "/dashboard": () => renderDashboard(context.state, "", { presentationMode: context.authState.presentationMode }),
     "/primeiro-acesso": () => renderOnboarding(context.personalState, context.authState),
-    "/perfil": () => renderProfile(context.state, { canEditContact: !context.authState.activePatient }),
+    "/perfil": () => renderProfile(context.state, {
+      canEditContact: !context.authState.activePatient,
+      canEditIdentity: !context.authState.activePatient,
+      forceEdit: context.authState.needsName
+    }),
     "/registro": () => renderEntry(context.state),
     "/historico": () => renderHistory(context.state),
     "/atividades": () => renderActivities(context.state),
     "/metas": () => renderGoals(context.state),
     "/vinculos": () => renderConnections(context.authState, context.personalState),
     "/me/dashboard": () => renderDashboard(context.personalState, "/me", { presentationMode: context.authState.presentationMode }),
-    "/me/perfil": () => renderProfile(context.personalState, { canEditContact: true }),
+    "/me/perfil": () => renderProfile(context.personalState, {
+      canEditContact: true,
+      canEditIdentity: true,
+      forceEdit: context.authState.needsName
+    }),
     "/me/registro": () => renderEntry(context.personalState),
     "/me/historico": () => renderHistory(context.personalState),
     "/me/atividades": () => renderActivities(context.personalState),

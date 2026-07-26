@@ -190,7 +190,7 @@
 .calendar-toolbar h2 {
   margin: 0;
   text-align: center;
-  text-transform: capitalize;
+  letter-spacing: 0;
 }
 
 .activity-calendar {
@@ -262,6 +262,11 @@
   border-bottom: 1px solid var(--border);
 }
 
+.activity-history-header.without-duration,
+.activity-history-row.without-duration {
+  grid-template-columns: 110px minmax(180px, 1fr) 110px minmax(160px, 1fr) 64px;
+}
+
 .activity-history-header > :nth-child(3),
 .activity-history-header > :nth-child(4),
 .activity-history-row > :nth-child(3),
@@ -273,8 +278,19 @@
   text-align: center;
 }
 
+.activity-history-header.without-duration > :nth-child(4),
+.activity-history-row.without-duration > :nth-child(4) {
+  text-align: left;
+}
+
 .activity-history-row .table-actions {
   justify-content: flex-end;
+  min-width: 42px;
+}
+
+.activity-edit-button {
+  flex: 0 0 42px;
+  font-size: 1.05rem;
 }
 
 .activity-history-header {
@@ -322,6 +338,10 @@
   background: linear-gradient(90deg, #69fd7d, #236137);
 }
 
+.activity-summary-action-compact {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .week-strip {
     gap: 0.25rem;
@@ -346,7 +366,8 @@
     font-size: 0.72rem;
   }
 
-  .activity-history-row {
+  .activity-history-row,
+  .activity-history-row.without-duration {
     grid-template-columns: 1fr auto;
   }
 
@@ -356,6 +377,19 @@
 
   .activity-history-row > :not(.activity-row-main, .table-actions) {
     display: none;
+  }
+
+  .activity-summary-action-full {
+    display: none;
+  }
+
+  .activity-summary-action-compact {
+    display: inline;
+  }
+
+  .activity-summary-action {
+    min-width: 48px;
+    padding-inline: 0.65rem;
   }
 
   .activity-row-main small {

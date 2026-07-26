@@ -40,7 +40,7 @@ function friendlyError(error) {
     "auth/email-already-in-use": "Este e-mail já possui uma conta. Entre ou recupere sua senha.",
     "auth/account-exists-with-different-credential": "Este e-mail já usa outro método de entrada. Entre pelo método original e vincule o Google na área Conta.",
     "auth/popup-closed-by-user": "A janela do Google foi fechada antes da conclusão.",
-    "auth/unauthorized-domain": "Este domínio ainda não está autorizado no Firebase.",
+    "auth/unauthorized-domain": "Este endereço ainda não está autorizado para acesso.",
     "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos e tente novamente."
   };
   return messages[error.code] || error.message;

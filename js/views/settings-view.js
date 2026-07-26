@@ -13,7 +13,7 @@ export function renderSettings(state, authState = {}) {
     <div class="view-stack">
       <section class="card">
         <h2>Conta e nuvem</h2>
-        <p class="muted">${authState.user ? `Conectado como ${escapeHtml(authState.user.email)}. ${escapeHtml(authState.syncStatus)}` : "Entre com Google na tela Conta para sincronizar seus dados com Firestore."}</p>
+        <p class="muted">${authState.user ? `Conectado como ${escapeHtml(authState.user.email)}. ${escapeHtml(authState.syncStatus)}` : "Entre pela tela Conta para sincronizar seus dados com a nuvem."}</p>
         <div class="button-row">
           <a class="button primary" href="#/conta">Abrir conta</a>
         </div>
@@ -47,7 +47,7 @@ export function renderSettings(state, authState = {}) {
       </section>
       <section class="card">
         <h2>Dados e backup</h2>
-        <p class="muted">Os dados ficam salvos neste navegador e, com login, também no Firestore.</p>
+        <p class="muted">Os dados ficam disponíveis neste dispositivo e sincronizados com a nuvem enquanto você estiver conectado.</p>
         <div class="button-row">
           <button class="button primary" id="export-csv" type="button">Exportar CSV</button>
           <button class="button" id="export-json" type="button">Exportar JSON</button>

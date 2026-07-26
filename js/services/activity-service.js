@@ -120,8 +120,9 @@ export function monthCalendar(monthISO, activities = []) {
 
 export function monthLabel(monthISO) {
   const [year, month] = monthISO.split("-").map(Number);
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" })
+  const label = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" })
     .format(new Date(year, month - 1, 1));
+  return label.charAt(0).toLocaleUpperCase("pt-BR") + label.slice(1);
 }
 
 export function shiftMonth(monthISO, amount) {

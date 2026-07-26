@@ -25,7 +25,10 @@ export function weeklyActivityCard(profile, activities = [], routePrefix = "") {
           <p class="eyebrow">Atividade física</p>
           <h2>${summary.completedDays} de ${summary.goalDays} dias nesta semana</h2>
         </div>
-        <a class="button" href="#${routePrefix}/atividades">Ver atividades</a>
+        <a class="button activity-summary-action" href="#${routePrefix}/atividades">
+          <span class="activity-summary-action-full">Ver atividades</span>
+          <span class="activity-summary-action-compact">Ver</span>
+        </a>
       </div>
       ${progressBar(summary.progress)}
       ${targetMinutes ? `

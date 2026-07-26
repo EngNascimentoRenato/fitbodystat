@@ -197,8 +197,9 @@ body.menu-collapsed .nav-link {
   flex: 0 0 1.35rem;
   place-items: center;
   text-align: center;
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 800;
+  line-height: 1;
 }
 
 .nav-submenu {
@@ -379,11 +380,39 @@ body.menu-collapsed .nav-submenu-content {
 .goals-plan-card .table-wrap {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+}
+
+.goals-plan-card table {
+  min-width: 650px;
+}
+
+.goals-plan-card .plan-difference {
+  width: 1%;
+}
+
+.compact-label {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .goals-plan-card th,
+  .goals-plan-card td {
+    padding-inline: 0.55rem;
+  }
+
+  .goals-plan-card .wide-label {
+    display: none;
+  }
+
+  .goals-plan-card .compact-label {
+    display: inline;
+  }
 }
 
 @media (max-width: 760px) {
   .goals-plan-card table {
-    min-width: 720px;
+    min-width: 650px;
   }
 }
 

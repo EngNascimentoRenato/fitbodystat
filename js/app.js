@@ -142,7 +142,7 @@ function persistPersonal(change) {
   if (!isApplyingCloudState) {
     saveChangeToCloud(authState.user.uid, personalState, change)
       .then(() => {
-        authState.syncStatus = "Sincronizado com Firestore.";
+        authState.syncStatus = "Sincronizado com a nuvem.";
       })
       .catch((error) => {
         authState.syncStatus = `Falha ao sincronizar: ${error.message}`;
@@ -446,7 +446,7 @@ observeAuth(async (user) => {
       state = normalizeState(cloudState);
       personalState = state;
       saveState(state, user.uid);
-      authState.syncStatus = "Dados carregados do Firestore.";
+      authState.syncStatus = "Dados carregados da nuvem.";
     } else {
       state = loadState(user.uid);
       personalState = state;
@@ -501,7 +501,7 @@ observeAuth(async (user) => {
     }
   } catch (error) {
     isApplyingCloudState = false;
-    authState.syncStatus = `Falha no Firebase: ${error.message}`;
+    authState.syncStatus = `Falha ao acessar o servidor: ${error.message}`;
   }
 
   render();

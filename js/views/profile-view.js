@@ -21,8 +21,24 @@ import {
   setFieldError,
   validateNumericFields
 } from "../utils/validation-utils.js";
+import { activityLabel } from "../data/activity-catalog.js";
 
 let profileHasPendingChanges = false;
+let profileEditMode = false;
+
+const sexLabels = {
+  male: "Masculino",
+  female: "Feminino"
+};
+
+const goalTypeLabels = {
+  "weight-loss": "Emagrecimento",
+  "weight-gain": "Ganho de peso",
+  "muscle-gain": "Ganho de massa muscular",
+  maintenance: "Manutenção",
+  recovery: "Recuperação de peso",
+  other: "Outro"
+};
 
 window.addEventListener("beforeunload", (event) => {
   if (!profileHasPendingChanges) return;
@@ -141,6 +157,93 @@ function renderPlanEditor(profile) {
   `;
 }
 
+function profileValue(label, value) {
+  return `
+    <div>
+      <dt>${escapeHtml(label)}</dt>
+      <dd>${escapeHtml(value || "-")}</dd>
+    </div>
+  `;
+}
+
+function renderProfileSummary(state, options) {
+  const profile = state.profile;
+  const preferred = (profile.preferredActivities || []).map(activityLabel).filter(Boolean);
+  const activityMinutes = Number(profile.averageActivityDurationMinutes) || 0;
+  const goalWeight = getGoalWeight(profile);
+  const bodyFat = calculateBodyFatByNavy({
+    sex: profile.sex,
+    heightCm: profile.heightCm,
+    waistCm: profile.startWaistCm,
+    neckCm: profile.startNeckCm,
+    hipCm: profile.startHipCm
+  });
+  const goalName = profile.goalType === "other" && profile.customGoalLabel
+    ? profile.customGoalLabel
+    : goalTypeLabels[profile.goalType] || "Não definido";
+
+  return `
+    <div class="view-stack profile-summary">
+      <section class="card">
+        <div class="chart-header">
+          <div>
+            <p class="eyebrow">Ficha do perfil</p>
+            <h2>${escapeHtml(profile.name || "Perfil corporal")}</h2>
+            <p class="muted">Informações consolidadas do acompanhamento atual.</p>
+          </div>
+          <button class="button primary" id="edit-profile" type="button">
+            ${options.canEditIdentity === false ? "Editar acompanhamento" : "Editar perfil"}
+          </button>
+        </div>
+        <dl class="profile-summary-grid">
+          ${profileValue("Sexo", sexLabels[profile.sex])}
+          ${profileValue("Data de nascimento", formatDate(profile.birthDate))}
+          ${profileValue("Altura", formatCm(profile.heightCm))}
+          ${options.canEditContact !== false ? profileValue("Telefone", formatPhone(state.contact?.phone || "")) : ""}
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Linha de base</h2>
+        <dl class="profile-summary-grid">
+          ${profileValue("Data inicial", formatDate(profile.startDate))}
+          ${profileValue("Peso inicial", formatKg(profile.startWeightKg))}
+          ${profileValue("Cintura inicial", formatCm(profile.startWaistCm))}
+          ${profileValue("Pescoço inicial", formatCm(profile.startNeckCm))}
+          ${profileValue("Quadril inicial", formatCm(profile.startHipCm))}
+          ${profileValue("Gordura estimada", formatPercent(bodyFat))}
+        </dl>
+      </section>
+
+      <section class="grid two">
+        <article class="card">
+          <h2>Objetivo e planejamento</h2>
+          <dl class="goal-summary-list">
+            ${profileValue("Objetivo", goalName)}
+            ${profileValue("Peso final desejado", formatKg(goalWeight))}
+            ${profileValue("Mudança semanal", getProgressMode(profile) === "maintain"
+              ? "Manutenção"
+              : `${formatKg(Number(profile.weeklyChangeGoalKg))} por semana`)}
+            ${profileValue("Prazo", profile.goalDeadlineMonths
+              ? `${formatDecimal(profile.goalDeadlineMonths, 1)} meses`
+              : "Sem prazo definido")}
+          </dl>
+        </article>
+        <article class="card">
+          <h2>Atividades físicas</h2>
+          <dl class="goal-summary-list">
+            ${profileValue("Meta semanal", `${profile.weeklyActivityGoalDays || 3} dias ativos`)}
+            ${profileValue("Meta de tempo", activityMinutes
+              ? `${activityMinutes} minutos por dia`
+              : "Não utilizada")}
+            ${profileValue("Atividades preferidas", preferred.join(", ") || "Nenhuma selecionada")}
+          </dl>
+        </article>
+      </section>
+    </div>
+  `;
+}
+
 function readProfileForm(form, currentProfile) {
   const data = new FormData(form);
   const value = (name, fallback) => data.has(name) ? data.get(name) : fallback;
@@ -163,7 +266,9 @@ function readProfileForm(form, currentProfile) {
     goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
     goalDeadlineMode: data.get("goalDeadlineMode") === "custom" ? "custom" : "auto",
     weeklyActivityGoalDays: toNumber(data.get("weeklyActivityGoalDays")) || 3,
-    averageActivityDurationMinutes: toNumber(data.get("averageActivityDurationMinutes")),
+    averageActivityDurationMinutes: data.has("trackActivityDuration")
+      ? toNumber(data.get("averageActivityDurationMinutes"))
+      : null,
     preferredActivities: data.getAll("preferredActivities")
   });
 }
@@ -189,8 +294,12 @@ function goalDirectionIsValid(profile, field) {
 export function renderProfile(state, options = {}) {
   const p = state.profile;
   const canEditContact = options.canEditContact !== false;
+  const canEditIdentity = options.canEditIdentity !== false;
+  const editing = options.forceEdit === true || profileEditMode;
+  if (!editing) return renderProfileSummary(state, { canEditContact, canEditIdentity });
   const baselineLocked = p.baselineLocked === true || state.entries.length > 0;
   const baselineDisabled = baselineLocked ? "disabled" : "";
+  const identityReadOnly = canEditIdentity ? "" : "readonly aria-readonly=\"true\"";
   const suggestedGoal = getSuggestedGoalWeight(p);
   const previewProfile = resolveGoalTiming({
     ...p,
@@ -206,10 +315,13 @@ export function renderProfile(state, options = {}) {
         ` : `
           <p class="form-notice">Os dados iniciais poderão ser ajustados até o primeiro registro de acompanhamento.</p>
         `}
+        ${canEditIdentity ? "" : `
+          <p class="form-notice">Dados de identidade pertencem ao paciente e estão disponíveis somente para consulta. Você pode editar as informações corporais e o planejamento.</p>
+        `}
         <div class="form-grid">
           <div class="field">
             <label for="name">Nome completo</label>
-            <input id="name" name="name" required minlength="2" autocomplete="name" value="${escapeAttribute(p.name || "")}" />
+            <input id="name" name="name" required minlength="2" autocomplete="name" ${identityReadOnly} value="${escapeAttribute(p.name || "")}" />
           </div>
           ${canEditContact ? `
             <div class="field">
@@ -229,7 +341,7 @@ export function renderProfile(state, options = {}) {
           </div>
           <div class="field">
             <label for="birthDate">Data de nascimento</label>
-            <input id="birthDate" name="birthDate" type="date" max="${todayISO()}" value="${escapeAttribute(p.birthDate || "")}" />
+            <input id="birthDate" name="birthDate" type="date" max="${todayISO()}" ${identityReadOnly} value="${escapeAttribute(p.birthDate || "")}" />
           </div>
           <div class="field">
             <label for="heightCm">Altura (cm)</label>
@@ -314,6 +426,7 @@ export function renderProfile(state, options = {}) {
           ${renderProfileInsight(previewProfile)}
         </div>
         <div class="button-row profile-card-save">
+          <button class="button" id="cancel-profile-edit" type="button">Cancelar</button>
           <button class="button primary" type="submit">Salvar alterações</button>
         </div>
       </section>
@@ -332,10 +445,21 @@ export function renderProfile(state, options = {}) {
               value="${escapeAttribute(p.weeklyActivityGoalDays ?? 3)}" />
           </div>
           <div class="field">
+            <label class="toggle-option">
+              <input id="trackActivityDuration" name="trackActivityDuration" type="checkbox"
+                ${Number(p.averageActivityDurationMinutes) > 0 ? "checked" : ""} />
+              <span>
+                <strong>Acompanhar também meta de tempo</strong>
+                <small>Opcional. Ative para comparar minutos planejados e realizados.</small>
+              </span>
+            </label>
+          </div>
+          <div class="field activity-duration-goal" ${Number(p.averageActivityDurationMinutes) > 0 ? "" : "hidden"}>
             <label for="averageActivityDurationMinutes">Duração média pretendida por dia (minutos)</label>
             <input id="averageActivityDurationMinutes" name="averageActivityDurationMinutes" type="number"
-              min="1" max="1440" value="${escapeAttribute(p.averageActivityDurationMinutes ?? "")}" />
-            <span class="help-text">Opcional. A meta semanal será calculada pelos dias ativos.</span>
+              min="1" max="1440" ${Number(p.averageActivityDurationMinutes) > 0 ? "" : "disabled"}
+              value="${escapeAttribute(p.averageActivityDurationMinutes ?? "")}" />
+            <span class="help-text">A meta semanal será calculada pelos dias ativos.</span>
           </div>
         </div>
         <div class="field">
@@ -358,6 +482,13 @@ export function renderProfile(state, options = {}) {
 
 export function bindProfile(state, persist, render) {
   const form = document.getElementById("profile-form");
+  if (!form) {
+    document.getElementById("edit-profile")?.addEventListener("click", () => {
+      profileEditMode = true;
+      render();
+    });
+    return;
+  }
   const heightField = form.elements.heightCm;
   const goalWeightField = form.elements.goalWeightKg;
   const weeklyField = form.elements.weeklyChangeGoalKg;
@@ -365,6 +496,14 @@ export function bindProfile(state, persist, render) {
   const mobileSave = document.getElementById("profile-mobile-save");
   let goalPlannerTimer = null;
   profileHasPendingChanges = false;
+
+  const setDurationGoalVisibility = () => {
+    const enabled = form.elements.trackActivityDuration?.checked === true;
+    const field = form.querySelector(".activity-duration-goal");
+    const input = form.elements.averageActivityDurationMinutes;
+    if (field) field.hidden = !enabled;
+    if (input) input.disabled = !enabled;
+  };
 
   const markDirty = () => {
     profileHasPendingChanges = true;
@@ -408,6 +547,16 @@ export function bindProfile(state, persist, render) {
     if (resolveHeightInput(heightField)) updateGoalPlanner();
   });
   document.getElementById("apply-goal-suggestion")?.addEventListener("click", applyGoalSuggestion);
+  form.elements.trackActivityDuration?.addEventListener("change", () => {
+    setDurationGoalVisibility();
+    markDirty();
+  });
+  document.getElementById("cancel-profile-edit")?.addEventListener("click", () => {
+    if (profileHasPendingChanges && !window.confirm("Descartar as alterações feitas no perfil?")) return;
+    profileHasPendingChanges = false;
+    profileEditMode = false;
+    render();
+  });
   form.elements.goalType?.addEventListener("change", applyGoalSuggestion);
   form.addEventListener("input", (event) => {
     markDirty();
@@ -487,8 +636,14 @@ export function bindProfile(state, persist, render) {
     if (phone !== null) state.contact = { ...(state.contact || {}), phone: normalizePhone(phone) };
     state.goalPlan = createDefaultMonthlyPlan(nextProfile);
     profileHasPendingChanges = false;
+    profileEditMode = false;
     persist({ type: "profile-plan" });
     showToast("Perfil e planejamento salvos.");
     render();
   });
+}
+
+export function resetProfileMode() {
+  profileHasPendingChanges = false;
+  profileEditMode = false;
 }

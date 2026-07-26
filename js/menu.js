@@ -1,30 +1,30 @@
 import { escapeHtml } from "./utils/html-utils.js";
 
 export const routes = [
-  { path: "/primeiro-acesso", title: "Primeiro acesso", eyebrow: "Configuração inicial", label: "Concluir cadastro", icon: "1" },
-  { path: "/atividades", title: "Atividades", eyebrow: "Frequência de atividades", label: "Atividades", icon: "A" },
-  { path: "/me/atividades", title: "Minhas atividades", eyebrow: "Meu espaço", label: "Minhas atividades", icon: "A", roles: ["professional", "admin"] },
-  { path: "/dashboard", title: "Dashboard", eyebrow: "Acompanhamento pessoal", label: "Dashboard", icon: "D" },
-  { path: "/perfil", title: "Perfil", eyebrow: "Dados corporais", label: "Perfil", icon: "P" },
+  { path: "/primeiro-acesso", title: "Primeiro acesso", eyebrow: "Configuração inicial", label: "Concluir cadastro", icon: "✓" },
+  { path: "/atividades", title: "Atividades", eyebrow: "Frequência de atividades", label: "Atividades", icon: "◆" },
+  { path: "/me/atividades", title: "Minhas atividades", eyebrow: "Meu espaço", label: "Minhas atividades", icon: "◆", roles: ["professional", "admin"] },
+  { path: "/dashboard", title: "Dashboard", eyebrow: "Acompanhamento pessoal", label: "Dashboard", icon: "▦" },
+  { path: "/perfil", title: "Perfil", eyebrow: "Dados corporais", label: "Perfil", icon: "♙" },
   { path: "/registro", title: "Novo registro", eyebrow: "Medidas ou atividade", label: "Novo registro", icon: "+" },
-  { path: "/historico", title: "Histórico", eyebrow: "Evolução registrada", label: "Histórico", icon: "H" },
-  { path: "/metas", title: "Metas", eyebrow: "Planejamento", label: "Metas", icon: "M" },
-  { path: "/vinculos", title: "Meus profissionais", eyebrow: "Convites e vínculos", label: "Meus profissionais", icon: "V" },
-  { path: "/me/dashboard", title: "Meu dashboard", eyebrow: "Meu espaço", label: "Meu dashboard", icon: "D", roles: ["professional", "admin"] },
+  { path: "/historico", title: "Histórico", eyebrow: "Evolução registrada", label: "Histórico", icon: "◷" },
+  { path: "/metas", title: "Metas", eyebrow: "Planejamento", label: "Metas", icon: "◎" },
+  { path: "/vinculos", title: "Meus profissionais", eyebrow: "Convites e vínculos", label: "Meus profissionais", icon: "↔" },
+  { path: "/me/dashboard", title: "Meu dashboard", eyebrow: "Meu espaço", label: "Meu dashboard", icon: "▦", roles: ["professional", "admin"] },
   { path: "/me/registro", title: "Meu novo registro", eyebrow: "Medidas ou atividade", label: "Meu novo registro", icon: "+", roles: ["professional", "admin"] },
-  { path: "/me/historico", title: "Meu histórico", eyebrow: "Meu espaço", label: "Meu histórico", icon: "H", roles: ["professional", "admin"] },
-  { path: "/me/metas", title: "Minhas metas", eyebrow: "Meu espaço", label: "Minhas metas", icon: "M", roles: ["professional", "admin"] },
-  { path: "/me/perfil", title: "Meu perfil", eyebrow: "Meu espaço", label: "Meu perfil", icon: "P", roles: ["professional", "admin"] },
-  { path: "/me/vinculos", title: "Meus profissionais", eyebrow: "Meu espaço", label: "Meus profissionais", icon: "V", roles: ["professional", "admin"] },
-  { path: "/pacientes", title: "Pacientes", eyebrow: "Acompanhamento profissional", label: "Pacientes", icon: "P", roles: ["professional"] },
-  { path: "/agenda", title: "Agenda", eyebrow: "Organização profissional", label: "Agenda", icon: "G", roles: ["professional"] },
-  { path: "/admin", title: "Visão geral", eyebrow: "Administração", label: "Visão geral", icon: "A", roles: ["admin"] },
-  { path: "/admin/usuarios", title: "Usuários", eyebrow: "Administração", label: "Usuários", icon: "U", roles: ["admin"] },
-  { path: "/admin/profissionais", title: "Profissionais", eyebrow: "Administração", label: "Profissionais", icon: "P", roles: ["admin"] },
-  { path: "/admin/vinculos", title: "Vínculos", eyebrow: "Administração", label: "Vínculos", icon: "V", roles: ["admin"] },
-  { path: "/admin/convites", title: "Convites pendentes", eyebrow: "Administração", label: "Convites pendentes", icon: "C", roles: ["admin"] },
-  { path: "/conta", title: "Conta", eyebrow: "Identidade e acesso", label: "Conta", icon: "C" },
-  { path: "/configuracoes", title: "Configurações", eyebrow: "Dados e privacidade", label: "Configurações", icon: "S" },
+  { path: "/me/historico", title: "Meu histórico", eyebrow: "Meu espaço", label: "Meu histórico", icon: "◷", roles: ["professional", "admin"] },
+  { path: "/me/metas", title: "Minhas metas", eyebrow: "Meu espaço", label: "Minhas metas", icon: "◎", roles: ["professional", "admin"] },
+  { path: "/me/perfil", title: "Meu perfil", eyebrow: "Meu espaço", label: "Meu perfil", icon: "♙", roles: ["professional", "admin"] },
+  { path: "/me/vinculos", title: "Meus profissionais", eyebrow: "Meu espaço", label: "Meus profissionais", icon: "↔", roles: ["professional", "admin"] },
+  { path: "/pacientes", title: "Pacientes", eyebrow: "Acompanhamento profissional", label: "Pacientes", icon: "♙", roles: ["professional"] },
+  { path: "/agenda", title: "Agenda", eyebrow: "Organização profissional", label: "Agenda", icon: "□", roles: ["professional"] },
+  { path: "/admin", title: "Visão geral", eyebrow: "Administração", label: "Visão geral", icon: "▦", roles: ["admin"] },
+  { path: "/admin/usuarios", title: "Usuários", eyebrow: "Administração", label: "Usuários", icon: "♙", roles: ["admin"] },
+  { path: "/admin/profissionais", title: "Profissionais", eyebrow: "Administração", label: "Profissionais", icon: "◇", roles: ["admin"] },
+  { path: "/admin/vinculos", title: "Vínculos", eyebrow: "Administração", label: "Vínculos", icon: "↔", roles: ["admin"] },
+  { path: "/admin/convites", title: "Convites pendentes", eyebrow: "Administração", label: "Convites pendentes", icon: "✉", roles: ["admin"] },
+  { path: "/conta", title: "Conta", eyebrow: "Identidade e acesso", label: "Conta", icon: "○" },
+  { path: "/configuracoes", title: "Configurações", eyebrow: "Dados e privacidade", label: "Configurações", icon: "⚙" },
   { path: "/metodos", title: "Métodos e cálculos", eyebrow: "Critérios e referências", label: "Métodos e cálculos", icon: "i" }
 ];
 
@@ -50,7 +50,7 @@ function routeIsAllowed(route, authState) {
 
 function navLink(path, label, icon, currentPath) {
   return `
-    <a class="nav-link" href="#${path}" ${path === currentPath ? 'aria-current="page"' : ""}>
+    <a class="nav-link" href="#${path}" title="${escapeHtml(label)}" ${path === currentPath ? 'aria-current="page"' : ""}>
       <span class="nav-icon" aria-hidden="true">${icon}</span>
       <span>${label}</span>
     </a>
@@ -63,13 +63,12 @@ function navSection(label, links) {
 
 function personalLinks(currentPath) {
   return [
-    navLink("/me/dashboard", "Meu dashboard", "D", currentPath),
-    navLink("/me/atividades", "Minhas atividades", "A", currentPath),
-    navLink("/me/registro", "Meu novo registro", "+", currentPath),
-    navLink("/me/historico", "Meu histórico", "H", currentPath),
-    navLink("/me/metas", "Minhas metas", "M", currentPath),
-    navLink("/me/perfil", "Meu perfil", "P", currentPath),
-    navLink("/me/vinculos", "Meus profissionais", "V", currentPath)
+    navLink("/me/dashboard", "Meu dashboard", "▦", currentPath),
+    navLink("/me/atividades", "Minhas atividades", "◆", currentPath),
+    navLink("/me/historico", "Meu histórico", "◷", currentPath),
+    navLink("/me/metas", "Minhas metas", "◎", currentPath),
+    navLink("/me/perfil", "Meu perfil", "♙", currentPath),
+    navLink("/me/vinculos", "Meus profissionais", "↔", currentPath)
   ].join("");
 }
 
@@ -77,7 +76,7 @@ function personalSubmenu(currentPath, activePatient) {
   const open = !activePatient && personalPaths.includes(currentPath) ? "open" : "";
   return `
     <details class="nav-submenu" ${open}>
-      <summary><span class="nav-icon">E</span><span>Meu espaço</span></summary>
+      <summary title="Meu espaço"><span class="nav-icon">⌂</span><span>Meu espaço</span></summary>
       <div class="nav-submenu-content">${personalLinks(currentPath)}</div>
     </details>
   `;
@@ -86,14 +85,13 @@ function personalSubmenu(currentPath, activePatient) {
 function standardPersonalMenu(currentPath, accountLinks) {
   return [
     navSection("Minha evolução", [
-      navLink("/dashboard", "Dashboard", "D", currentPath),
-      navLink("/atividades", "Atividades", "A", currentPath),
-      navLink("/registro", "Novo registro", "+", currentPath),
-      navLink("/historico", "Histórico", "H", currentPath),
-      navLink("/metas", "Metas", "M", currentPath),
-      navLink("/perfil", "Perfil", "P", currentPath)
+      navLink("/dashboard", "Dashboard", "▦", currentPath),
+      navLink("/atividades", "Atividades", "◆", currentPath),
+      navLink("/historico", "Histórico", "◷", currentPath),
+      navLink("/metas", "Metas", "◎", currentPath),
+      navLink("/perfil", "Perfil", "♙", currentPath)
     ].join("")),
-    navSection("Relacionamentos", navLink("/vinculos", "Meus profissionais", "V", currentPath)),
+    navSection("Relacionamentos", navLink("/vinculos", "Meus profissionais", "↔", currentPath)),
     navSection("Conta", accountLinks)
   ].join("");
 }
@@ -119,8 +117,8 @@ export function renderMenu(currentPath, authState) {
   }
 
   const accountLinks = [
-    navLink("/conta", "Conta", "C", currentPath),
-    navLink("/configuracoes", "Configurações", "S", currentPath),
+    navLink("/conta", "Conta", "○", currentPath),
+    navLink("/configuracoes", "Configurações", "⚙", currentPath),
     navLink("/metodos", "Métodos e cálculos", "i", currentPath)
   ].join("");
 
@@ -137,18 +135,17 @@ export function renderMenu(currentPath, authState) {
     const patient = authState.activePatient;
     const patientLabel = authState.presentationMode === "off" ? patient?.name : "Identidade protegida";
     const patientLinks = patient ? navSection(`Paciente: ${escapeHtml(patientLabel)}`, [
-      navLink("/dashboard", "Dashboard do paciente", "D", currentPath),
-      navLink("/atividades", "Atividades do paciente", "A", currentPath),
-      navLink("/registro", "Novo registro do paciente", "+", currentPath),
-      navLink("/historico", "Histórico do paciente", "H", currentPath),
-      navLink("/metas", "Metas e planejamento", "M", currentPath),
-      navLink("/perfil", "Perfil corporal", "P", currentPath)
+      navLink("/dashboard", "Dashboard do paciente", "▦", currentPath),
+      navLink("/atividades", "Atividades do paciente", "◆", currentPath),
+      navLink("/historico", "Histórico do paciente", "◷", currentPath),
+      navLink("/metas", "Metas e planejamento", "◎", currentPath),
+      navLink("/perfil", "Perfil corporal", "♙", currentPath)
     ].join("")) : "";
     menu.innerHTML = [
       patientLinks,
       navSection("Área profissional", [
-        navLink("/agenda", "Agenda", "G", currentPath),
-        navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "P", currentPath)
+        navLink("/agenda", "Agenda", "□", currentPath),
+        navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "♙", currentPath)
       ].join("")),
       navSection("Conta", accountLinks)
     ].join("");
@@ -156,11 +153,11 @@ export function renderMenu(currentPath, authState) {
   }
 
   const adminLinks = [
-    navLink("/admin", "Visão geral", "A", currentPath),
-    navLink("/admin/usuarios", "Usuários", "U", currentPath),
-    navLink("/admin/profissionais", "Profissionais", "P", currentPath),
-    navLink("/admin/vinculos", "Vínculos", "V", currentPath),
-    navLink("/admin/convites", "Convites pendentes", "C", currentPath)
+    navLink("/admin", "Visão geral", "▦", currentPath),
+    navLink("/admin/usuarios", "Usuários", "♙", currentPath),
+    navLink("/admin/profissionais", "Profissionais", "◇", currentPath),
+    navLink("/admin/vinculos", "Vínculos", "↔", currentPath),
+    navLink("/admin/convites", "Convites pendentes", "✉", currentPath)
   ].join("");
   menu.innerHTML = [
     navSection("Administração", adminLinks),
