@@ -178,7 +178,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary), var(--accent));
+  background: linear-gradient(90deg, #4ee8f3, #0b1cff);
   border-radius: inherit;
 }
 

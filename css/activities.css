@@ -319,7 +319,7 @@
 }
 
 .weekly-progress-line.duration .progress-fill {
-  background: var(--accent);
+  background: linear-gradient(90deg, #69fd7d, #236137);
 }
 
 @media (max-width: 760px) {
