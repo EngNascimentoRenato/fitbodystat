@@ -9,7 +9,7 @@ export function createEntry(overrides = {}) {
     neckCm: null,
     hipCm: null,
     bodyFatManual: null,
-    bodyFatMethod: "navy",
+    bodyFatMethod: "circumference",
     notes: "",
     ...overrides
   };

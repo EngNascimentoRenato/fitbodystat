@@ -1,5 +1,6 @@
 import { enrichEntries } from "./progress-service.js";
 import { formatDate } from "../utils/date-utils.js";
+import { bodyFatMethodLabel } from "../models/goal-model.js";
 
 export function exportCsv(profile, entries) {
   const rows = enrichEntries(profile, entries);
@@ -12,7 +13,7 @@ export function exportCsv(profile, entries) {
     entry.hipCm || "",
     entry.bmi ? entry.bmi.toFixed(1) : "",
     entry.bodyFat ? entry.bodyFat.toFixed(1) : "",
-    entry.bodyFatMethod || "",
+    bodyFatMethodLabel(entry.bodyFatMethod),
     entry.notes || ""
   ]);
 

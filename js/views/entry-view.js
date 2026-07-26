@@ -9,6 +9,7 @@ import { showToast } from "../components/toast.js";
 import { mergeDailyActivity } from "../services/activity-service.js";
 import { validateNumericFields } from "../utils/validation-utils.js";
 import { confirmAction } from "../components/modal.js";
+import { bodyFatMethodIsEstimated } from "../models/goal-model.js";
 
 let activeEntryMode = "activity";
 let selectedActivityDate = todayISO();
@@ -113,7 +114,28 @@ export function renderEntry(state) {
 }
 
 function bindMeasurementForm(state, persist, render) {
-  document.getElementById("entry-form")?.addEventListener("submit", (event) => {
+  const form = document.getElementById("entry-form");
+  const methodField = form?.elements.bodyFatMethod;
+  const valueField = form?.elements.bodyFatManual;
+  const updateBodyFatFields = () => {
+    const estimated = bodyFatMethodIsEstimated(methodField?.value);
+    const field = form?.querySelector("[data-body-fat-value-field]");
+    const help = form?.querySelector("[data-body-fat-help]");
+    const notice = form?.querySelector("[data-body-fat-notice]");
+    if (field) field.hidden = estimated;
+    if (valueField) {
+      valueField.disabled = estimated;
+      valueField.required = !estimated;
+    }
+    if (help) help.textContent = estimated ? "" : "Informe o resultado obtido pelo método selecionado.";
+    if (notice) notice.textContent = estimated
+      ? "O aplicativo calculará uma estimativa pelas circunferências. O resultado não substitui uma avaliação profissional."
+      : "O valor informado será priorizado. Para comparar a evolução, procure repetir o mesmo método e condições.";
+  };
+  methodField?.addEventListener("change", updateBodyFatFields);
+  updateBodyFatFields();
+
+  form?.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const date = data.get("date");
@@ -130,7 +152,11 @@ function bindMeasurementForm(state, persist, render) {
       waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
       neckCm: { rule: "circumferenceCm", label: "Pescoço" },
       hipCm: { rule: "circumferenceCm", label: "Quadril", required: state.profile.sex === "female" },
-      bodyFatManual: { rule: "bodyFatPercent", label: "Gordura corporal" }
+      bodyFatManual: {
+        rule: "bodyFatPercent",
+        label: "Gordura corporal",
+        required: !bodyFatMethodIsEstimated(data.get("bodyFatMethod"))
+      }
     });
     if (!validation.valid) {
       showToast("Revise os campos destacados.");

@@ -1,7 +1,12 @@
 import { preferredActivityPicker } from "../components/activity-picker.js";
 import { measurementHelpButton } from "../components/measurement-guide.js";
 import { createDefaultMonthlyPlan } from "../data/seed-plan.js";
-import { calculateBodyFatByNavy, classifyBodyFat } from "../services/body-fat-service.js";
+import { classifyBodyFat, resolveProfileBodyFat } from "../services/body-fat-service.js";
+import {
+  bodyFatMethodIsEstimated,
+  bodyFatMethods,
+  normalizeBodyFatMethod
+} from "../models/goal-model.js";
 import { calculateBmi, classifyBmi } from "../services/bmi-service.js";
 import {
   getGoalWeight,
@@ -86,6 +91,17 @@ function userOnboarding(state, authState) {
           <div class="field">
             <label for="onboarding-hip">Quadril inicial (cm) ${measurementHelpButton("hip")}</label>
             <input id="onboarding-hip" name="startHipCm" inputmode="decimal" />
+          </div>
+          <div class="field">
+            <label for="onboarding-body-fat-method">Origem da gordura corporal</label>
+            <select id="onboarding-body-fat-method" name="startBodyFatMethod">
+              ${bodyFatMethods.map((method) => `<option value="${method.value}">${method.label}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field" data-onboarding-body-fat-value>
+            <label for="onboarding-body-fat">Percentual inicial informado (%)</label>
+            <input id="onboarding-body-fat" name="startBodyFatManual" inputmode="decimal" />
+            <span class="help-text">Preencha o resultado obtido pelo método escolhido.</span>
           </div>
         </div>
         <div class="onboarding-insight" id="onboarding-insight" aria-live="polite">
@@ -245,21 +261,19 @@ function updateInsight(form) {
     startWeightKg: toNumber(data.get("startWeightKg")),
     startWaistCm: toNumber(data.get("startWaistCm")),
     startNeckCm: toNumber(data.get("startNeckCm")),
-    startHipCm: toNumber(data.get("startHipCm"))
+    startHipCm: toNumber(data.get("startHipCm")),
+    startBodyFatMethod: normalizeBodyFatMethod(data.get("startBodyFatMethod")),
+    startBodyFatManual: bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+      ? null
+      : toNumber(data.get("startBodyFatManual"))
   };
   const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
-  const bodyFat = calculateBodyFatByNavy({
-    sex: profile.sex,
-    heightCm: profile.heightCm,
-    waistCm: profile.startWaistCm,
-    neckCm: profile.startNeckCm,
-    hipCm: profile.startHipCm
-  });
+  const bodyFat = resolveProfileBodyFat(profile);
   const insight = document.getElementById("onboarding-insight");
   if (!insight) return;
   insight.innerHTML = bmi
     ? `<strong>IMC estimado: ${formatDecimal(bmi, 1)} (${escapeHtml(classifyBmi(bmi))}).</strong>
-       ${bodyFat ? ` Gordura corporal estimada: ${formatPercent(bodyFat)} (${escapeHtml(classifyBodyFat(profile.sex, bodyFat))}).` : " Complete as circunferências necessárias para estimar a gordura corporal."}`
+       ${bodyFat ? ` Gordura corporal ${bodyFatMethodIsEstimated(profile.startBodyFatMethod) ? "estimada" : "informada"}: ${formatPercent(bodyFat)} (${escapeHtml(classifyBodyFat(profile.sex, bodyFat))}).` : " Complete os dados necessários para obter a gordura corporal."}`
     : "Preencha altura, peso e circunferências para visualizar as estimativas iniciais.";
 }
 
@@ -362,11 +376,30 @@ export function bindOnboarding(context) {
   const hipField = document.getElementById("onboarding-hip");
   const heightField = document.getElementById("onboarding-height");
   const goalWeightField = document.getElementById("onboarding-goal-weight");
+  const bodyFatMethodField = document.getElementById("onboarding-body-fat-method");
+  const bodyFatValueField = document.getElementById("onboarding-body-fat");
   let goalWeightWasEdited = false;
   let goalPlannerTimer = null;
+  const updateBodyFatFields = () => {
+    const estimated = bodyFatMethodIsEstimated(bodyFatMethodField?.value);
+    const field = document.querySelector("[data-onboarding-body-fat-value]");
+    const neckField = userForm?.elements.startNeckCm;
+    const hipRequired = estimated && sexField?.value === "female";
+    if (field) field.hidden = estimated;
+    if (bodyFatValueField) {
+      bodyFatValueField.disabled = estimated;
+      bodyFatValueField.required = !estimated;
+    }
+    if (neckField) neckField.required = estimated;
+    if (hipField) hipField.required = hipRequired;
+    updateInsight(userForm);
+  };
+  bodyFatMethodField?.addEventListener("change", updateBodyFatFields);
+  updateBodyFatFields();
   const updateHipRequirement = () => {
     if (!hipField) return;
-    hipField.required = sexField?.value === "female";
+    hipField.required = bodyFatMethodIsEstimated(bodyFatMethodField?.value)
+      && sexField?.value === "female";
   };
   sexField?.addEventListener("change", updateHipRequirement);
   updateHipRequirement();
@@ -426,8 +459,21 @@ export function bindOnboarding(context) {
       heightCm: { rule: "heightCm", label: "Altura", required: true },
       startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
       startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: true },
-      startNeckCm: { rule: "circumferenceCm", label: "Pescoço inicial", required: true },
-      startHipCm: { rule: "circumferenceCm", label: "Quadril inicial", required: data.get("sex") === "female" },
+      startNeckCm: {
+        rule: "circumferenceCm",
+        label: "Pescoço inicial",
+        required: bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+      },
+      startHipCm: {
+        rule: "circumferenceCm",
+        label: "Quadril inicial",
+        required: bodyFatMethodIsEstimated(data.get("startBodyFatMethod")) && data.get("sex") === "female"
+      },
+      startBodyFatManual: {
+        rule: "bodyFatPercent",
+        label: "Gordura corporal inicial",
+        required: !bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+      },
       targetBmi: { rule: "targetBmi", label: "IMC de referência", required: true },
       goalWeightKg: { rule: "weightKg", label: "Peso final", required: true },
       weeklyChangeGoalKg: { rule: "weeklyChangeKg", label: "Mudança semanal", required: deadlineMode === "auto" && !maintenanceGoal },
@@ -451,6 +497,10 @@ export function bindOnboarding(context) {
       startWaistCm: toNumber(data.get("startWaistCm")),
       startNeckCm: toNumber(data.get("startNeckCm")),
       startHipCm: toNumber(data.get("startHipCm")),
+      startBodyFatMethod: normalizeBodyFatMethod(data.get("startBodyFatMethod")),
+      startBodyFatManual: bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+        ? null
+        : toNumber(data.get("startBodyFatManual")),
       goalType: data.get("goalType"),
       targetBmi: toNumber(data.get("targetBmi")) || 24.9,
       goalWeightKg: toNumber(data.get("goalWeightKg")),

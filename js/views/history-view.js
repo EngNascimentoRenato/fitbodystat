@@ -1,5 +1,10 @@
 import { enrichEntries } from "../services/progress-service.js";
-import { bodyFatMethods } from "../models/goal-model.js";
+import {
+  bodyFatMethodIsEstimated,
+  bodyFatMethodLabel,
+  bodyFatMethods,
+  normalizeBodyFatMethod
+} from "../models/goal-model.js";
 import { formatDate } from "../utils/date-utils.js";
 import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../utils/number-utils.js";
 import { confirmAction } from "../components/modal.js";
@@ -14,15 +19,25 @@ function numberInput(name, value, label) {
 }
 
 function renderBodyFatEditor(entry) {
+  const selectedMethod = normalizeBodyFatMethod(entry.bodyFatMethod);
   return `
     <div class="table-edit-stack">
       <select class="table-input" name="bodyFatMethod" aria-label="Método de gordura corporal">
         ${bodyFatMethods.map((method) => `
-          <option value="${method.value}" ${method.value === (entry.bodyFatMethod || "navy") ? "selected" : ""}>${method.label}</option>
+          <option value="${method.value}" ${method.value === selectedMethod ? "selected" : ""}>${method.label}</option>
         `).join("")}
       </select>
-      ${numberInput("bodyFatManual", entry.bodyFatManual, "Gordura informada em percentual")}
+      <div data-history-body-fat-value ${bodyFatMethodIsEstimated(selectedMethod) ? "hidden" : ""}>
+        ${numberInput("bodyFatManual", entry.bodyFatManual, "Gordura informada em percentual")}
+      </div>
     </div>
+  `;
+}
+
+function renderBodyFat(entry) {
+  return `
+    <span>${formatPercent(entry.bodyFat)}</span>
+    <small class="table-secondary">${escapeHtml(bodyFatMethodLabel(entry.bodyFatMethod))}</small>
   `;
 }
 
@@ -93,7 +108,7 @@ export function renderHistory(state) {
                   <td class="number">${isEditing ? numberInput("neckCm", entry.neckCm, "Pescoço") : formatCm(entry.neckCm)}</td>
                   <td class="number">${isEditing ? numberInput("hipCm", entry.hipCm, "Quadril") : formatCm(entry.hipCm)}</td>
                   <td class="number">${formatDecimal(entry.bmi, 1)}</td>
-                  <td class="number">${isEditing ? renderBodyFatEditor(entry) : formatPercent(entry.bodyFat)}</td>
+                  <td class="number">${isEditing ? renderBodyFatEditor(entry) : renderBodyFat(entry)}</td>
                   <td class="number">${formatKg(entry.weekDiff)}</td>
                   <td>${isEditing
                     ? `<textarea class="table-input" name="notes" aria-label="Observações">${escapeHtml(entry.notes || "")}</textarea>`
@@ -110,6 +125,18 @@ export function renderHistory(state) {
 }
 
 export function bindHistory(state, persist, render) {
+  document.querySelectorAll('[name="bodyFatMethod"]').forEach((select) => {
+    select.addEventListener("change", () => {
+      const valueContainer = select.closest(".table-edit-stack")?.querySelector("[data-history-body-fat-value]");
+      const input = valueContainer?.querySelector('[name="bodyFatManual"]');
+      const estimated = bodyFatMethodIsEstimated(select.value);
+      if (valueContainer) valueContainer.hidden = estimated;
+      if (input) {
+        input.disabled = estimated;
+        input.required = !estimated;
+      }
+    });
+  });
   document.querySelectorAll("[data-edit-entry]").forEach((button) => {
     button.addEventListener("click", () => {
       editingEntryId = button.dataset.editEntry;
@@ -148,7 +175,11 @@ export function bindHistory(state, persist, render) {
       waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
       neckCm: { rule: "circumferenceCm", label: "Pescoço" },
       hipCm: { rule: "circumferenceCm", label: "Quadril", required: state.profile.sex === "female" },
-      bodyFatManual: { rule: "bodyFatPercent", label: "Gordura corporal" }
+      bodyFatManual: {
+        rule: "bodyFatPercent",
+        label: "Gordura corporal",
+        required: !bodyFatMethodIsEstimated(value("bodyFatMethod"))
+      }
     });
     if (!validation.valid) {
       showToast("Revise os campos destacados.");
@@ -162,8 +193,10 @@ export function bindHistory(state, persist, render) {
       waistCm: toNumber(value("waistCm")),
       neckCm: toNumber(value("neckCm")),
       hipCm: toNumber(value("hipCm")),
-      bodyFatMethod: value("bodyFatMethod"),
-      bodyFatManual: toNumber(value("bodyFatManual")),
+      bodyFatMethod: normalizeBodyFatMethod(value("bodyFatMethod")),
+      bodyFatManual: bodyFatMethodIsEstimated(value("bodyFatMethod"))
+        ? null
+        : toNumber(value("bodyFatManual")),
       notes: value("notes").trim()
     };
     state.entries = state.entries

@@ -153,8 +153,8 @@ export function createBaselineEntry(profile) {
     waistCm: profile.startWaistCm,
     neckCm: profile.startNeckCm,
     hipCm: profile.startHipCm,
-    bodyFatMethod: "navy",
-    bodyFatManual: null,
+    bodyFatMethod: profile.startBodyFatMethod || "circumference",
+    bodyFatManual: profile.startBodyFatManual ?? null,
     notes: "Registro inicial do perfil",
     source: "profile",
     isBaseline: true

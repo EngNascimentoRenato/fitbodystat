@@ -14,6 +14,7 @@ import {
   nextMilestoneProgress
 } from "../services/progress-service.js";
 import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
+import { bodyFatMethodLabel } from "../models/goal-model.js";
 import { formatDate } from "../utils/date-utils.js";
 import { weeklyActivityCard } from "../components/activity-summary.js";
 import { formatActivityMinutes, weeklyActivitySummary } from "../services/activity-service.js";
@@ -107,7 +108,13 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
         ${statCard("Peso atual", formatKg(latest?.weightKg), `${formatKg(latest?.weightKg - profile.startWeightKg)} desde o início`)}
         ${statCard("IMC", formatDecimal(latest?.bmi, 1), latest?.bmiClass || "Sem dados")}
         ${statCard("Cintura", formatCm(latest?.waistCm), `Inicial: ${formatCm(profile.startWaistCm)}`)}
-        ${statCard("Gordura corporal", formatPercent(latest?.bodyFat), latest?.bodyFatClass || "Por medidas ou medidor")}
+        ${statCard(
+          "Gordura corporal",
+          formatPercent(latest?.bodyFat),
+          latest?.bodyFat
+            ? `${latest.bodyFatClass} · ${bodyFatMethodLabel(latest.bodyFatMethod)}`
+            : "Sem dados"
+        )}
       </section>`}
 
       ${evolutionOnly

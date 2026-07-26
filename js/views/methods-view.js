@@ -11,7 +11,7 @@ export function renderMethods() {
 
       <section class="card">
         <h2>Percentual de gordura por circunferências</h2>
-        <p>A estimativa usa equações baseadas no método de circunferências associado à Marinha dos Estados Unidos.</p>
+        <p>O resultado calculado a partir de circunferências é uma estimativa. No registro, o aplicativo identifica separadamente valores de bioimpedância, adipômetro, DEXA, avaliação profissional e outros métodos.</p>
         <div class="grid two">
           <div>
             <h3>Masculino</h3>
@@ -27,7 +27,7 @@ export function renderMethods() {
 
       <section class="card">
         <h2>Medição informada</h2>
-        <p>O percentual também pode ser informado a partir de balança de bioimpedância, adipômetro, DEXA ou avaliação profissional.</p>
+        <p>Quando um percentual for informado, ele terá prioridade sobre a estimativa por medidas. Para acompanhar tendências, procure repetir o mesmo método e condições.</p>
         <p class="muted">Métodos diferentes não são diretamente intercambiáveis. Para acompanhar evolução, prefira repetir o mesmo método e condições de medição.</p>
       </section>
 

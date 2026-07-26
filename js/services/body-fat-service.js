@@ -28,7 +28,7 @@ export function classifyBodyFat(sex, bodyFat) {
 }
 
 export function resolveBodyFat(entry, profile) {
-  if (entry.bodyFatManual) {
+  if (entry.bodyFatManual !== null && entry.bodyFatManual !== undefined && entry.bodyFatManual !== "") {
     return Number(entry.bodyFatManual);
   }
 
@@ -39,4 +39,13 @@ export function resolveBodyFat(entry, profile) {
     neckCm: entry.neckCm,
     hipCm: entry.hipCm
   });
+}
+
+export function resolveProfileBodyFat(profile) {
+  return resolveBodyFat({
+    waistCm: profile.startWaistCm,
+    neckCm: profile.startNeckCm,
+    hipCm: profile.startHipCm,
+    bodyFatManual: profile.startBodyFatManual
+  }, profile);
 }

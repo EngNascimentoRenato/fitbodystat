@@ -10,12 +10,12 @@ export function measurementFields(profile, entry = {}) {
     <div class="field">
       <label for="neckCm">Pescoço (cm) ${measurementHelpButton("neck")}</label>
       <input id="neckCm" name="neckCm" inputmode="decimal" value="${escapeAttribute(entry.neckCm ?? profile.startNeckCm ?? "")}" />
-      <span class="help-text">Necessário para estimar gordura por medidas.</span>
+      <span class="help-text">Usado na estimativa por medidas corporais.</span>
     </div>
     <div class="field">
       <label for="hipCm">Quadril (cm) ${measurementHelpButton("hip")}</label>
       <input id="hipCm" name="hipCm" inputmode="decimal" value="${escapeAttribute(entry.hipCm ?? profile.startHipCm ?? "")}" />
-      <span class="help-text">Necessário para cálculo feminino pelo método da Marinha e opcional para acompanhamento geral.</span>
+      <span class="help-text">Usado na estimativa feminina e opcional no acompanhamento geral.</span>
     </div>
   `;
 }

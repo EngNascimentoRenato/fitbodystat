@@ -1,5 +1,11 @@
 import { showToast } from "../components/toast.js";
-import { calculateBodyFatByNavy, classifyBodyFat } from "../services/body-fat-service.js";
+import { classifyBodyFat, resolveProfileBodyFat } from "../services/body-fat-service.js";
+import {
+  bodyFatMethodIsEstimated,
+  bodyFatMethodLabel,
+  bodyFatMethods,
+  normalizeBodyFatMethod
+} from "../models/goal-model.js";
 import { calculateBmi, classifyBmi, getBmiTargets } from "../services/bmi-service.js";
 import {
   getGoalDirection,
@@ -60,13 +66,7 @@ document.addEventListener("click", (event) => {
 function renderProfileInsight(profile) {
   const bmi = calculateBmi(profile.startWeightKg, profile.heightCm);
   const bmiTargets = getBmiTargets(profile.heightCm);
-  const bodyFat = calculateBodyFatByNavy({
-    sex: profile.sex,
-    heightCm: profile.heightCm,
-    waistCm: profile.startWaistCm,
-    neckCm: profile.startNeckCm,
-    hipCm: profile.startHipCm
-  });
+  const bodyFat = resolveProfileBodyFat(profile);
   const goalWeight = getGoalWeight(profile);
   const finalBmi = calculateBmi(goalWeight, profile.heightCm);
   const mode = getProgressMode(profile);
@@ -171,13 +171,7 @@ function renderProfileSummary(state, options) {
   const preferred = (profile.preferredActivities || []).map(activityLabel).filter(Boolean);
   const activityMinutes = Number(profile.averageActivityDurationMinutes) || 0;
   const goalWeight = getGoalWeight(profile);
-  const bodyFat = calculateBodyFatByNavy({
-    sex: profile.sex,
-    heightCm: profile.heightCm,
-    waistCm: profile.startWaistCm,
-    neckCm: profile.startNeckCm,
-    hipCm: profile.startHipCm
-  });
+  const bodyFat = resolveProfileBodyFat(profile);
   const goalName = profile.goalType === "other" && profile.customGoalLabel
     ? profile.customGoalLabel
     : goalTypeLabels[profile.goalType] || "Não definido";
@@ -211,7 +205,8 @@ function renderProfileSummary(state, options) {
           ${profileValue("Cintura inicial", formatCm(profile.startWaistCm))}
           ${profileValue("Pescoço inicial", formatCm(profile.startNeckCm))}
           ${profileValue("Quadril inicial", formatCm(profile.startHipCm))}
-          ${profileValue("Gordura estimada", formatPercent(bodyFat))}
+          ${profileValue("Gordura corporal", formatPercent(bodyFat))}
+          ${profileValue("Origem da gordura", bodyFatMethodLabel(profile.startBodyFatMethod))}
         </dl>
       </section>
 
@@ -258,6 +253,10 @@ function readProfileForm(form, currentProfile) {
     startWaistCm: toNumber(value("startWaistCm", currentProfile.startWaistCm)),
     startNeckCm: toNumber(value("startNeckCm", currentProfile.startNeckCm)),
     startHipCm: toNumber(value("startHipCm", currentProfile.startHipCm)),
+    startBodyFatMethod: normalizeBodyFatMethod(value("startBodyFatMethod", currentProfile.startBodyFatMethod)),
+    startBodyFatManual: bodyFatMethodIsEstimated(value("startBodyFatMethod", currentProfile.startBodyFatMethod))
+      ? null
+      : toNumber(value("startBodyFatManual", currentProfile.startBodyFatManual)),
     targetBmi: toNumber(data.get("targetBmi")) || 24.9,
     goalWeightKg: toNumber(data.get("goalWeightKg")),
     goalType: data.get("goalType") || "",
@@ -366,7 +365,21 @@ export function renderProfile(state, options = {}) {
           <div class="field">
             <label for="startHipCm">Quadril inicial (cm) ${measurementHelpButton("hip")}</label>
             <input id="startHipCm" name="startHipCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startHipCm ?? "")}" />
-            <span class="help-text">Necessário para cálculo feminino pelo método da Marinha e opcional para acompanhamento geral.</span>
+            <span class="help-text">Usado na estimativa feminina por medidas e opcional no acompanhamento geral.</span>
+          </div>
+          <div class="field">
+            <label for="startBodyFatMethod">Origem da gordura corporal</label>
+            <select id="startBodyFatMethod" name="startBodyFatMethod" ${baselineDisabled}>
+              ${bodyFatMethods.map((method) => `
+                <option value="${method.value}" ${method.value === normalizeBodyFatMethod(p.startBodyFatMethod) ? "selected" : ""}>${method.label}</option>
+              `).join("")}
+            </select>
+          </div>
+          <div class="field" data-profile-body-fat-value>
+            <label for="startBodyFatManual">Percentual inicial informado (%)</label>
+            <input id="startBodyFatManual" name="startBodyFatManual" inputmode="decimal" ${baselineDisabled}
+              value="${escapeAttribute(p.startBodyFatManual ?? "")}" />
+            <span class="help-text">Preencha quando o resultado vier de medição ou avaliação externa.</span>
           </div>
           <div class="field">
             <label for="goalType">Objetivo principal</label>
@@ -496,6 +509,20 @@ export function bindProfile(state, persist, render) {
   const mobileSave = document.getElementById("profile-mobile-save");
   let goalPlannerTimer = null;
   profileHasPendingChanges = false;
+  const bodyFatInputLocked = form.elements.startBodyFatManual?.disabled === true;
+
+  const updateBodyFatFields = () => {
+    const estimated = bodyFatMethodIsEstimated(form.elements.startBodyFatMethod?.value);
+    const field = form.querySelector("[data-profile-body-fat-value]");
+    const input = form.elements.startBodyFatManual;
+    if (field) field.hidden = estimated;
+    if (input) {
+      input.disabled = bodyFatInputLocked || estimated;
+      input.required = !estimated;
+    }
+  };
+  form.elements.startBodyFatMethod?.addEventListener("change", updateBodyFatFields);
+  updateBodyFatFields();
 
   const setDurationGoalVisibility = () => {
     const enabled = form.elements.trackActivityDuration?.checked === true;
@@ -607,7 +634,16 @@ export function bindProfile(state, persist, render) {
       startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
       startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial" },
       startNeckCm: { rule: "circumferenceCm", label: "Pescoço inicial" },
-      startHipCm: { rule: "circumferenceCm", label: "Quadril inicial", required: data.get("sex") === "female" },
+      startHipCm: {
+        rule: "circumferenceCm",
+        label: "Quadril inicial",
+        required: bodyFatMethodIsEstimated(data.get("startBodyFatMethod")) && data.get("sex") === "female"
+      },
+      startBodyFatManual: {
+        rule: "bodyFatPercent",
+        label: "Gordura corporal inicial",
+        required: !bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+      },
       targetBmi: { rule: "targetBmi", label: "IMC de referência", required: true },
       goalWeightKg: { rule: "weightKg", label: "Peso final", required: true },
       weeklyChangeGoalKg: { rule: "weeklyChangeKg", label: "Mudança semanal", required: deadlineMode === "auto" && !maintenanceGoal },

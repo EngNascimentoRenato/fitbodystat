@@ -10,6 +10,8 @@ export const defaultProfile = {
   startWaistCm: null,
   startNeckCm: null,
   startHipCm: null,
+  startBodyFatManual: null,
+  startBodyFatMethod: "circumference",
   baselineLocked: false,
   baselineLockedAt: null,
   goalWeightKg: null,
