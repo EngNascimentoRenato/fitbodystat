@@ -29,6 +29,7 @@ O FitBodyStat poderá tratar:
 - dados de contato;
 - peso, medidas corporais, percentual de gordura e objetivos;
 - atividades físicas e informações de evolução;
+- ciclos de acompanhamento, suas linhas de base, objetivos, estados e encerramentos;
 - vínculos entre usuários e profissionais;
 - dados de agenda e atendimento;
 - anotações e documentos profissionais futuros;
@@ -48,6 +49,11 @@ neste inventário antes de sua implementação.
 
 Cada novo recurso deverá indicar proprietário do dado, pessoas autorizadas,
 finalidade do acesso e eventos que encerram a autorização.
+
+Os ciclos pertencem ao usuário. Profissionais vinculados somente poderão
+consultá-los ou editá-los conforme as permissões vigentes do vínculo. Encerrar um
+ciclo não implica eliminar suas medições; retenção, exportação e exclusão devem
+preservar a relação entre o registro e seu ciclo.
 
 ## Exclusão de registros
 

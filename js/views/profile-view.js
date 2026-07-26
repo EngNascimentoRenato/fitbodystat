@@ -29,6 +29,7 @@ import {
 } from "../utils/validation-utils.js";
 import { activityLabel } from "../data/activity-catalog.js";
 import { confirmAction } from "../components/modal.js";
+import { activeCycle } from "../models/cycle-model.js";
 
 let profileHasPendingChanges = false;
 let profileEditMode = false;
@@ -45,6 +46,15 @@ const goalTypeLabels = {
   maintenance: "Manutenção",
   recovery: "Recuperação de peso",
   other: "Outro"
+};
+
+const cycleStatusLabels = {
+  draft: "Rascunho",
+  active: "Ativo",
+  completed: "Concluído",
+  abandoned: "Abandonado",
+  expired: "Expirado",
+  archived: "Arquivado"
 };
 
 window.addEventListener("beforeunload", (event) => {
@@ -175,6 +185,10 @@ function profileValue(label, value) {
 
 function renderProfileSummary(state, options) {
   const profile = state.profile;
+  const currentCycle = activeCycle(state);
+  const previousCycles = (state.cycles || [])
+    .filter((cycle) => cycle.id !== currentCycle?.id)
+    .sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || "")));
   const preferred = (profile.preferredActivities || []).map(activityLabel).filter(Boolean);
   const activityMinutes = Number(profile.averageActivityDurationMinutes) || 0;
   const goalWeight = getGoalWeight(profile);
@@ -206,7 +220,13 @@ function renderProfileSummary(state, options) {
       </section>
 
       <section class="card">
-        <h2>Linha de base</h2>
+        <div class="chart-header">
+          <div>
+            <p class="eyebrow">Projeto atual</p>
+            <h2>${escapeHtml(currentCycle?.name || "Linha de base")}</h2>
+          </div>
+          ${currentCycle ? `<span class="badge">${escapeHtml(cycleStatusLabels[currentCycle.status] || currentCycle.status)}</span>` : ""}
+        </div>
         <dl class="profile-summary-grid">
           ${profileValue("Data inicial", formatDate(profile.startDate))}
           ${profileValue("Peso inicial", formatKg(profile.startWeightKg))}
@@ -243,6 +263,28 @@ function renderProfileSummary(state, options) {
           </dl>
         </article>
       </section>
+
+      ${previousCycles.length ? `
+        <section class="card">
+          <div class="chart-header">
+            <div>
+              <h2>Projetos anteriores</h2>
+              <p class="muted">Ciclos preservados sem interferir no acompanhamento atual.</p>
+            </div>
+          </div>
+          <div class="cycle-list">
+            ${previousCycles.map((cycle) => `
+              <article class="cycle-list-item">
+                <div>
+                  <strong>${escapeHtml(cycle.name || "Ciclo de acompanhamento")}</strong>
+                  <small>${formatDate(cycle.startedAt)}${cycle.endedAt ? ` a ${formatDate(cycle.endedAt)}` : ""}</small>
+                </div>
+                <span class="badge">${escapeHtml(cycleStatusLabels[cycle.status] || cycle.status)}</span>
+              </article>
+            `).join("")}
+          </div>
+        </section>
+      ` : ""}
     </div>
   `;
 }

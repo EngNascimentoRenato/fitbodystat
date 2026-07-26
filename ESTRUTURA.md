@@ -38,6 +38,11 @@ js/components/             Componentes visuais reutilizaveis
 js/utils/                  Funcoes utilitarias compartilhadas
 ```
 
+O estado pessoal também mantém ciclos de acompanhamento. A coleção
+`users/{userId}/cycles` armazena linha de base, objetivo e planejamento de cada
+projeto. Durante a transição, o ciclo ativo continua projetado no perfil para
+compatibilidade com as telas existentes, e cada medição recebe um `cycleId`.
+
 ## Estilos
 
 ```text

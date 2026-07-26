@@ -33,6 +33,7 @@ import {
 import { renderRoute } from "./router.js";
 import { escapeAttribute, escapeHtml } from "./utils/html-utils.js";
 import { formatPhone } from "./utils/phone-utils.js";
+import { ensureCycleState, syncActiveCycleFromProfile } from "./models/cycle-model.js";
 
 const roleLabels = {
   user: "Usuário",
@@ -116,6 +117,12 @@ function persist(change) {
     return;
   }
 
+  if (change?.type === "profile-plan") {
+    state = syncActiveCycleFromProfile(state);
+  } else {
+    state = ensureCycleState(state);
+  }
+
   saveChangeToCloud(authState.activePatient.uid, state, change)
     .then(() => {
       authState.syncStatus = "Dados do paciente sincronizados.";
@@ -127,6 +134,10 @@ function persist(change) {
 
 function persistPersonal(change) {
   if (!authState.user) return;
+  personalState = change?.type === "profile-plan"
+    ? syncActiveCycleFromProfile(personalState)
+    : ensureCycleState(personalState);
+  if (!authState.activePatient) state = personalState;
   const name = String(personalState.profile?.name || "").trim();
   authState.needsName = !name;
   saveState(personalState, authState.user.uid);
@@ -360,6 +371,7 @@ async function completeOnboarding(payload) {
   personalState.profile = profile;
   personalState.contact = { ...personalState.contact, ...(payload.contact || {}) };
   if (payload.goalPlan) personalState.goalPlan = payload.goalPlan;
+  personalState = ensureCycleState(personalState);
   state = personalState;
 
   const actor = { uid: authState.user.uid, role: authState.role };
@@ -441,6 +453,11 @@ observeAuth(async (user) => {
       : authState.role === "admin" ? "admin" : "personal";
 
     const cloudState = await loadCloudState(user.uid);
+    const requiresCycleMigration = Boolean(
+      cloudState?.profile
+      && (!(cloudState.cycles || []).length
+        || (cloudState.entries || []).some((entry) => !entry.cycleId))
+    );
     isApplyingCloudState = true;
     if (cloudState?.profile) {
       state = normalizeState(cloudState);
@@ -481,10 +498,14 @@ observeAuth(async (user) => {
     }
     const actor = { uid: user.uid, role: authState.role };
     if (cloudState?.profile) {
-      await Promise.all([
-        saveProfileAndPlan(user.uid, personalState, actor),
-        saveSettings(user.uid, personalState.settings, actor)
-      ]);
+      if (requiresCycleMigration) {
+        await saveCloudState(user.uid, personalState, actor);
+      } else {
+        await Promise.all([
+          saveProfileAndPlan(user.uid, personalState, actor),
+          saveSettings(user.uid, personalState.settings, actor)
+        ]);
+      }
     } else {
       await saveCloudState(user.uid, personalState, actor);
     }

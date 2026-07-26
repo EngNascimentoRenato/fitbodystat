@@ -59,12 +59,13 @@ export async function getUser(userId) {
 
 export async function loadCloudState(userId, options = {}) {
   const includeContact = options.includeContact !== false;
-  const [profileSnapshot, planSnapshot, settingsSnapshot, entriesSnapshot, activitiesSnapshot, contactSnapshot] = await Promise.all([
+  const [profileSnapshot, planSnapshot, settingsSnapshot, entriesSnapshot, activitiesSnapshot, cyclesSnapshot, contactSnapshot] = await Promise.all([
     getDoc(doc(db, "profiles", userId)),
     getDoc(doc(db, "plans", userId)),
     getDoc(doc(db, "settings", userId)),
     getDocs(collection(db, "users", userId, "measurements")),
     getDocs(collection(db, "users", userId, "activities")),
+    getDocs(collection(db, "users", userId, "cycles")),
     includeContact ? getDoc(doc(db, "contacts", userId)) : Promise.resolve(null)
   ]);
 
@@ -73,6 +74,7 @@ export async function loadCloudState(userId, options = {}) {
     || settingsSnapshot.exists()
     || !entriesSnapshot.empty
     || !activitiesSnapshot.empty
+    || !cyclesSnapshot.empty
     || contactSnapshot?.exists();
 
   if (!hasData) return null;
@@ -88,7 +90,11 @@ export async function loadCloudState(userId, options = {}) {
       .sort((a, b) => a.date.localeCompare(b.date)),
     activities: activitiesSnapshot.docs
       .map((item) => ({ id: item.id, ...withoutMetadata(item.data()) }))
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    cycles: cyclesSnapshot.docs
+      .map((item) => ({ id: item.id, ...withoutMetadata(item.data()) }))
+      .sort((a, b) => String(a.startedAt || "").localeCompare(String(b.startedAt || ""))),
+    activeCycleId: profileSnapshot.exists() ? profileSnapshot.data().activeCycleId || null : null
   };
 }
 
@@ -107,7 +113,11 @@ export async function saveCloudState(userId, state, actor = {}) {
     updatedByRole: actor.role || "user"
   };
 
-  batch.set(doc(db, "profiles", userId), { ...state.profile, ...audit }, { merge: true });
+  batch.set(doc(db, "profiles", userId), {
+    ...state.profile,
+    activeCycleId: state.activeCycleId || null,
+    ...audit
+  }, { merge: true });
   batch.set(doc(db, "plans", userId), { goalPlan: state.goalPlan || [], ...audit }, { merge: true });
   batch.set(doc(db, "settings", userId), { ...(state.settings || {}), ...audit }, { merge: true });
   batch.set(doc(db, "contacts", userId), { ...(state.contact || { phone: "" }), ...audit }, { merge: true });
@@ -130,6 +140,10 @@ export async function saveCloudState(userId, state, actor = {}) {
     batch.set(doc(activitiesRef, activity.id), { ...activity, ...audit }, { merge: true });
   });
 
+  (state.cycles || []).forEach((cycle) => {
+    batch.set(doc(db, "users", userId, "cycles", cycle.id), { ...cycle, ...audit }, { merge: true });
+  });
+
   await batch.commit();
 }
 
@@ -145,8 +159,15 @@ function auditData(userId, actor = {}) {
 export async function saveProfileAndPlan(userId, state, actor = {}) {
   const audit = auditData(userId, actor);
   const batch = writeBatch(db);
-  batch.set(doc(db, "profiles", userId), { ...state.profile, ...audit }, { merge: true });
+  batch.set(doc(db, "profiles", userId), {
+    ...state.profile,
+    activeCycleId: state.activeCycleId || null,
+    ...audit
+  }, { merge: true });
   batch.set(doc(db, "plans", userId), { goalPlan: state.goalPlan || [], ...audit }, { merge: true });
+  (state.cycles || []).forEach((cycle) => {
+    batch.set(doc(db, "users", userId, "cycles", cycle.id), { ...cycle, ...audit }, { merge: true });
+  });
   await batch.commit();
 }
 
@@ -174,7 +195,11 @@ export async function saveMeasurement(userId, entry, actor = {}) {
 export async function saveMeasurementAndProfile(userId, state, entry, actor = {}) {
   const audit = auditData(userId, actor);
   const batch = writeBatch(db);
-  batch.set(doc(db, "profiles", userId), { ...state.profile, ...audit }, { merge: true });
+  batch.set(doc(db, "profiles", userId), {
+    ...state.profile,
+    activeCycleId: state.activeCycleId || null,
+    ...audit
+  }, { merge: true });
   batch.set(doc(db, "users", userId, "measurements", entry.id), { ...entry, ...audit }, { merge: true });
   await batch.commit();
 }

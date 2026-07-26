@@ -316,6 +316,31 @@
   display: none;
 }
 
+.cycle-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--border);
+}
+
+.cycle-list-item {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cycle-list-item > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.cycle-list-item small {
+  color: var(--muted);
+}
+
 .profile-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -1,5 +1,6 @@
 import { defaultProfile } from "../models/profile-model.js";
 import { createDefaultMonthlyPlan, defaultMonthlyPlan } from "./seed-plan.js";
+import { ensureCycleState } from "../models/cycle-model.js";
 
 const LEGACY_STORAGE_KEY = "minha-evolucao-state-v1";
 const STORAGE_PREFIX = "fitbodystat-state-v2";
@@ -16,6 +17,8 @@ export function createBlankState() {
     },
     entries: [],
     activities: [],
+    cycles: [],
+    activeCycleId: null,
     goalPlan: createDefaultMonthlyPlan(defaultProfile),
     settings: {
       theme: "light"
@@ -33,7 +36,7 @@ export function normalizeState(parsed = {}) {
   };
   profile.baselineLocked = profile.baselineLocked === true || entries.length > 0;
 
-  return {
+  return ensureCycleState({
     ...createBlankState(),
     ...parsed,
     profile,
@@ -43,7 +46,7 @@ export function normalizeState(parsed = {}) {
     entries,
     activities: parsed.activities || [],
     goalPlan: parsed.goalPlan || parsed.monthlyPlan || defaultMonthlyPlan
-  };
+  });
 }
 
 export function loadState(userId = "guest") {

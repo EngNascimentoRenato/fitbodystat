@@ -177,6 +177,7 @@ function bindMeasurementForm(state, persist, render) {
     }
 
     const entry = createEntry({
+      cycleId: state.activeCycleId || null,
       date,
       weightKg: toNumber(data.get("weightKg")),
       waistCm: toNumber(data.get("waistCm")),

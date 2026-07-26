@@ -112,6 +112,21 @@ service cloud.firestore {
         allow read: if canReadHealthData(userId);
         allow create, update, delete: if canEditHealthData(userId);
       }
+
+      match /cycles/{cycleId} {
+        allow read: if canReadHealthData(userId);
+        allow create, update: if canEditHealthData(userId)
+          && request.resource.data.id == cycleId
+          && request.resource.data.status in [
+            "draft",
+            "active",
+            "completed",
+            "abandoned",
+            "expired",
+            "archived"
+          ];
+        allow delete: if false;
+      }
     }
 
     match /profiles/{userId} {

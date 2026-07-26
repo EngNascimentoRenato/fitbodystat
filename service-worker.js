@@ -33,6 +33,7 @@ const APP_SHELL = [
   "./js/models/activity-model.js",
   "./js/models/agenda-model.js",
   "./js/models/professional-profile-model.js",
+  "./js/models/cycle-model.js",
   "./js/services/bmi-service.js",
   "./js/services/body-fat-service.js",
   "./js/services/progress-service.js",
