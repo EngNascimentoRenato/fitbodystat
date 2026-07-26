@@ -100,17 +100,32 @@ function renderActivityForm(state) {
   `;
 }
 
+function renderMeasurementUnavailable() {
+  const profileRoute = location.hash.includes("/me/") ? "#/me/perfil" : "#/perfil";
+  return `
+    <section class="card empty-state">
+      <h2>Crie um projeto antes de registrar medidas</h2>
+      <p class="muted">Peso e medidas corporais precisam de uma linha de base para que a evolução seja calculada corretamente. As atividades físicas continuam disponíveis sem projeto.</p>
+      <div class="button-row">
+        <a class="button primary" href="${profileRoute}">Ir para o perfil</a>
+      </div>
+    </section>
+  `;
+}
+
 export function renderEntry(state) {
   consumeActivityEditRequest();
   return `
     <div class="view-stack">
       ${renderModeSelector()}
       ${activeEntryMode === "activity" ? renderActivityForm(state) : `
-        ${entryForm(state.profile)}
-        <section class="card">
-          <h2>Como medir</h2>
-          <p class="muted">Para consistência, registre pela manhã, em jejum, depois de ir ao banheiro. No método por medidas, mantenha a fita nivelada e sem apertar a pele.</p>
-        </section>
+        ${state.activeCycleId ? `
+          ${entryForm(state.profile)}
+          <section class="card">
+            <h2>Como medir</h2>
+            <p class="muted">Para consistência, registre pela manhã, em jejum, depois de ir ao banheiro. No método por medidas, mantenha a fita nivelada e sem apertar a pele.</p>
+          </section>
+        ` : renderMeasurementUnavailable()}
       `}
     </div>
   `;

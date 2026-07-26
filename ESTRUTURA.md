@@ -54,6 +54,18 @@ ativos e assinaturas, sem depender de um único profissional.
 O primeiro acesso do usuário cria apenas o perfil básico. A ausência de ciclo
 ativo é um estado válido: o Dashboard apresenta próximos passos, e o projeto pode
 ser criado posteriormente pelo usuário ou por profissional vinculado e autorizado.
+Nesse estado, a apresentação considera o contexto: o usuário vê a quantidade de
+profissionais vinculados e suas ações pessoais; o profissional que abriu um
+paciente vê somente ações operacionais relacionadas à criação do projeto.
+Atividades físicas podem ser registradas sem projeto; peso e medidas corporais
+exigem um ciclo ativo para preservar a linha de base e o contexto histórico.
+O perfil possui editores independentes para dados pessoais, linha de base,
+objetivo e preferências de atividades.
+
+Links de convite usam apenas o identificador aleatório do documento. Antes da
+autenticação, a página informa genericamente que existe um convite profissional,
+sem revelar dados do profissional ou do destinatário. O vínculo somente é criado
+após autenticação, verificação do e-mail e aceite expresso do paciente.
 
 ## Estilos
 

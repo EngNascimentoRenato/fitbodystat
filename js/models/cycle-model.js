@@ -21,7 +21,14 @@ const CYCLE_FIELDS = [
 export const INITIAL_CYCLE_ID = "initial-cycle";
 
 export function profileHasCycleData(profile = {}) {
-  return Boolean(profile.startDate && Number.isFinite(Number(profile.startWeightKg)));
+  const startWeightKg = Number(profile.startWeightKg);
+  return Boolean(
+    profile.startDate
+    && profile.startWeightKg !== null
+    && profile.startWeightKg !== ""
+    && Number.isFinite(startWeightKg)
+    && startWeightKg > 0
+  );
 }
 
 export function cycleFromProfile(profile = {}, overrides = {}) {
@@ -59,6 +66,17 @@ export function applyCycleToProfile(profile = {}, cycle = null) {
 export function ensureCycleState(state = {}) {
   let cycles = Array.isArray(state.cycles) ? state.cycles.map((cycle) => ({ ...cycle })) : [];
   let activeCycleId = state.activeCycleId || null;
+  const hasInitialCycleEntries = (state.entries || [])
+    .some((entry) => entry.cycleId === INITIAL_CYCLE_ID);
+  const invalidEmptyInitialCycle = cycles.find((cycle) =>
+    cycle.id === INITIAL_CYCLE_ID
+    && !profileHasCycleData(cycle)
+    && !hasInitialCycleEntries
+  );
+  if (invalidEmptyInitialCycle) {
+    cycles = cycles.filter((cycle) => cycle.id !== INITIAL_CYCLE_ID);
+    if (activeCycleId === INITIAL_CYCLE_ID) activeCycleId = null;
+  }
 
   if (!cycles.length && profileHasCycleData(state.profile)) {
     cycles = [cycleFromProfile(state.profile)];

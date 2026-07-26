@@ -171,6 +171,30 @@
   color: var(--success);
 }
 
+.invitation-login-notice {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  background: var(--primary-soft);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius);
+}
+
+.invitation-login-notice p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.invitation-login .login-access-column > .google-button,
+.invitation-login .login-access-column > .form-separator {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .invitation-login .login-registration-column {
+    order: -1;
+  }
+}
+
 .access-method-list {
   display: grid;
   border-top: 1px solid var(--border);

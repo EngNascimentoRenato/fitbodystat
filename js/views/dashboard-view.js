@@ -66,6 +66,32 @@ function dashboardSummary(profile, latest, activities) {
 export function renderDashboard(state, routePrefix = "", options = {}) {
   if (!state.activeCycleId) {
     const pendingInvitations = Number(options.pendingInvitations) || 0;
+    const professionalCount = Number(options.professionalCount) || 0;
+    if (options.patientContext === true) {
+      return `
+        <div class="view-stack">
+          <section class="card hero-panel">
+            <div>
+              <p class="eyebrow">Paciente sem projeto</p>
+              <h2>Este paciente ainda não possui um projeto ativo</h2>
+              <p>Crie a linha de base e o planejamento quando houver informações suficientes para iniciar o acompanhamento.</p>
+            </div>
+          </section>
+          <section class="card">
+            <p class="eyebrow">Próximo passo</p>
+            <h2>Iniciar acompanhamento</h2>
+            <p class="muted">O projeto reunirá medidas iniciais, objetivo e ritmo planejado.</p>
+            <div class="button-row">
+              <a class="button primary" href="#/perfil">Criar projeto</a>
+              <a class="button" href="#/pacientes">Voltar aos pacientes</a>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+    const linkedProfessionalText = professionalCount === 1
+      ? "Você possui 1 profissional vinculado."
+      : `Você possui ${professionalCount} profissionais vinculados.`;
     return `
       <div class="view-stack">
         <section class="card hero-panel">
@@ -74,6 +100,8 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
             <h2>${pendingInvitations ? "Você recebeu um convite profissional" : "Seu perfil está pronto"}</h2>
             <p>${pendingInvitations
               ? "Revise o convite, conheça as permissões solicitadas e confirme o vínculo antes de compartilhar seus dados."
+              : professionalCount
+              ? `${linkedProfessionalText} Seu projeto pode ser criado por você ou por um profissional autorizado.`
               : "Crie seu projeto quando tiver as medidas necessárias ou aguarde a orientação de um profissional."}</p>
           </div>
         </section>
@@ -85,11 +113,18 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
               <p class="muted">${pendingInvitations} convite${pendingInvitations === 1 ? "" : "s"} aguardando sua decisão.</p>
               <a class="button primary" href="#${routePrefix}/vinculos">Revisar convite</a>
             </article>
+          ` : professionalCount ? `
+            <article class="card">
+              <p class="eyebrow">Com acompanhamento</p>
+              <h2>${linkedProfessionalText}</h2>
+              <p class="muted">Consulte e gerencie seus vínculos na área de profissionais.</p>
+              <a class="button" href="#${routePrefix}/vinculos">Meus profissionais</a>
+            </article>
           ` : `
             <article class="card">
               <p class="eyebrow">Com acompanhamento</p>
-              <h2>Aguardar um profissional</h2>
-              <p class="muted">Quando houver um convite, ele aparecerá aqui antes de qualquer compartilhamento.</p>
+              <h2>Aguardar convite profissional</h2>
+              <p class="muted">Um vínculo somente será criado depois que você revisar e aceitar o convite.</p>
               <a class="button" href="#${routePrefix}/vinculos">Meus profissionais</a>
             </article>
           `}

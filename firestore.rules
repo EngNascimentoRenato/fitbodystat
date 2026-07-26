@@ -125,7 +125,11 @@ service cloud.firestore {
             "expired",
             "archived"
           ];
-        allow delete: if false;
+        allow delete: if canEditHealthData(userId)
+          && cycleId == "initial-cycle"
+          && (!("startWeightKg" in resource.data)
+            || resource.data.startWeightKg == null
+            || resource.data.startWeightKg == "");
       }
     }
 

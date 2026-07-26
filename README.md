@@ -32,6 +32,10 @@ Progressive Web App para acompanhamento de peso, medidas corporais, IMC, percent
 - Modo temporário de apresentação e privacidade do Dashboard.
 - Ciclos de acompanhamento com projeto ativo, encerramento e histórico preservado.
 - Cadastro básico separado da criação do projeto e convites profissionais compartilháveis.
+- Login contextual para convites, com aceite explícito e sem alegar envio automático de e-mail.
+- Perfil com edição independente de dados pessoais, linha de base, metas e atividades.
+- Atividades disponíveis sem projeto; peso e medidas exigem acompanhamento ativo.
+- Dashboard sem projeto adaptado separadamente para usuário e profissional.
 - PWA instalável com cache offline básico.
 
 ## Perfis de acesso

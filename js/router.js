@@ -88,7 +88,9 @@ export function renderRoute(context) {
   const viewMap = {
     "/dashboard": () => renderDashboard(context.state, "", {
       presentationMode: context.authState.presentationMode,
-      pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length
+      pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length,
+      professionalCount: (context.authState.professionals || []).length,
+      patientContext: Boolean(context.authState.activePatient)
     }),
     "/primeiro-acesso": () => renderOnboarding(context.personalState, context.authState),
     "/perfil": () => renderProfile(context.state, {
@@ -103,7 +105,9 @@ export function renderRoute(context) {
     "/vinculos": () => renderConnections(context.authState, context.personalState),
     "/me/dashboard": () => renderDashboard(context.personalState, "/me", {
       presentationMode: context.authState.presentationMode,
-      pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length
+      pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length,
+      professionalCount: (context.authState.professionals || []).length,
+      patientContext: false
     }),
     "/me/perfil": () => renderProfile(context.personalState, {
       canEditContact: true,

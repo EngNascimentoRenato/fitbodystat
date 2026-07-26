@@ -11,13 +11,26 @@ import {
 const statusEl = document.getElementById("login-status");
 const signInForm = document.getElementById("sign-in-form");
 const createForm = document.getElementById("create-account-form");
-const googleButton = document.getElementById("sign-in-google");
 const forgotButton = document.getElementById("forgot-password");
 let handlingAuth = false;
 
 const initialStatus = new URLSearchParams(location.search).get("status");
 const invitationId = new URLSearchParams(location.search).get("invite");
-if (invitationId) localStorage.setItem("fitbodystat-pending-invitation", invitationId);
+if (invitationId) {
+  localStorage.setItem("fitbodystat-pending-invitation", invitationId);
+  document.body.classList.add("invitation-login");
+  document.getElementById("invitation-login-notice").hidden = false;
+  document.querySelector(".login-access-column h1").textContent = "Já possuo uma conta";
+  document.querySelector(".login-access-column .muted").textContent =
+    "Entre para consultar o convite com segurança.";
+  document.querySelector(".login-registration-column h2").textContent = "Aceitar convite e criar conta";
+  document.querySelector(".login-registration-column .muted").textContent =
+    "Seu vínculo só será criado depois da confirmação dentro do aplicativo.";
+  document.querySelector(".invitation-google-button").hidden = false;
+  document.querySelector(".invitation-google-button").style.removeProperty("display");
+  document.querySelector(".invitation-google-separator").hidden = false;
+  window.setTimeout(() => document.getElementById("create-name")?.focus(), 0);
+}
 
 function setStatus(message, type = "info") {
   statusEl.textContent = message;
@@ -84,7 +97,8 @@ signInForm.addEventListener("submit", async (event) => {
 
 createForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const data = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const data = new FormData(form);
   const name = String(data.get("name") || "").trim();
   const password = data.get("password");
   const confirmPassword = data.get("confirmPassword");
@@ -107,7 +121,7 @@ createForm.addEventListener("submit", async (event) => {
     setStatus("Criando conta...");
     await createAccountWithEmail(name, data.get("email"), password);
     await signOutUser();
-    event.currentTarget.reset();
+    form.reset();
     setStatus("Conta criada. Verifique seu e-mail antes de entrar.", "success");
   } catch (error) {
     await signOutUser().catch(() => {});
@@ -117,17 +131,19 @@ createForm.addEventListener("submit", async (event) => {
   }
 });
 
-googleButton.addEventListener("click", async () => {
-  handlingAuth = true;
-  try {
-    setStatus("Entrando com Google...");
-    await signInWithGoogle();
-    goToApp();
-  } catch (error) {
-    setStatus(`Não foi possível entrar com Google: ${friendlyError(error)}`, "error");
-  } finally {
-    handlingAuth = false;
-  }
+document.querySelectorAll(".google-button").forEach((button) => {
+  button.addEventListener("click", async () => {
+    handlingAuth = true;
+    try {
+      setStatus("Entrando com Google...");
+      await signInWithGoogle();
+      goToApp();
+    } catch (error) {
+      setStatus(`Não foi possível entrar com Google: ${friendlyError(error)}`, "error");
+    } finally {
+      handlingAuth = false;
+    }
+  });
 });
 
 forgotButton.addEventListener("click", async () => {

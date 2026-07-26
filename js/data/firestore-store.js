@@ -101,9 +101,11 @@ export async function loadCloudState(userId, options = {}) {
 export async function saveCloudState(userId, state, actor = {}) {
   const measurementsRef = collection(db, "users", userId, "measurements");
   const activitiesRef = collection(db, "users", userId, "activities");
-  const [existingEntries, existingActivities] = await Promise.all([
+  const cyclesRef = collection(db, "users", userId, "cycles");
+  const [existingEntries, existingActivities, existingCycles] = await Promise.all([
     getDocs(measurementsRef),
-    getDocs(activitiesRef)
+    getDocs(activitiesRef),
+    getDocs(cyclesRef)
   ]);
   const batch = writeBatch(db);
   const audit = {
@@ -140,8 +142,18 @@ export async function saveCloudState(userId, state, actor = {}) {
     batch.set(doc(activitiesRef, activity.id), { ...activity, ...audit }, { merge: true });
   });
 
+  const currentCycleIds = new Set((state.cycles || []).map((cycle) => cycle.id));
+  existingCycles.docs.forEach((cycleSnapshot) => {
+    const cycle = cycleSnapshot.data();
+    const invalidInitialCycle = cycleSnapshot.id === "initial-cycle"
+      && (cycle.startWeightKg === null || cycle.startWeightKg === "");
+    if (invalidInitialCycle && !currentCycleIds.has(cycleSnapshot.id)) {
+      batch.delete(cycleSnapshot.ref);
+    }
+  });
+
   (state.cycles || []).forEach((cycle) => {
-    batch.set(doc(db, "users", userId, "cycles", cycle.id), { ...cycle, ...audit }, { merge: true });
+    batch.set(doc(cyclesRef, cycle.id), { ...cycle, ...audit }, { merge: true });
   });
 
   await batch.commit();

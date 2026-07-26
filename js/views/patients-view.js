@@ -132,7 +132,7 @@ export function bindPatients(context) {
       return;
     }
     try {
-      await createCareInvitation({
+      const invitationRef = await createCareInvitation({
         uid: context.authState.user.uid,
         email: context.authState.user.email,
         displayName: context.authState.professionalProfile?.name
@@ -140,7 +140,26 @@ export function bindPatients(context) {
           || context.authState.user.displayName,
         professionType: context.authState.professionalProfile?.professionType || ""
       }, email);
-      showToast("Convite enviado. O paciente precisa aceitá-lo na própria conta.");
+      const url = invitationLink(invitationRef.id);
+      const shouldShare = await confirmAction({
+        title: "Convite criado",
+        message: "Se o paciente já possui uma conta, verá o convite no aplicativo. Caso ainda não possua, compartilhe o link para que ele possa se cadastrar. Nenhum e-mail foi enviado automaticamente.",
+        confirmLabel: "Compartilhar link",
+        cancelLabel: "Fechar"
+      });
+      if (shouldShare) {
+        const text = `${context.authState.professionalProfile?.name || "Um profissional"} convidou você para o FitBodyStat.`;
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: "Convite FitBodyStat", text, url });
+          } else {
+            await navigator.clipboard.writeText(url);
+            showToast("Link do convite copiado.");
+          }
+        } catch (shareError) {
+          if (shareError.name !== "AbortError") showToast("Convite criado, mas não foi possível compartilhar o link.");
+        }
+      }
       await refresh();
     } catch (error) {
       showToast(`Não foi possível enviar o convite: ${error.message}`);

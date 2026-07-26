@@ -32,6 +32,40 @@ test("migra o perfil atual para um único ciclo inicial", () => {
   assert.equal(activeCycle(first).startWeightKg, 90);
 });
 
+test("não cria ciclo para perfil básico sem peso inicial", () => {
+  const state = ensureCycleState({
+    profile: {
+      name: "Usuário novo",
+      birthDate: "1990-01-01",
+      startDate: "2026-07-26",
+      startWeightKg: null
+    },
+    entries: [],
+    cycles: []
+  });
+
+  assert.equal(state.cycles.length, 0);
+  assert.equal(state.activeCycleId, null);
+});
+
+test("remove ciclo inicial vazio criado por versão anterior", () => {
+  const state = ensureCycleState({
+    profile: { startDate: "2026-07-26", startWeightKg: null },
+    entries: [],
+    activeCycleId: INITIAL_CYCLE_ID,
+    cycles: [{
+      id: INITIAL_CYCLE_ID,
+      name: "Acompanhamento inicial",
+      status: "active",
+      startedAt: "2026-07-26",
+      startWeightKg: null
+    }]
+  });
+
+  assert.equal(state.cycles.length, 0);
+  assert.equal(state.activeCycleId, null);
+});
+
 test("encerra o ciclo ativo sem excluir seu histórico", () => {
   const state = ensureCycleState({ profile, cycles: [], entries: [] });
   const closed = closeActiveCycle(state, "completed", {

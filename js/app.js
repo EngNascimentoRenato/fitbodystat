@@ -35,7 +35,11 @@ import {
 import { renderRoute } from "./router.js";
 import { escapeAttribute, escapeHtml } from "./utils/html-utils.js";
 import { formatPhone } from "./utils/phone-utils.js";
-import { ensureCycleState, syncActiveCycleFromProfile } from "./models/cycle-model.js";
+import {
+  ensureCycleState,
+  profileHasCycleData,
+  syncActiveCycleFromProfile
+} from "./models/cycle-model.js";
 
 const roleLabels = {
   user: "Usuário",
@@ -457,7 +461,11 @@ observeAuth(async (user) => {
     const requiresCycleMigration = Boolean(
       cloudState?.profile
       && (!(cloudState.cycles || []).length
-        || (cloudState.entries || []).some((entry) => !entry.cycleId))
+        || (cloudState.entries || []).some((entry) => !entry.cycleId)
+        || (cloudState.cycles || []).some((cycle) =>
+          cycle.id === "initial-cycle"
+          && !profileHasCycleData(cycle)
+          && !(cloudState.entries || []).some((entry) => entry.cycleId === cycle.id)))
     );
     isApplyingCloudState = true;
     if (cloudState?.profile) {
