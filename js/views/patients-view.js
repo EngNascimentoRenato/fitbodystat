@@ -146,7 +146,12 @@ export function bindPatients(context) {
   document.querySelectorAll("[data-revoke-patient]").forEach((button) => {
     button.addEventListener("click", async () => {
       const patient = (context.authState.patients || []).find((item) => (item.uid || item.id) === button.dataset.revokePatient);
-      if (!patient || !confirmAction("Encerrar o vínculo com este paciente?")) return;
+      if (!patient || !await confirmAction({
+        title: "Encerrar vínculo?",
+        message: "O acompanhamento deste paciente será encerrado.",
+        confirmLabel: "Encerrar",
+        tone: "danger"
+      })) return;
       try {
         await revokeCareLink(patient.link, context.authState.user.uid);
         showToast("Vínculo encerrado.");

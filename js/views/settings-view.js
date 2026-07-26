@@ -150,8 +150,13 @@ export function bindSettings(state, persist, render, replaceState, authState, se
     downloadText("fitbodystat.json", JSON.stringify(state, null, 2), "application/json");
   });
 
-  document.getElementById("reset-data").addEventListener("click", () => {
-    if (!confirmAction("Apagar perfil, metas e registros desta conta?")) return;
+  document.getElementById("reset-data").addEventListener("click", async () => {
+    if (!await confirmAction({
+      title: "Apagar dados pessoais?",
+      message: "Perfil, metas e registros desta conta serão apagados. Esta ação não pode ser desfeita.",
+      confirmLabel: "Apagar dados",
+      tone: "danger"
+    })) return;
     replaceState(resetState(authState?.user?.uid));
     persist();
     showToast("Dados apagados.");

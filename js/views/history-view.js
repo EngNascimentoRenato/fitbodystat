@@ -149,7 +149,7 @@ export function bindHistory(state, persist, render) {
     render();
   });
 
-  document.querySelector("[data-save-entry]")?.addEventListener("click", (event) => {
+  document.querySelector("[data-save-entry]")?.addEventListener("click", async (event) => {
     const entryId = event.currentTarget.dataset.saveEntry;
     const row = event.currentTarget.closest("[data-entry-row]");
     const currentEntry = state.entries.find((entry) => entry.id === entryId);
@@ -170,7 +170,7 @@ export function bindHistory(state, persist, render) {
       showToast("Já existe outro registro nessa data.");
       return;
     }
-    const validation = validateNumericFields(row, {
+    const validation = await validateNumericFields(row, {
       weightKg: { rule: "weightKg", label: "Peso", required: true },
       waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
       neckCm: { rule: "circumferenceCm", label: "Pescoço" },
@@ -209,8 +209,13 @@ export function bindHistory(state, persist, render) {
   });
 
   document.querySelectorAll("[data-delete-entry]").forEach((button) => {
-    button.addEventListener("click", () => {
-      if (!confirmAction("Excluir este registro?")) return;
+    button.addEventListener("click", async () => {
+      if (!await confirmAction({
+        title: "Excluir registro?",
+        message: "Esta medição será removida do histórico.",
+        confirmLabel: "Excluir",
+        tone: "danger"
+      })) return;
       const entryId = button.dataset.deleteEntry;
       state.entries = state.entries.filter((entry) => entry.id !== entryId);
       editingEntryId = null;

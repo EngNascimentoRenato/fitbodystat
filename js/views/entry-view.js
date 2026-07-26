@@ -14,11 +14,13 @@ import { bodyFatMethodIsEstimated } from "../models/goal-model.js";
 let activeEntryMode = "activity";
 let selectedActivityDate = todayISO();
 let editingActivityDate = null;
+let entryHasPendingChanges = false;
 
 export function resetEntryMode() {
   activeEntryMode = "activity";
   selectedActivityDate = todayISO();
   editingActivityDate = null;
+  entryHasPendingChanges = false;
 }
 
 function consumeActivityEditRequest() {
@@ -34,7 +36,8 @@ function renderModeSelector() {
   return `
     <div class="entry-mode" role="tablist" aria-label="Tipo de registro">
       <button data-entry-mode="measurement" type="button" role="tab"
-        aria-selected="${activeEntryMode === "measurement"}">Medidas corporais</button>
+        aria-selected="${activeEntryMode === "measurement"}"
+        ${editingActivityDate ? "disabled" : ""}>Medidas corporais</button>
       <button data-entry-mode="activity" type="button" role="tab"
         aria-selected="${activeEntryMode === "activity"}">Atividade física</button>
     </div>
@@ -90,7 +93,7 @@ function renderActivityForm(state) {
         ${isEditing ? `
           <button class="button" id="cancel-activity-edit" type="button">Cancelar</button>
           <button class="button danger" id="delete-activity-edit" data-activity-id="${escapeAttribute(existingActivity.id)}" type="button">Excluir</button>
-        ` : ""}
+        ` : `<button class="button" id="cancel-activity-entry" type="button">Cancelar</button>`}
         <button class="button primary" type="submit">${isEditing ? "Atualizar atividade" : "Registrar atividade"}</button>
       </div>
     </form>
@@ -134,8 +137,18 @@ function bindMeasurementForm(state, persist, render) {
   };
   methodField?.addEventListener("change", updateBodyFatFields);
   updateBodyFatFields();
+  document.getElementById("cancel-measurement-entry")?.addEventListener("click", async () => {
+    if (entryHasPendingChanges && !await confirmAction({
+      title: "Descartar registro?",
+      message: "Os dados preenchidos não serão salvos.",
+      confirmLabel: "Descartar",
+      tone: "warning"
+    })) return;
+    entryHasPendingChanges = false;
+    location.hash = location.hash.includes("/me/") ? "#/me/dashboard" : "#/dashboard";
+  });
 
-  form?.addEventListener("submit", (event) => {
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const date = data.get("date");
@@ -147,7 +160,7 @@ function bindMeasurementForm(state, persist, render) {
       showToast("Já existe um registro nessa data. Edite-o pelo histórico.");
       return;
     }
-    const validation = validateNumericFields(event.currentTarget, {
+    const validation = await validateNumericFields(event.currentTarget, {
       weightKg: { rule: "weightKg", label: "Peso", required: true },
       waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
       neckCm: { rule: "circumferenceCm", label: "Pescoço" },
@@ -183,6 +196,7 @@ function bindMeasurementForm(state, persist, render) {
       };
     }
     persist({ type: "entry-upsert", entry, profileChanged });
+    entryHasPendingChanges = false;
     showToast("Registro salvo.");
     location.hash = "#/dashboard";
     render();
@@ -192,17 +206,32 @@ function bindMeasurementForm(state, persist, render) {
 function bindActivityForm(state, persist, render) {
   const activityRoute = () => location.hash.includes("/me/") ? "#/me/atividades" : "#/atividades";
 
-  document.getElementById("cancel-activity-edit")?.addEventListener("click", () => {
+  const cancelActivity = async () => {
+    if (entryHasPendingChanges && !await confirmAction({
+      title: editingActivityDate ? "Cancelar edição?" : "Descartar registro?",
+      message: "As alterações realizadas não serão salvas.",
+      confirmLabel: "Descartar",
+      tone: "warning"
+    })) return;
+    entryHasPendingChanges = false;
     editingActivityDate = null;
     location.hash = activityRoute();
     render();
-  });
+  };
+  document.getElementById("cancel-activity-edit")?.addEventListener("click", cancelActivity);
+  document.getElementById("cancel-activity-entry")?.addEventListener("click", cancelActivity);
 
-  document.getElementById("delete-activity-edit")?.addEventListener("click", (event) => {
-    if (!confirmAction("Excluir esta atividade?")) return;
+  document.getElementById("delete-activity-edit")?.addEventListener("click", async (event) => {
+    if (!await confirmAction({
+      title: "Excluir atividade?",
+      message: "Este registro será removido do histórico.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    })) return;
     const activityId = event.currentTarget.dataset.activityId;
     state.activities = state.activities.filter((activity) => activity.id !== activityId);
     persist({ type: "activity-delete", activityId });
+    entryHasPendingChanges = false;
     editingActivityDate = null;
     showToast("Atividade excluída.");
     location.hash = activityRoute();
@@ -254,6 +283,7 @@ function bindActivityForm(state, persist, render) {
       activity
     ].sort((a, b) => a.date.localeCompare(b.date));
     persist({ type: "activity-upsert", activity });
+    entryHasPendingChanges = false;
     editingActivityDate = null;
     showToast(isEditing
       ? "Atividade atualizada."
@@ -264,8 +294,24 @@ function bindActivityForm(state, persist, render) {
 }
 
 export function bindEntry(state, persist, render) {
+  document.querySelectorAll("#entry-form, #activity-form").forEach((form) => {
+    form.addEventListener("input", () => {
+      entryHasPendingChanges = true;
+    });
+    form.addEventListener("change", () => {
+      entryHasPendingChanges = true;
+    });
+  });
   document.querySelectorAll("[data-entry-mode]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+      if (button.dataset.entryMode === activeEntryMode) return;
+      if (entryHasPendingChanges && !await confirmAction({
+        title: "Trocar tipo de registro?",
+        message: "Os dados preenchidos nesta aba não serão salvos.",
+        confirmLabel: "Trocar e descartar",
+        tone: "warning"
+      })) return;
+      entryHasPendingChanges = false;
       activeEntryMode = button.dataset.entryMode;
       if (activeEntryMode === "activity") {
         selectedActivityDate = todayISO();

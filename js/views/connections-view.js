@@ -132,7 +132,12 @@ export function bindConnections(context) {
   document.querySelectorAll("[data-revoke-link]").forEach((button) => {
     button.addEventListener("click", async () => {
       const professional = (context.authState.professionals || []).find((item) => item.link.id === button.dataset.revokeLink);
-      if (!professional || !confirmAction("Remover o acesso deste profissional aos seus dados?")) return;
+      if (!professional || !await confirmAction({
+        title: "Remover acesso?",
+        message: "Este profissional deixará de acessar seus dados.",
+        confirmLabel: "Remover",
+        tone: "danger"
+      })) return;
       try {
         await revokeCareLink(professional.link, context.authState.user.uid);
         showToast("Vínculo removido.");

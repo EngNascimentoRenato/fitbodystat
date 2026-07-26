@@ -1,4 +1,5 @@
 import { toNumber } from "./number-utils.js";
+import { confirmAction } from "../components/modal.js";
 
 export function requiredFields(payload, fields) {
   return fields.filter((field) => payload[field] === null || payload[field] === undefined || payload[field] === "");
@@ -52,11 +53,15 @@ export function heightInMetersSuggestion(value) {
   return Math.round(number * 100);
 }
 
-export function resolveHeightInput(field, ask = window.confirm) {
+export async function resolveHeightInput(field, ask = confirmAction) {
   if (!field || field.disabled) return true;
   const suggestion = heightInMetersSuggestion(field.value);
   if (suggestion === null) return true;
-  const accepted = ask(`Você quis informar ${suggestion} cm?`);
+  const accepted = await ask({
+    title: "Confirmar altura",
+    message: `Você quis informar ${suggestion} cm?`,
+    confirmLabel: "Usar esta altura"
+  });
   if (accepted) {
     field.value = String(suggestion);
     clearFieldError(field);
@@ -68,7 +73,7 @@ export function resolveHeightInput(field, ask = window.confirm) {
   return false;
 }
 
-export function validateNumericFields(container, specifications, options = {}) {
+export async function validateNumericFields(container, specifications, options = {}) {
   const values = {};
   const unusual = [];
   let firstInvalid = null;
@@ -117,10 +122,13 @@ export function validateNumericFields(container, specifications, options = {}) {
   }
 
   if (unusual.length && options.confirmUnusual !== false) {
-    const ask = options.ask || window.confirm;
-    const accepted = ask(
-      `Confira estes valores pouco usuais:\n\n${unusual.join("\n")}\n\nDeseja continuar mesmo assim?`
-    );
+    const ask = options.ask || confirmAction;
+    const accepted = await ask({
+      title: "Conferir valores",
+      message: `Estes valores parecem pouco usuais:\n\n${unusual.join("\n")}`,
+      confirmLabel: "Continuar",
+      tone: "warning"
+    });
     if (!accepted) return { valid: false, values, unusual: true };
   }
 

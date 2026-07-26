@@ -270,7 +270,12 @@ export function bindAdmin(context) {
 
   document.querySelectorAll("[data-cancel-professional-registration]").forEach((button) => {
     button.addEventListener("click", async () => {
-      if (!confirmAction("Cancelar este pré-cadastro profissional?")) return;
+      if (!await confirmAction({
+        title: "Cancelar pré-cadastro?",
+        message: "O acesso profissional pendente será removido.",
+        confirmLabel: "Cancelar pré-cadastro",
+        tone: "danger"
+      })) return;
       try {
         await cancelProfessionalRegistration(button.dataset.cancelProfessionalRegistration);
         showToast("Pré-cadastro cancelado.");
@@ -301,7 +306,12 @@ export function bindAdmin(context) {
       const user = (context.authState.adminUsers || []).find((item) => (item.uid || item.id) === userId);
       if (!user) return;
       const nextStatus = user.status === "suspended" ? "active" : "suspended";
-      if (nextStatus === "suspended" && !confirmAction("Suspender o acesso desta conta?")) return;
+      if (nextStatus === "suspended" && !await confirmAction({
+        title: "Suspender conta?",
+        message: "O usuário perderá o acesso até que a conta seja reativada.",
+        confirmLabel: "Suspender",
+        tone: "warning"
+      })) return;
       try {
         await updateUserStatus(userId, nextStatus);
         showToast(nextStatus === "active" ? "Conta reativada." : "Conta suspensa.");
@@ -315,7 +325,12 @@ export function bindAdmin(context) {
   document.querySelectorAll("[data-admin-revoke]").forEach((button) => {
     button.addEventListener("click", async () => {
       const link = (context.authState.adminLinks || []).find((item) => item.id === button.dataset.adminRevoke);
-      if (!link || !confirmAction("Encerrar este vínculo?")) return;
+      if (!link || !await confirmAction({
+        title: "Encerrar vínculo?",
+        message: "O acesso compartilhado entre usuário e profissional será encerrado.",
+        confirmLabel: "Encerrar",
+        tone: "danger"
+      })) return;
       try {
         await revokeCareLink(link, context.authState.user.uid);
         showToast("Vínculo encerrado.");

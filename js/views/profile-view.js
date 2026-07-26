@@ -28,6 +28,7 @@ import {
   validateNumericFields
 } from "../utils/validation-utils.js";
 import { activityLabel } from "../data/activity-catalog.js";
+import { confirmAction } from "../components/modal.js";
 
 let profileHasPendingChanges = false;
 let profileEditMode = false;
@@ -52,15 +53,21 @@ window.addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   if (!profileHasPendingChanges) return;
   const link = event.target.closest('a[href^="#/"]');
   if (!link || link.hash === location.hash) return;
-  if (window.confirm("Há alterações não salvas no perfil. Deseja sair mesmo assim?")) {
+  event.preventDefault();
+  if (await confirmAction({
+    title: "Descartar alterações?",
+    message: "Há alterações não salvas no perfil.",
+    confirmLabel: "Descartar",
+    tone: "warning"
+  })) {
     profileHasPendingChanges = false;
+    location.hash = link.hash;
     return;
   }
-  event.preventDefault();
 });
 
 function renderProfileInsight(profile) {
@@ -570,16 +577,21 @@ export function bindProfile(state, persist, render) {
     updateGoalPlanner();
   };
 
-  heightField?.addEventListener("blur", () => {
-    if (resolveHeightInput(heightField)) updateGoalPlanner();
+  heightField?.addEventListener("blur", async () => {
+    if (await resolveHeightInput(heightField)) updateGoalPlanner();
   });
   document.getElementById("apply-goal-suggestion")?.addEventListener("click", applyGoalSuggestion);
   form.elements.trackActivityDuration?.addEventListener("change", () => {
     setDurationGoalVisibility();
     markDirty();
   });
-  document.getElementById("cancel-profile-edit")?.addEventListener("click", () => {
-    if (profileHasPendingChanges && !window.confirm("Descartar as alterações feitas no perfil?")) return;
+  document.getElementById("cancel-profile-edit")?.addEventListener("click", async () => {
+    if (profileHasPendingChanges && !await confirmAction({
+      title: "Descartar alterações?",
+      message: "As modificações feitas no perfil não serão salvas.",
+      confirmLabel: "Descartar",
+      tone: "warning"
+    })) return;
     profileHasPendingChanges = false;
     profileEditMode = false;
     render();
@@ -618,7 +630,7 @@ export function bindProfile(state, persist, render) {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (!resolveHeightInput(heightField)) return;
+    if (!await resolveHeightInput(heightField)) return;
     const data = new FormData(form);
     const phone = data.get("phone");
     if (phone !== null && !phoneIsValid(phone)) {
@@ -629,7 +641,7 @@ export function bindProfile(state, persist, render) {
 
     const deadlineMode = data.get("goalDeadlineMode") === "custom" ? "custom" : "auto";
     const maintenanceGoal = data.get("goalType") === "maintenance";
-    const validation = validateNumericFields(form, {
+    const validation = await validateNumericFields(form, {
       heightCm: { rule: "heightCm", label: "Altura", required: true },
       startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
       startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial" },
@@ -662,9 +674,12 @@ export function bindProfile(state, persist, render) {
       return;
     }
     if (deadlineMode === "custom" && getProgressMode(nextProfile) !== "maintain") {
-      const accepted = window.confirm(
-        `Para cumprir esse prazo, o ritmo será de ${formatKg(Number(nextProfile.weeklyChangeGoalKg))} por semana. Deseja aplicar?`
-      );
+      const accepted = await confirmAction({
+        title: "Aplicar novo ritmo?",
+        message: `Para cumprir esse prazo, o ritmo será de ${formatKg(Number(nextProfile.weeklyChangeGoalKg))} por semana.`,
+        confirmLabel: "Aplicar",
+        tone: "warning"
+      });
       if (!accepted) return;
     }
 

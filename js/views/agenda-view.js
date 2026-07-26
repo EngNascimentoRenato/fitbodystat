@@ -1267,7 +1267,7 @@ export function bindAgenda(context) {
           blockCandidate,
           (context.authState.agendaEvents || []).filter((item) => item.id !== source.id)
         );
-        if (conflicts.length && !confirmAction(
+        if (conflicts.length && !await confirmAction(
           `O bloqueio se sobrepõe a ${conflicts.length} item(ns) da agenda. Cancelar e bloquear mesmo assim?`
         )) {
           submit.disabled = false;
@@ -1327,11 +1327,11 @@ export function bindAgenda(context) {
     const conflictEvents = (context.authState.agendaEvents || [])
       .filter((item) => !removeLinkedBlock || item.id !== linkedBlock.id);
     const conflicts = eventConflicts(candidate, conflictEvents);
-    if (conflicts.length && !confirmAction(
+    if (conflicts.length && !await confirmAction(
       `Há ${conflicts.length} item(ns) ocupando este horário. Reabrir mesmo assim?`
     )) return;
     if (!eventIsWithinAvailability(candidate, context.authState.agendaAvailability)
-      && !confirmAction("Este compromisso está fora dos horários habituais. Reabrir mesmo assim?")) return;
+      && !await confirmAction("Este compromisso está fora dos horários habituais. Reabrir mesmo assim?")) return;
 
     submit.disabled = true;
     try {
@@ -1467,14 +1467,14 @@ export function bindAgenda(context) {
       const conflicts = candidateOccurrences.flatMap((occurrence) =>
         eventConflicts(occurrence, existingOccurrences)
       );
-      if (conflicts.length && !confirmAction(
+      if (conflicts.length && !await confirmAction(
         `Há ${new Set(conflicts.map((item) => item.sourceEventId || item.id)).size} item(ns) ocupando este período. Salvar mesmo assim?`
       )) {
         submit.disabled = false;
         return;
       }
       if (!eventIsWithinAvailability(candidate, context.authState.agendaAvailability)
-        && !confirmAction("Este compromisso está fora dos horários habituais de atendimento. Salvar mesmo assim?")) {
+        && !await confirmAction("Este compromisso está fora dos horários habituais de atendimento. Salvar mesmo assim?")) {
         submit.disabled = false;
         return;
       }
@@ -1516,7 +1516,12 @@ export function bindAgenda(context) {
 
   document.getElementById("delete-agenda-event")?.addEventListener("click", async () => {
     const event = agendaUi.draft;
-    if (!event?.id || !confirmAction("Excluir este item da agenda?")) return;
+    if (!event?.id || !await confirmAction({
+      title: "Excluir item da agenda?",
+      message: "Este item será removido permanentemente.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    })) return;
     const previousEvents = [...(context.authState.agendaEvents || [])];
     context.authState.agendaEvents = previousEvents.filter((item) => item.id !== event.id);
     agendaUi.editorOpen = false;

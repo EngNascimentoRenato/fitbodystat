@@ -48,6 +48,7 @@ export function entryForm(profile, entry = {}) {
         <textarea id="notes" name="notes">${escapeHtml(entry.notes || "")}</textarea>
       </div>
       <div class="button-row">
+        <button class="button" id="cancel-measurement-entry" type="button">Cancelar</button>
         <button class="button primary" type="submit">Salvar registro</button>
       </div>
     </form>

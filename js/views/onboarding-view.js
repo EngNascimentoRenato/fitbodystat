@@ -415,8 +415,8 @@ export function bindOnboarding(context) {
     goalWeightWasEdited = false;
     updateOnboardingGoalPlanner(userForm);
   };
-  heightField?.addEventListener("blur", () => {
-    if (resolveHeightInput(heightField)) {
+  heightField?.addEventListener("blur", async () => {
+    if (await resolveHeightInput(heightField)) {
       updateInsight(userForm);
       if (!goalWeightWasEdited) applyGoalSuggestion();
     }
@@ -446,7 +446,7 @@ export function bindOnboarding(context) {
   updateOnboardingGoalPlanner(userForm);
   userForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!resolveHeightInput(heightField)) return;
+    if (!await resolveHeightInput(heightField)) return;
     const data = new FormData(event.currentTarget);
     if (!phoneIsValid(data.get("phone"))) {
       showToast("Informe um telefone válido, com DDD.");
@@ -455,7 +455,7 @@ export function bindOnboarding(context) {
 
     const deadlineMode = data.get("goalDeadlineMode") === "custom" ? "custom" : "auto";
     const maintenanceGoal = data.get("goalType") === "maintenance";
-    const validation = validateNumericFields(event.currentTarget, {
+    const validation = await validateNumericFields(event.currentTarget, {
       heightCm: { rule: "heightCm", label: "Altura", required: true },
       startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
       startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: true },

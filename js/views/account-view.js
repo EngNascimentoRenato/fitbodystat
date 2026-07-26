@@ -297,9 +297,12 @@ export function bindAccount(context) {
       const profile = context.authState.professionalProfile || {};
       const location = (profile.locations || [])
         .find((item) => item.id === button.dataset.deleteProfessionalLocation);
-      if (!location || !confirmAction(
-        `Excluir "${location.name}"? Compromissos já registrados continuarão exibindo este local.`
-      )) return;
+      if (!location || !await confirmAction({
+        title: "Excluir local?",
+        message: `"${location.name}" será removido. Compromissos já registrados continuarão exibindo este local.`,
+        confirmLabel: "Excluir",
+        tone: "danger"
+      })) return;
       button.disabled = true;
       try {
         const locations = (profile.locations || []).filter((item) => item.id !== location.id);
@@ -417,9 +420,12 @@ export function bindAccount(context) {
   document.getElementById("personal-workspace-enabled")?.addEventListener("change", async (event) => {
     const input = event.currentTarget;
     const enabled = input.checked;
-    if (!enabled && !confirmAction(
-      "Desativar o ambiente pessoal? Seus dados serão preservados e poderão ser acessados ao ativá-lo novamente."
-    )) {
+    if (!enabled && !await confirmAction({
+      title: "Desativar ambiente pessoal?",
+      message: "Seus dados serão preservados e poderão ser acessados ao ativá-lo novamente.",
+      confirmLabel: "Desativar",
+      tone: "warning"
+    })) {
       input.checked = true;
       return;
     }
