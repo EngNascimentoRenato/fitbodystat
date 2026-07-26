@@ -628,7 +628,7 @@ export function bindProfile(state, persist, render) {
   });
   updateGoalPlanner();
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!await resolveHeightInput(heightField)) return;
     const data = new FormData(form);
