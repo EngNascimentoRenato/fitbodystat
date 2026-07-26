@@ -312,6 +312,10 @@
   margin-bottom: 0;
 }
 
+.profile-edit-label-short {
+  display: none;
+}
+
 .profile-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -580,6 +584,14 @@ tr:last-child td {
 
   .profile-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-edit-label-full {
+    display: none;
+  }
+
+  .profile-edit-label-short {
+    display: inline;
   }
 
   .onboarding-steps {

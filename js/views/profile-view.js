@@ -193,7 +193,8 @@ function renderProfileSummary(state, options) {
             <p class="muted">Informações consolidadas do acompanhamento atual.</p>
           </div>
           <button class="button primary" id="edit-profile" type="button">
-            ${options.canEditIdentity === false ? "Editar acompanhamento" : "Editar perfil"}
+            <span class="profile-edit-label-full">${options.canEditIdentity === false ? "Editar acompanhamento" : "Editar perfil"}</span>
+            <span class="profile-edit-label-short">Editar</span>
           </button>
         </div>
         <dl class="profile-summary-grid">
