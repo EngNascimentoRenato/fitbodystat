@@ -288,6 +288,7 @@ export async function createCareInvitation(professional, patientEmail) {
     professionalId: professional.uid,
     professionalName: professional.displayName || "",
     professionalEmail: professional.email || "",
+    professionalArea: professional.professionType || "",
     patientEmailLower,
     patientId: null,
     status: "pending",
@@ -358,7 +359,7 @@ export async function respondToCareInvitation(invitation, user, response, option
       },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    }, { merge: true });
+    });
   }
 
   await batch.commit();
@@ -412,12 +413,21 @@ export async function listPatientsForProfessional(professionalId) {
 export async function listProfessionalsForUser(patientId) {
   const links = await listCareLinksForUser(patientId);
   const professionals = await Promise.all(links.map(async (link) => {
-    const [user, contactSnapshot] = await Promise.all([
+    const [user, contactSnapshot, professionalProfileSnapshot] = await Promise.all([
       getUser(link.professionalId),
-      getDoc(doc(db, "contacts", link.professionalId))
+      getDoc(doc(db, "contacts", link.professionalId)),
+      getDoc(doc(db, "professionalProfiles", link.professionalId))
     ]);
     const contact = contactSnapshot.exists() ? withoutMetadata(contactSnapshot.data()) : {};
-    return user ? { ...user, phone: contact.phone || "", link } : null;
+    const professionalProfile = professionalProfileSnapshot.exists()
+      ? withoutMetadata(professionalProfileSnapshot.data())
+      : {};
+    return user ? {
+      ...user,
+      phone: contact.phone || "",
+      professionType: professionalProfile.professionType || "",
+      link
+    } : null;
   }));
   return professionals.filter(Boolean);
 }

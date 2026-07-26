@@ -163,7 +163,7 @@ service cloud.firestore {
 
     match /professionalProfiles/{userId} {
       allow read: if accountIsActive()
-        && (request.auth.uid == userId || isAdmin());
+        && (request.auth.uid == userId || isAdmin() || activeRelationship(userId));
 
       allow create, update: if isAdmin()
         || (accountIsActive()
@@ -327,6 +327,25 @@ service cloud.firestore {
     }
 
     match /careLinks/{linkId} {
+      function acceptedInvitationMatchesLink() {
+        let invitation = getAfter(
+          /databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)
+        );
+        return invitation.data.status == "accepted"
+          && invitation.data.patientId == request.auth.uid
+          && invitation.data.professionalId == request.resource.data.professionalId
+          && request.resource.data.patientId == request.auth.uid
+          && linkId == request.resource.data.professionalId + "_" + request.auth.uid
+          && request.resource.data.status == "active"
+          && request.resource.data.originInvitationId == request.resource.data.invitationId
+          && request.resource.data.permissions.viewData == invitation.data.permissions.viewData
+          && request.resource.data.permissions.editData == invitation.data.permissions.editData
+          && request.resource.data.permissions.createCycles == true
+          && request.resource.data.permissions.sharePhone is bool
+          && request.resource.data.accessBenefit.source == "professional-link"
+          && request.resource.data.accessBenefit.activeWhileLinked == true;
+      }
+
       allow read: if isAdmin()
         || (accountIsActive()
           && (resource.data.professionalId == request.auth.uid
@@ -334,25 +353,16 @@ service cloud.firestore {
 
       allow create: if isAdmin()
         || (accountIsActive()
-          && request.resource.data.patientId == request.auth.uid
-          && linkId == request.resource.data.professionalId + "_" + request.auth.uid
-          && request.resource.data.status == "active"
-          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.status == "accepted"
-          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.patientId == request.auth.uid
-          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.professionalId == request.resource.data.professionalId
-          && request.resource.data.originInvitationId == request.resource.data.invitationId
-          && request.resource.data.permissions.viewData == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions.viewData
-          && request.resource.data.permissions.editData == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions.editData
-          && ((!("createCycles" in getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions)
-                && request.resource.data.permissions.createCycles == true)
-            || request.resource.data.permissions.createCycles == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions.createCycles)
-          && request.resource.data.permissions.sharePhone is bool
-          && ((!("accessBenefit" in getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data)
-                && request.resource.data.accessBenefit.source == "professional-link"
-                && request.resource.data.accessBenefit.activeWhileLinked == true)
-            || request.resource.data.accessBenefit == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.accessBenefit));
+          && acceptedInvitationMatchesLink());
 
       allow update: if isAdmin()
+        || (accountIsActive()
+          && resource.data.status == "revoked"
+          && acceptedInvitationMatchesLink()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "invitationId", "status", "permissions", "originInvitationId",
+            "accessBenefit", "createdAt", "updatedAt", "revokedBy", "revokedAt"
+          ]))
         || (accountIsActive()
           && resource.data.patientId == request.auth.uid
           && resource.data.status == "active"

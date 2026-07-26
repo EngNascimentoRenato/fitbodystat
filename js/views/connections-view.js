@@ -10,6 +10,19 @@ import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { formatPhone } from "../utils/phone-utils.js";
 
+const professionTypeLabels = {
+  nutritionist: "Nutricionista",
+  "personal-trainer": "Personal trainer",
+  physician: "Médico",
+  "physical-therapist": "Fisioterapeuta",
+  "physical-educator": "Profissional de educação física",
+  other: "Outra área"
+};
+
+function professionLabel(value) {
+  return professionTypeLabels[value] || value || "Área não informada";
+}
+
 export function renderConnections(authState, personalState) {
   const pending = (authState.invitations || []).filter((item) => item.status === "pending");
   const professionals = authState.professionals || [];
@@ -30,11 +43,12 @@ export function renderConnections(authState, personalState) {
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Profissional</th><th>E-mail</th><th>Permissões</th><th>Telefone</th><th></th></tr></thead>
+            <thead><tr><th>Profissional</th><th>Área</th><th>E-mail</th><th>Permissões</th><th>Telefone</th><th></th></tr></thead>
             <tbody>
               ${pending.map((invitation) => `
                 <tr>
                   <td>${escapeHtml(invitation.professionalName || "Profissional")}</td>
+                  <td>${escapeHtml(professionLabel(invitation.professionalArea))}</td>
                   <td>${escapeHtml(invitation.professionalEmail || "-")}</td>
                   <td>
                     Visualizar e atualizar acompanhamento
@@ -55,7 +69,7 @@ export function renderConnections(authState, personalState) {
                     </div>
                   </td>
                 </tr>
-              `).join("") || `<tr><td colspan="5">Nenhum convite pendente.</td></tr>`}
+              `).join("") || `<tr><td colspan="6">Nenhum convite pendente.</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -65,11 +79,12 @@ export function renderConnections(authState, personalState) {
         <h2>Profissionais vinculados</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone profissional</th><th>Meu telefone</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>Área</th><th>E-mail</th><th>Telefone profissional</th><th>Meu telefone</th><th>Status</th><th></th></tr></thead>
             <tbody>
               ${professionals.map((professional) => `
                 <tr>
                   <td>${escapeHtml(professional.name || "Profissional")}</td>
+                  <td>${escapeHtml(professionLabel(professional.professionType))}</td>
                   <td>${escapeHtml(professional.email || "-")}</td>
                   <td>${professional.phone
                     ? `<a href="tel:${escapeAttribute(professional.phone)}">${escapeHtml(formatPhone(professional.phone))}</a>`
@@ -86,7 +101,7 @@ export function renderConnections(authState, personalState) {
                   <td><span class="badge">Ativo</span></td>
                   <td><button class="button danger" data-revoke-link="${professional.link.id}" type="button">Remover vínculo</button></td>
                 </tr>
-              `).join("") || `<tr><td colspan="6">Nenhum profissional vinculado.</td></tr>`}
+              `).join("") || `<tr><td colspan="7">Nenhum profissional vinculado.</td></tr>`}
             </tbody>
           </table>
         </div>

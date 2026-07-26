@@ -135,7 +135,10 @@ export function bindPatients(context) {
       await createCareInvitation({
         uid: context.authState.user.uid,
         email: context.authState.user.email,
-        displayName: context.personalState.profile?.name || context.authState.user.displayName
+        displayName: context.authState.professionalProfile?.name
+          || context.personalState.profile?.name
+          || context.authState.user.displayName,
+        professionType: context.authState.professionalProfile?.professionType || ""
       }, email);
       showToast("Convite enviado. O paciente precisa aceitá-lo na própria conta.");
       await refresh();
