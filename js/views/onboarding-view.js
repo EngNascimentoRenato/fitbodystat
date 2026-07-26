@@ -46,12 +46,12 @@ function basicUserOnboarding(state, authState) {
           </div>
           <div class="field">
             <label for="basic-sex">Sexo</label>
-            <select id="basic-sex" name="sex">
-              <option value="">Prefiro informar depois</option>
+            <select id="basic-sex" name="sex" required>
+              <option value="" disabled selected>Selecione</option>
               <option value="male">Masculino</option>
               <option value="female">Feminino</option>
             </select>
-            <span class="help-text">Será necessário apenas quando você utilizar cálculos corporais específicos.</span>
+            <span class="help-text">Usado na seleção da equação para estimativas corporais.</span>
           </div>
           <div class="field">
             <label for="basic-height">Altura (cm)</label>
@@ -209,7 +209,7 @@ function userOnboarding(state, authState) {
           </div>
           <div class="field">
             <label for="onboarding-activity-duration">Duração média por dia (minutos)</label>
-            <input id="onboarding-activity-duration" name="averageActivityDurationMinutes" type="number" min="1" max="1440" />
+            <input id="onboarding-activity-duration" name="averageActivityDurationMinutes" type="number" min="1" max="1440" value="30" />
           </div>
         </div>
         <div class="field">

@@ -70,9 +70,11 @@ Atividades físicas podem ser registradas sem projeto; peso e medidas corporais
 exigem um ciclo ativo para preservar a linha de base e o contexto histórico.
 O perfil possui editores independentes para dados pessoais, linha de base,
 objetivo e preferências de atividades.
-No histórico de medidas, a exclusão fica subordinada à abertura da edição do
-registro. As listagens de medidas e atividades preservam o conteúdo completo em
-telas estreitas por meio de rolagem interna.
+No histórico de medidas, o lápis abre o formulário completo de registro com os
+dados da medição selecionada. Durante essa edição, a aba de atividade permanece
+bloqueada e as ações de exclusão e cancelamento ficam dentro do próprio
+formulário, em paralelo ao fluxo de edição das atividades. As listagens preservam
+o conteúdo completo em telas estreitas por meio de rolagem interna.
 
 Links de convite usam apenas o identificador aleatório do documento. Antes da
 autenticação, a página informa genericamente que existe um convite profissional,

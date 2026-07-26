@@ -17,6 +17,7 @@ const CYCLE_FIELDS = [
   "goalDeadlineMonths",
   "goalDeadlineMode",
   "weeklyActivityGoalDays",
+  "trackActivityDuration",
   "averageActivityDurationMinutes"
 ];
 

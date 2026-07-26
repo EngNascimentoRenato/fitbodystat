@@ -455,15 +455,6 @@ function renderCycleDialog(state) {
             <span class="help-text">O valor obtido por avaliação externa substitui a estimativa por circunferências.</span>
           </div>
           <div class="field" data-new-cycle-estimated-field>
-            <label for="cycle-sex">Equação corporal utilizada</label>
-            <select id="cycle-sex" name="sex">
-              <option value="" ${!draft.sex ? "selected" : ""}>Selecione uma equação</option>
-              <option value="male" ${draft.sex === "male" ? "selected" : ""}>Equação masculina</option>
-              <option value="female" ${draft.sex === "female" ? "selected" : ""}>Equação feminina</option>
-            </select>
-            <span class="help-text">A estimativa por circunferências depende da equação corporal selecionada.</span>
-          </div>
-          <div class="field" data-new-cycle-estimated-field>
             <label for="cycle-start-neck">Pescoço inicial (cm)</label>
             <input id="cycle-start-neck" name="startNeckCm" inputmode="decimal"
               value="${escapeAttribute(draft.startNeckCm ?? "")}" />
@@ -645,8 +636,8 @@ function renderBasicProfileEditor(state, options) {
           </div>
           <div class="field">
             <label for="basic-profile-sex">Sexo</label>
-            <select id="basic-profile-sex" name="sex" ${baselineLocked ? "disabled" : ""}>
-              <option value="" ${!p.sex ? "selected" : ""}>Prefiro informar depois</option>
+            <select id="basic-profile-sex" name="sex" required ${baselineLocked ? "disabled" : ""}>
+              <option value="" ${!p.sex ? "selected" : ""} disabled>Selecione</option>
               <option value="male" ${p.sex === "male" ? "selected" : ""}>Masculino</option>
               <option value="female" ${p.sex === "female" ? "selected" : ""}>Feminino</option>
             </select>
@@ -675,6 +666,10 @@ function renderBasicProfileEditor(state, options) {
 
 function renderActivityProfileEditor(state) {
   const p = state.profile;
+  const trackDuration = p.trackActivityDuration !== false;
+  const activityDuration = Number(p.averageActivityDurationMinutes) > 0
+    ? p.averageActivityDurationMinutes
+    : 30;
   return `
     <form class="form profile-form" id="activity-profile-form">
       <section class="card">
@@ -695,18 +690,18 @@ function renderActivityProfileEditor(state) {
             <span class="field-label">Meta de tempo</span>
             <label class="toggle-option">
               <input id="activity-profile-track-duration" name="trackActivityDuration" type="checkbox"
-                ${Number(p.averageActivityDurationMinutes) > 0 ? "checked" : ""} />
+                ${trackDuration ? "checked" : ""} />
               <span>
                 <strong>Acompanhar também meta de tempo</strong>
                 <small>Opcional. Ative para comparar minutos planejados e realizados.</small>
               </span>
             </label>
           </div>
-          <div class="field activity-duration-goal" ${Number(p.averageActivityDurationMinutes) > 0 ? "" : "hidden"}>
+          <div class="field activity-duration-goal" ${trackDuration ? "" : "hidden"}>
             <label for="activity-profile-duration">Duração média pretendida por dia (minutos)</label>
             <input id="activity-profile-duration" name="averageActivityDurationMinutes" type="number"
-              min="1" max="1440" ${Number(p.averageActivityDurationMinutes) > 0 ? "" : "disabled"}
-              value="${escapeAttribute(p.averageActivityDurationMinutes ?? "")}" />
+              min="1" max="1440" ${trackDuration ? "" : "disabled"}
+              value="${escapeAttribute(activityDuration)}" />
           </div>
         </div>
         <div class="field">
@@ -748,6 +743,7 @@ function readProfileForm(form, currentProfile) {
     goalDeadlineMonths: toNumber(data.get("goalDeadlineMonths")),
     goalDeadlineMode: data.get("goalDeadlineMode") === "custom" ? "custom" : "auto",
     weeklyActivityGoalDays: toNumber(data.get("weeklyActivityGoalDays")) || 3,
+    trackActivityDuration: data.has("trackActivityDuration"),
     averageActivityDurationMinutes: data.has("trackActivityDuration")
       ? toNumber(data.get("averageActivityDurationMinutes"))
       : null,
@@ -833,13 +829,13 @@ export function renderProfile(state, options = {}) {
             </div>
           ` : ""}
           <div class="field">
-            <label for="sex">Referência corporal para estimativa</label>
-            <select id="sex" name="sex" ${baselineDisabled}>
-              <option value="" ${!p.sex ? "selected" : ""}>Não utilizar estimativa por circunferências</option>
-              <option value="male" ${p.sex === "male" ? "selected" : ""}>Equação masculina</option>
-              <option value="female" ${p.sex === "female" ? "selected" : ""}>Equação feminina</option>
+            <label for="sex">Sexo</label>
+            <select id="sex" name="sex" required ${baselineDisabled}>
+              <option value="" ${!p.sex ? "selected" : ""} disabled>Selecione</option>
+              <option value="male" ${p.sex === "male" ? "selected" : ""}>Masculino</option>
+              <option value="female" ${p.sex === "female" ? "selected" : ""}>Feminino</option>
             </select>
-            <span class="help-text">Usada somente para selecionar a equação corporal.</span>
+            <span class="help-text">Usado na seleção da equação para estimativas corporais.</span>
           </div>
           <div class="field">
             <label for="birthDate">Data de nascimento</label>
@@ -1049,6 +1045,7 @@ export function bindProfile(state, persist, render) {
       state.profile = {
         ...state.profile,
         weeklyActivityGoalDays: toNumber(data.get("weeklyActivityGoalDays")) || 3,
+        trackActivityDuration: data.has("trackActivityDuration"),
         averageActivityDurationMinutes: data.has("trackActivityDuration")
           ? toNumber(data.get("averageActivityDurationMinutes"))
           : null,
@@ -1167,7 +1164,7 @@ export function bindProfile(state, persist, render) {
         ...(newCycleDraft || initialNewCycleDraft(state)),
         name: String(data.get("name") || "").trim(),
         startDate: data.get("startDate"),
-        sex: data.get("sex"),
+        sex: (newCycleDraft || initialNewCycleDraft(state)).sex || state.profile.sex,
         heightCm: toNumber(data.get("heightCm")),
         startWeightKg: toNumber(data.get("startWeightKg")),
         startWaistCm: toNumber(data.get("startWaistCm")),
@@ -1193,7 +1190,6 @@ export function bindProfile(state, persist, render) {
         valueInput.disabled = estimated;
         valueInput.required = !estimated;
       }
-      if (baselineForm.elements.sex) baselineForm.elements.sex.required = estimated;
       if (baselineForm.elements.startNeckCm) baselineForm.elements.startNeckCm.required = estimated;
       if (baselineForm.elements.startHipCm) {
         baselineForm.elements.startHipCm.required = estimated && draft.sex === "female";
@@ -1211,7 +1207,7 @@ export function bindProfile(state, persist, render) {
       const draft = readBaselineDraft();
       const estimated = bodyFatMethodIsEstimated(draft.startBodyFatMethod);
       if (estimated && !draft.sex) {
-        showToast("Selecione a equação masculina ou feminina para usar a estimativa por circunferências.");
+        showToast("Informe o sexo no perfil para usar a estimativa por circunferências.");
         return;
       }
       const validation = await validateNumericFields(baselineForm, {

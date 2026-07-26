@@ -23,6 +23,7 @@ export const defaultProfile = {
   goalType: "",
   customGoalLabel: "",
   weeklyActivityGoalDays: 3,
-  averageActivityDurationMinutes: null,
+  trackActivityDuration: true,
+  averageActivityDurationMinutes: 30,
   preferredActivities: []
 };

@@ -95,7 +95,12 @@
 }
 
 [data-theme="dark"] .activity-chip {
-  --chip-soft: var(--surface-strong);
+  --chip-soft: color-mix(in srgb, var(--chip-color) 34%, var(--surface-strong));
+}
+
+[data-theme="dark"] .activity-chip input:checked + span {
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px var(--chip-color);
 }
 
 .activity-more {
