@@ -163,9 +163,14 @@ export function createBaselineEntry(profile) {
 
 export function enrichEntries(profile, entries) {
   const baseline = createBaselineEntry(profile);
-  const regularEntries = (entries || []).filter((entry) =>
-    entry.id !== "profile-initial" && (!baseline || entry.date !== baseline.date)
-  );
+  const regularEntries = (entries || []).filter((entry) => {
+    const belongsToActiveCycle = !profile.activeCycleId
+      || !entry.cycleId
+      || entry.cycleId === profile.activeCycleId;
+    return belongsToActiveCycle
+      && entry.id !== "profile-initial"
+      && (!baseline || entry.date !== baseline.date);
+  });
 
   return [...(baseline ? [baseline] : []), ...regularEntries]
     .sort((a, b) => a.date.localeCompare(b.date))

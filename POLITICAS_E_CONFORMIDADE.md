@@ -55,6 +55,10 @@ consultá-los ou editá-los conforme as permissões vigentes do vínculo. Encerr
 ciclo não implica eliminar suas medições; retenção, exportação e exclusão devem
 preservar a relação entre o registro e seu ciclo.
 
+O motivo de encerramento de um ciclo é opcional e pode conter informação pessoal.
+Ele deve seguir as mesmas permissões, exportação, retenção e eliminação aplicadas
+ao restante do acompanhamento, sem ser exposto em indicadores administrativos.
+
 ## Exclusão de registros
 
 Registros relevantes, como medidas, atividades, metas e compromissos, deverão usar

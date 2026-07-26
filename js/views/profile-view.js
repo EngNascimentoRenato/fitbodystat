@@ -29,10 +29,16 @@ import {
 } from "../utils/validation-utils.js";
 import { activityLabel } from "../data/activity-catalog.js";
 import { confirmAction } from "../components/modal.js";
-import { activeCycle } from "../models/cycle-model.js";
+import {
+  activeCycle,
+  closeActiveCycle,
+  startNewCycle
+} from "../models/cycle-model.js";
 
 let profileHasPendingChanges = false;
 let profileEditMode = false;
+let cycleDialogMode = null;
+let selectedCycleId = null;
 
 const sexLabels = {
   male: "Masculino",
@@ -183,6 +189,140 @@ function profileValue(label, value) {
   `;
 }
 
+function renderCycleDialog(state) {
+  if (!cycleDialogMode) return "";
+  if (cycleDialogMode === "view") {
+    const cycle = (state.cycles || []).find((item) => item.id === selectedCycleId);
+    if (!cycle) return "";
+    return `
+      <dialog class="account-dialog" id="cycle-dialog">
+        <form method="dialog">
+          <div class="account-dialog-header">
+            <h2>${escapeHtml(cycle.name || "Projeto anterior")}</h2>
+            <button class="icon-button" data-close-cycle-dialog type="button" aria-label="Fechar">×</button>
+          </div>
+          <dl class="goal-summary-list">
+            ${profileValue("Situação", cycleStatusLabels[cycle.status] || cycle.status)}
+            ${profileValue("Período", `${formatDate(cycle.startedAt)}${cycle.endedAt ? ` a ${formatDate(cycle.endedAt)}` : ""}`)}
+            ${profileValue("Objetivo", goalTypeLabels[cycle.goalType] || cycle.goalType)}
+            ${profileValue("Peso inicial", formatKg(cycle.startWeightKg))}
+            ${profileValue("Peso final desejado", formatKg(cycle.goalWeightKg))}
+            ${profileValue("Cintura inicial", formatCm(cycle.startWaistCm))}
+            ${profileValue("Motivo do encerramento", cycle.endReason || "Não informado")}
+          </dl>
+          <div class="account-dialog-actions">
+            <button class="button primary" data-close-cycle-dialog type="button">Fechar</button>
+          </div>
+        </form>
+      </dialog>
+    `;
+  }
+  const current = activeCycle(state);
+  if (cycleDialogMode === "close" && current) {
+    return `
+      <dialog class="account-dialog" id="cycle-dialog">
+        <form id="close-cycle-form">
+          <div class="account-dialog-header">
+            <h2>Encerrar projeto</h2>
+            <button class="icon-button" data-close-cycle-dialog type="button" aria-label="Fechar">×</button>
+          </div>
+          <p class="muted">As medições e o planejamento serão preservados para consulta.</p>
+          <div class="form-grid">
+            <div class="field">
+              <label for="cycle-close-status">Como este projeto terminou?</label>
+              <select id="cycle-close-status" name="status" required>
+                <option value="completed">Concluído</option>
+                <option value="abandoned">Abandonado</option>
+                <option value="expired">Expirado</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="cycle-ended-at">Data de encerramento</label>
+              <input id="cycle-ended-at" name="endedAt" type="date" max="${todayISO()}" value="${todayISO()}" required />
+            </div>
+          </div>
+          <div class="field">
+            <label for="cycle-end-reason">Motivo ou observação</label>
+            <textarea id="cycle-end-reason" name="endReason"></textarea>
+          </div>
+          <div class="account-dialog-actions">
+            <button class="button" data-close-cycle-dialog type="button">Cancelar</button>
+            <button class="button primary" type="submit">Encerrar projeto</button>
+          </div>
+        </form>
+      </dialog>
+    `;
+  }
+
+  const latest = [...(state.entries || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const reference = latest || state.profile;
+  return `
+    <dialog class="account-dialog" id="cycle-dialog">
+      <form id="new-cycle-form">
+        <div class="account-dialog-header">
+          <h2>Iniciar novo projeto</h2>
+          <button class="icon-button" data-close-cycle-dialog type="button" aria-label="Fechar">×</button>
+        </div>
+        <p class="muted">Revise a nova linha de base. Projetos anteriores continuarão disponíveis.</p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="cycle-name">Nome do projeto</label>
+            <input id="cycle-name" name="name" maxlength="80" placeholder="Ex.: Manutenção 2027" required />
+          </div>
+          <div class="field">
+            <label for="cycle-start-date">Data inicial</label>
+            <input id="cycle-start-date" name="startDate" type="date" max="${todayISO()}" value="${todayISO()}" required />
+          </div>
+          <div class="field">
+            <label for="cycle-start-weight">Peso inicial (kg)</label>
+            <input id="cycle-start-weight" name="startWeightKg" inputmode="decimal"
+              value="${escapeAttribute(reference.weightKg ?? reference.startWeightKg ?? "")}" required />
+          </div>
+          <div class="field">
+            <label for="cycle-start-waist">Cintura inicial (cm)</label>
+            <input id="cycle-start-waist" name="startWaistCm" inputmode="decimal"
+              value="${escapeAttribute(reference.waistCm ?? reference.startWaistCm ?? "")}" />
+          </div>
+          <div class="field">
+            <label for="cycle-start-neck">Pescoço inicial (cm)</label>
+            <input id="cycle-start-neck" name="startNeckCm" inputmode="decimal"
+              value="${escapeAttribute(reference.neckCm ?? reference.startNeckCm ?? "")}" />
+          </div>
+          <div class="field">
+            <label for="cycle-start-hip">Quadril inicial (cm)</label>
+            <input id="cycle-start-hip" name="startHipCm" inputmode="decimal"
+              value="${escapeAttribute(reference.hipCm ?? reference.startHipCm ?? "")}" />
+          </div>
+          <div class="field">
+            <label for="cycle-goal-type">Objetivo</label>
+            <select id="cycle-goal-type" name="goalType" required>
+              <option value="weight-loss">Emagrecimento</option>
+              <option value="weight-gain">Ganho de peso</option>
+              <option value="muscle-gain">Ganho de massa muscular</option>
+              <option value="maintenance">Manutenção</option>
+              <option value="recovery">Recuperação de peso</option>
+              <option value="other">Outro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="cycle-goal-weight">Peso final desejado (kg)</label>
+            <input id="cycle-goal-weight" name="goalWeightKg" inputmode="decimal"
+              value="${escapeAttribute(reference.weightKg ?? reference.startWeightKg ?? "")}" required />
+          </div>
+          <div class="field">
+            <label for="cycle-weekly-change">Mudança semanal desejada (kg)</label>
+            <input id="cycle-weekly-change" name="weeklyChangeGoalKg" inputmode="decimal" value="0.5" required />
+          </div>
+        </div>
+        <div class="account-dialog-actions">
+          <button class="button" data-close-cycle-dialog type="button">Cancelar</button>
+          <button class="button primary" type="submit">Iniciar projeto</button>
+        </div>
+      </form>
+    </dialog>
+  `;
+}
+
 function renderProfileSummary(state, options) {
   const profile = state.profile;
   const currentCycle = activeCycle(state);
@@ -223,7 +363,7 @@ function renderProfileSummary(state, options) {
         <div class="chart-header">
           <div>
             <p class="eyebrow">Projeto atual</p>
-            <h2>${escapeHtml(currentCycle?.name || "Linha de base")}</h2>
+            <h2>${escapeHtml(currentCycle?.name || "Nenhum projeto ativo")}</h2>
           </div>
           ${currentCycle ? `<span class="badge">${escapeHtml(cycleStatusLabels[currentCycle.status] || currentCycle.status)}</span>` : ""}
         </div>
@@ -236,6 +376,11 @@ function renderProfileSummary(state, options) {
           ${profileValue("Gordura corporal", formatPercent(bodyFat))}
           ${profileValue("Origem da gordura", bodyFatMethodLabel(profile.startBodyFatMethod))}
         </dl>
+        <div class="button-row profile-card-save">
+          ${currentCycle
+            ? `<button class="button" id="close-active-cycle" type="button">Encerrar projeto</button>`
+            : `<button class="button primary" id="start-new-cycle" type="button">Iniciar novo projeto</button>`}
+        </div>
       </section>
 
       <section class="grid two">
@@ -280,11 +425,13 @@ function renderProfileSummary(state, options) {
                   <small>${formatDate(cycle.startedAt)}${cycle.endedAt ? ` a ${formatDate(cycle.endedAt)}` : ""}</small>
                 </div>
                 <span class="badge">${escapeHtml(cycleStatusLabels[cycle.status] || cycle.status)}</span>
+                <button class="button" data-view-cycle="${escapeAttribute(cycle.id)}" type="button">Consultar</button>
               </article>
             `).join("")}
           </div>
         </section>
       ` : ""}
+      ${renderCycleDialog(state)}
     </div>
   `;
 }
@@ -346,7 +493,10 @@ export function renderProfile(state, options = {}) {
   const canEditIdentity = options.canEditIdentity !== false;
   const editing = options.forceEdit === true || profileEditMode;
   if (!editing) return renderProfileSummary(state, { canEditContact, canEditIdentity });
-  const baselineLocked = p.baselineLocked === true || state.entries.length > 0;
+  const activeEntries = state.activeCycleId
+    ? state.entries.filter((entry) => !entry.cycleId || entry.cycleId === state.activeCycleId)
+    : [];
+  const baselineLocked = p.baselineLocked === true || activeEntries.length > 0;
   const baselineDisabled = baselineLocked ? "disabled" : "";
   const identityReadOnly = canEditIdentity ? "" : "readonly aria-readonly=\"true\"";
   const suggestedGoal = getSuggestedGoalWeight(p);
@@ -550,6 +700,97 @@ export function bindProfile(state, persist, render) {
       profileEditMode = true;
       render();
     });
+    const openCycleDialog = (mode) => {
+      cycleDialogMode = mode;
+      render();
+    };
+    const closeCycleDialog = () => {
+      cycleDialogMode = null;
+      selectedCycleId = null;
+      render();
+    };
+    document.getElementById("close-active-cycle")?.addEventListener("click", () => openCycleDialog("close"));
+    document.getElementById("start-new-cycle")?.addEventListener("click", () => openCycleDialog("new"));
+    document.querySelectorAll("[data-view-cycle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        selectedCycleId = button.dataset.viewCycle;
+        openCycleDialog("view");
+      });
+    });
+    document.querySelectorAll("[data-close-cycle-dialog]").forEach((button) => {
+      button.addEventListener("click", closeCycleDialog);
+    });
+    const cycleDialog = document.getElementById("cycle-dialog");
+    if (cycleDialog) {
+      cycleDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeCycleDialog();
+      });
+      cycleDialog.showModal();
+    }
+    document.getElementById("close-cycle-form")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      if (!await confirmAction({
+        title: "Encerrar projeto?",
+        message: "O histórico será preservado, mas novos registros não serão associados a este projeto.",
+        confirmLabel: "Encerrar",
+        tone: "warning"
+      })) return;
+      Object.assign(state, closeActiveCycle(state, data.get("status"), {
+        endedAt: data.get("endedAt"),
+        endReason: data.get("endReason")
+      }));
+      cycleDialogMode = null;
+      persist({ type: "profile-plan" });
+      showToast("Projeto encerrado.");
+      render();
+    });
+    document.getElementById("new-cycle-form")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      const startWeightKg = toNumber(data.get("startWeightKg"));
+      const goalWeightKg = toNumber(data.get("goalWeightKg"));
+      const weeklyChangeGoalKg = toNumber(data.get("weeklyChangeGoalKg"));
+      if (![startWeightKg, goalWeightKg, weeklyChangeGoalKg].every(Number.isFinite)) {
+        showToast("Revise peso inicial, peso final e mudança semanal.");
+        return;
+      }
+      if (data.get("goalType") === "weight-loss" && goalWeightKg >= startWeightKg) {
+        showToast("Para emagrecimento, o peso final deve ser menor que o peso inicial.");
+        return;
+      }
+      if (["weight-gain", "recovery"].includes(data.get("goalType")) && goalWeightKg <= startWeightKg) {
+        showToast("Para ganho ou recuperação, o peso final deve ser maior que o peso inicial.");
+        return;
+      }
+      const next = startNewCycle(state, {
+        name: data.get("name"),
+        startDate: data.get("startDate"),
+        startWeightKg,
+        startWaistCm: toNumber(data.get("startWaistCm")),
+        startNeckCm: toNumber(data.get("startNeckCm")),
+        startHipCm: toNumber(data.get("startHipCm")),
+        startBodyFatMethod: "circumference",
+        startBodyFatManual: null,
+        goalType: data.get("goalType"),
+        goalWeightKg,
+        weeklyChangeGoalKg,
+        weeklyLossGoalKg: weeklyChangeGoalKg,
+        goalDeadlineMode: "auto",
+        goalDeadlineMonths: null
+      });
+      const resolvedProfile = resolveGoalTiming(next.profile);
+      Object.assign(state, {
+        ...next,
+        profile: resolvedProfile,
+        goalPlan: createDefaultMonthlyPlan(resolvedProfile)
+      });
+      cycleDialogMode = null;
+      persist({ type: "profile-plan" });
+      showToast("Novo projeto iniciado.");
+      render();
+    });
     return;
   }
   const heightField = form.elements.heightCm;
@@ -740,4 +981,6 @@ export function bindProfile(state, persist, render) {
 export function resetProfileMode() {
   profileHasPendingChanges = false;
   profileEditMode = false;
+  cycleDialogMode = null;
+  selectedCycleId = null;
 }

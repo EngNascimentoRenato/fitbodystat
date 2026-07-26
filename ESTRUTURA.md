@@ -42,6 +42,9 @@ O estado pessoal também mantém ciclos de acompanhamento. A coleção
 `users/{userId}/cycles` armazena linha de base, objetivo e planejamento de cada
 projeto. Durante a transição, o ciclo ativo continua projetado no perfil para
 compatibilidade com as telas existentes, e cada medição recebe um `cycleId`.
+O ciclo pode ser encerrado como concluído, abandonado ou expirado. Um novo ciclo
+só pode ser iniciado quando não houver outro ativo, e seus cálculos consideram
+somente as medições associadas ao projeto atual.
 
 ## Estilos
 

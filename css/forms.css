@@ -625,6 +625,7 @@ tr:last-child td {
 
   .professional-locations-heading,
   .professional-location-item,
+  .cycle-list-item,
   .workspace-account-status {
     align-items: stretch;
     flex-direction: column;
@@ -632,6 +633,7 @@ tr:last-child td {
 
   .professional-locations-heading .button,
   .professional-location-item .button-row,
+  .cycle-list-item .button,
   .workspace-account-status .button {
     width: 100%;
   }
