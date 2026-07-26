@@ -3,10 +3,19 @@ import { todayISO } from "../utils/date-utils.js";
 import { measurementFields } from "./measurement-form.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 
-export function entryForm(profile, entry = {}) {
+export function entryForm(profile, entry = {}, options = {}) {
   const bodyFatMethod = normalizeBodyFatMethod(entry.bodyFatMethod);
+  const isEditing = options.isEditing === true;
   return `
     <form class="form card" id="entry-form">
+      <div class="chart-header">
+        <div>
+          <h2>${isEditing ? "Editar medição" : "Registrar medidas"}</h2>
+          <p class="muted">${isEditing
+            ? "Atualize somente os dados deste registro."
+            : "Informe as medidas coletadas nesta data."}</p>
+        </div>
+      </div>
       <fieldset class="measurement-group">
         <legend>Dados principais</legend>
         <div class="form-grid">
@@ -49,7 +58,10 @@ export function entryForm(profile, entry = {}) {
       </div>
       <div class="button-row">
         <button class="button" id="cancel-measurement-entry" type="button">Cancelar</button>
-        <button class="button primary" type="submit">Salvar registro</button>
+        ${isEditing
+          ? `<button class="button danger" id="delete-measurement-edit" type="button">Excluir</button>`
+          : ""}
+        <button class="button primary" type="submit">${isEditing ? "Salvar alterações" : "Salvar registro"}</button>
       </div>
     </form>
   `;

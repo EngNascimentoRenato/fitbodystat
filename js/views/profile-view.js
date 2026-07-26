@@ -378,12 +378,12 @@ function renderCycleDialog(state) {
           <div class="goal-preview" id="new-cycle-goal-preview">
             ${renderProfileInsight(preview)}
           </div>
+          <div id="new-cycle-plan-preview">
+            ${renderPlanEditor(preview)}
+          </div>
           <div class="account-dialog-actions">
             <button class="button" id="new-cycle-back" type="button">Voltar</button>
             <button class="button primary" type="submit">Criar projeto</button>
-          </div>
-          <div id="new-cycle-plan-preview">
-            ${renderPlanEditor(preview)}
           </div>
         </form>
       </dialog>
@@ -400,8 +400,11 @@ function renderCycleDialog(state) {
           </div>
           <button class="icon-button" data-close-cycle-dialog type="button" aria-label="Fechar">×</button>
         </div>
-        <p class="muted">Esses dados permitem calcular IMC e, quando escolhido, estimar gordura corporal pelas circunferências.</p>
-        <div class="form-grid">
+        <p class="muted">Esses dados permitem calcular o IMC e estimar a gordura corporal.</p>
+        <div class="new-cycle-baseline-groups">
+          <fieldset class="measurement-group">
+            <legend>Identificação do projeto</legend>
+            <div class="form-grid">
           <div class="field">
             <label for="cycle-name">Nome do projeto</label>
             <input id="cycle-name" name="name" maxlength="80" placeholder="Ex.: Acompanhamento inicial"
@@ -412,19 +415,15 @@ function renderCycleDialog(state) {
             <input id="cycle-start-date" name="startDate" type="date" max="${todayISO()}"
               value="${escapeAttribute(draft.startDate || todayISO())}" required />
           </div>
+            </div>
+          </fieldset>
+          <fieldset class="measurement-group">
+            <legend>Medições principais</legend>
+            <div class="form-grid new-cycle-primary-measures">
           <div class="field">
             <label for="cycle-height">Altura (cm)</label>
             <input id="cycle-height" name="heightCm" inputmode="decimal"
               value="${escapeAttribute(draft.heightCm ?? "")}" required />
-          </div>
-          <div class="field">
-            <label for="cycle-sex">Referência corporal para estimativa</label>
-            <select id="cycle-sex" name="sex">
-              <option value="" ${!draft.sex ? "selected" : ""}>Não utilizar estimativa por circunferências</option>
-              <option value="male" ${draft.sex === "male" ? "selected" : ""}>Equação masculina</option>
-              <option value="female" ${draft.sex === "female" ? "selected" : ""}>Equação feminina</option>
-            </select>
-            <span class="help-text">Usada somente para selecionar a equação corporal; não precisa representar a identidade de gênero.</span>
           </div>
           <div class="field">
             <label for="cycle-start-weight">Peso inicial (kg)</label>
@@ -434,19 +433,14 @@ function renderCycleDialog(state) {
           <div class="field">
             <label for="cycle-start-waist">Cintura inicial (cm)</label>
             <input id="cycle-start-waist" name="startWaistCm" inputmode="decimal"
-              value="${escapeAttribute(draft.startWaistCm ?? "")}" />
+              value="${escapeAttribute(draft.startWaistCm ?? "")}" required />
           </div>
-          <div class="field">
-            <label for="cycle-start-neck">Pescoço inicial (cm)</label>
-            <input id="cycle-start-neck" name="startNeckCm" inputmode="decimal"
-              value="${escapeAttribute(draft.startNeckCm ?? "")}" />
-          </div>
-          <div class="field">
-            <label for="cycle-start-hip">Quadril inicial (cm)</label>
-            <input id="cycle-start-hip" name="startHipCm" inputmode="decimal"
-              value="${escapeAttribute(draft.startHipCm ?? "")}" />
-          </div>
-          <div class="field">
+            </div>
+          </fieldset>
+          <fieldset class="measurement-group">
+            <legend>Composição corporal</legend>
+            <div class="form-grid">
+          <div class="field new-cycle-method-field">
             <label for="cycle-body-fat-method">Origem da gordura corporal</label>
             <select id="cycle-body-fat-method" name="startBodyFatMethod">
               ${bodyFatMethods.map((method) => `
@@ -458,8 +452,30 @@ function renderCycleDialog(state) {
             <label for="cycle-body-fat-manual">Percentual de gordura informado (%)</label>
             <input id="cycle-body-fat-manual" name="startBodyFatManual" inputmode="decimal"
               value="${escapeAttribute(draft.startBodyFatManual ?? "")}" />
-            <span class="help-text">Quando preenchido por método externo, este valor substitui a estimativa pelas circunferências.</span>
+            <span class="help-text">O valor obtido por avaliação externa substitui a estimativa por circunferências.</span>
           </div>
+          <div class="field" data-new-cycle-estimated-field>
+            <label for="cycle-sex">Equação corporal utilizada</label>
+            <select id="cycle-sex" name="sex">
+              <option value="" ${!draft.sex ? "selected" : ""}>Selecione uma equação</option>
+              <option value="male" ${draft.sex === "male" ? "selected" : ""}>Equação masculina</option>
+              <option value="female" ${draft.sex === "female" ? "selected" : ""}>Equação feminina</option>
+            </select>
+            <span class="help-text">A estimativa por circunferências depende da equação corporal selecionada.</span>
+          </div>
+          <div class="field" data-new-cycle-estimated-field>
+            <label for="cycle-start-neck">Pescoço inicial (cm)</label>
+            <input id="cycle-start-neck" name="startNeckCm" inputmode="decimal"
+              value="${escapeAttribute(draft.startNeckCm ?? "")}" />
+          </div>
+          <div class="field" data-new-cycle-estimated-field>
+            <label for="cycle-start-hip">Quadril inicial (cm)</label>
+            <input id="cycle-start-hip" name="startHipCm" inputmode="decimal"
+              value="${escapeAttribute(draft.startHipCm ?? "")}" />
+            <span class="help-text">Obrigatório somente para a equação feminina.</span>
+          </div>
+            </div>
+          </fieldset>
         </div>
         <div class="goal-preview" id="new-cycle-baseline-preview">
           ${renderNewCycleBaselinePreview(draft)}
@@ -1170,9 +1186,17 @@ export function bindProfile(state, persist, render) {
       const valueField = baselineForm.querySelector("[data-new-cycle-body-fat-value]");
       const valueInput = baselineForm.elements.startBodyFatManual;
       if (valueField) valueField.hidden = estimated;
+      baselineForm.querySelectorAll("[data-new-cycle-estimated-field]").forEach((field) => {
+        field.hidden = !estimated;
+      });
       if (valueInput) {
         valueInput.disabled = estimated;
         valueInput.required = !estimated;
+      }
+      if (baselineForm.elements.sex) baselineForm.elements.sex.required = estimated;
+      if (baselineForm.elements.startNeckCm) baselineForm.elements.startNeckCm.required = estimated;
+      if (baselineForm.elements.startHipCm) {
+        baselineForm.elements.startHipCm.required = estimated && draft.sex === "female";
       }
       document.getElementById("new-cycle-baseline-preview").innerHTML =
         renderNewCycleBaselinePreview(draft);
@@ -1193,7 +1217,7 @@ export function bindProfile(state, persist, render) {
       const validation = await validateNumericFields(baselineForm, {
         heightCm: { rule: "heightCm", label: "Altura", required: true },
         startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
-        startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: estimated },
+        startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: true },
         startNeckCm: { rule: "circumferenceCm", label: "Pescoço inicial", required: estimated },
         startHipCm: {
           rule: "circumferenceCm",

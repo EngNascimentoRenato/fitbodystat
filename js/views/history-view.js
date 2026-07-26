@@ -1,38 +1,8 @@
 import { enrichEntries } from "../services/progress-service.js";
-import {
-  bodyFatMethodIsEstimated,
-  bodyFatMethodLabel,
-  bodyFatMethods,
-  normalizeBodyFatMethod
-} from "../models/goal-model.js";
+import { bodyFatMethodLabel } from "../models/goal-model.js";
 import { formatDate } from "../utils/date-utils.js";
-import { formatCm, formatDecimal, formatKg, formatPercent, toNumber } from "../utils/number-utils.js";
-import { confirmAction } from "../components/modal.js";
-import { showToast } from "../components/toast.js";
+import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
-import { validateNumericFields } from "../utils/validation-utils.js";
-
-let editingEntryId = null;
-
-function numberInput(name, value, label) {
-  return `<input class="table-input number" name="${name}" inputmode="decimal" aria-label="${label}" value="${escapeAttribute(value ?? "")}" />`;
-}
-
-function renderBodyFatEditor(entry) {
-  const selectedMethod = normalizeBodyFatMethod(entry.bodyFatMethod);
-  return `
-    <div class="table-edit-stack">
-      <select class="table-input" name="bodyFatMethod" aria-label="Método de gordura corporal">
-        ${bodyFatMethods.map((method) => `
-          <option value="${method.value}" ${method.value === selectedMethod ? "selected" : ""}>${method.label}</option>
-        `).join("")}
-      </select>
-      <div data-history-body-fat-value ${bodyFatMethodIsEstimated(selectedMethod) ? "hidden" : ""}>
-        ${numberInput("bodyFatManual", entry.bodyFatManual, "Gordura informada em percentual")}
-      </div>
-    </div>
-  `;
-}
 
 function renderBodyFat(entry) {
   return `
@@ -41,7 +11,7 @@ function renderBodyFat(entry) {
   `;
 }
 
-function renderActions(entry, isEditing, baselineLocked) {
+function renderActions(entry, baselineLocked) {
   if (entry.isBaseline) {
     return `
       <div class="table-actions">
@@ -51,15 +21,10 @@ function renderActions(entry, isEditing, baselineLocked) {
     `;
   }
 
-  return isEditing ? `
+  return `
     <div class="table-actions">
-      <button class="button" data-cancel-entry type="button">Cancelar</button>
-      <button class="button primary" data-save-entry="${escapeAttribute(entry.id)}" type="button">Salvar</button>
-    </div>
-  ` : `
-    <div class="table-actions">
-      <button class="button" data-edit-entry="${escapeAttribute(entry.id)}" type="button">Editar</button>
-      <button class="button danger" data-delete-entry="${escapeAttribute(entry.id)}" type="button">Excluir</button>
+      <button class="icon-button history-edit-button" data-edit-entry="${escapeAttribute(entry.id)}"
+        type="button" aria-label="Editar registro de ${escapeAttribute(formatDate(entry.date))}" title="Editar registro">✎</button>
     </div>
   `;
 }
@@ -97,23 +62,18 @@ export function renderHistory(state) {
           </thead>
           <tbody>
             ${rows.map((entry) => {
-              const isEditing = !entry.isBaseline && entry.id === editingEntryId;
               return `
                 <tr data-entry-row="${escapeAttribute(entry.id)}">
-                  <td>${isEditing
-                    ? `<input class="table-input" name="date" type="date" required value="${escapeAttribute(entry.date)}" />`
-                    : formatDate(entry.date)}</td>
-                  <td class="number">${isEditing ? numberInput("weightKg", entry.weightKg, "Peso") : formatKg(entry.weightKg)}</td>
-                  <td class="number">${isEditing ? numberInput("waistCm", entry.waistCm, "Cintura") : formatCm(entry.waistCm)}</td>
-                  <td class="number">${isEditing ? numberInput("neckCm", entry.neckCm, "Pescoço") : formatCm(entry.neckCm)}</td>
-                  <td class="number">${isEditing ? numberInput("hipCm", entry.hipCm, "Quadril") : formatCm(entry.hipCm)}</td>
+                  <td>${formatDate(entry.date)}</td>
+                  <td class="number">${formatKg(entry.weightKg)}</td>
+                  <td class="number">${formatCm(entry.waistCm)}</td>
+                  <td class="number">${formatCm(entry.neckCm)}</td>
+                  <td class="number">${formatCm(entry.hipCm)}</td>
                   <td class="number">${formatDecimal(entry.bmi, 1)}</td>
-                  <td class="number">${isEditing ? renderBodyFatEditor(entry) : renderBodyFat(entry)}</td>
+                  <td class="number">${renderBodyFat(entry)}</td>
                   <td class="number">${formatKg(entry.weekDiff)}</td>
-                  <td>${isEditing
-                    ? `<textarea class="table-input" name="notes" aria-label="Observações">${escapeHtml(entry.notes || "")}</textarea>`
-                    : escapeHtml(entry.notes || "-")}</td>
-                  <td>${renderActions(entry, isEditing, baselineLocked)}</td>
+                  <td>${escapeHtml(entry.notes || "-")}</td>
+                  <td>${renderActions(entry, baselineLocked)}</td>
                 </tr>
               `;
             }).join("")}
@@ -125,103 +85,10 @@ export function renderHistory(state) {
 }
 
 export function bindHistory(state, persist, render) {
-  document.querySelectorAll('[name="bodyFatMethod"]').forEach((select) => {
-    select.addEventListener("change", () => {
-      const valueContainer = select.closest(".table-edit-stack")?.querySelector("[data-history-body-fat-value]");
-      const input = valueContainer?.querySelector('[name="bodyFatManual"]');
-      const estimated = bodyFatMethodIsEstimated(select.value);
-      if (valueContainer) valueContainer.hidden = estimated;
-      if (input) {
-        input.disabled = estimated;
-        input.required = !estimated;
-      }
-    });
-  });
   document.querySelectorAll("[data-edit-entry]").forEach((button) => {
     button.addEventListener("click", () => {
-      editingEntryId = button.dataset.editEntry;
-      render();
-    });
-  });
-
-  document.querySelector("[data-cancel-entry]")?.addEventListener("click", () => {
-    editingEntryId = null;
-    render();
-  });
-
-  document.querySelector("[data-save-entry]")?.addEventListener("click", async (event) => {
-    const entryId = event.currentTarget.dataset.saveEntry;
-    const row = event.currentTarget.closest("[data-entry-row]");
-    const currentEntry = state.entries.find((entry) => entry.id === entryId);
-    if (!row || !currentEntry) return;
-
-    const value = (name) => row.querySelector(`[name="${name}"]`)?.value ?? "";
-    const date = value("date");
-    const weightKg = toNumber(value("weightKg"));
-    if (!date) {
-      showToast("Informe uma data e um peso válidos.");
-      return;
-    }
-    if (state.profile.startDate && date <= state.profile.startDate) {
-      showToast("A medição deve ser posterior à data inicial do perfil.");
-      return;
-    }
-    if (state.entries.some((entry) => entry.id !== entryId && entry.date === date)) {
-      showToast("Já existe outro registro nessa data.");
-      return;
-    }
-    const validation = await validateNumericFields(row, {
-      weightKg: { rule: "weightKg", label: "Peso", required: true },
-      waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
-      neckCm: { rule: "circumferenceCm", label: "Pescoço" },
-      hipCm: { rule: "circumferenceCm", label: "Quadril", required: state.profile.sex === "female" },
-      bodyFatManual: {
-        rule: "bodyFatPercent",
-        label: "Gordura corporal",
-        required: !bodyFatMethodIsEstimated(value("bodyFatMethod"))
-      }
-    });
-    if (!validation.valid) {
-      showToast("Revise os campos destacados.");
-      return;
-    }
-
-    const updatedEntry = {
-      ...currentEntry,
-      date,
-      weightKg,
-      waistCm: toNumber(value("waistCm")),
-      neckCm: toNumber(value("neckCm")),
-      hipCm: toNumber(value("hipCm")),
-      bodyFatMethod: normalizeBodyFatMethod(value("bodyFatMethod")),
-      bodyFatManual: bodyFatMethodIsEstimated(value("bodyFatMethod"))
-        ? null
-        : toNumber(value("bodyFatManual")),
-      notes: value("notes").trim()
-    };
-    state.entries = state.entries
-      .map((entry) => entry.id === entryId ? updatedEntry : entry)
-      .sort((a, b) => a.date.localeCompare(b.date));
-    editingEntryId = null;
-    persist({ type: "entry-upsert", entry: updatedEntry });
-    showToast("Registro atualizado.");
-    render();
-  });
-
-  document.querySelectorAll("[data-delete-entry]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      if (!await confirmAction({
-        title: "Excluir registro?",
-        message: "Esta medição será removida do histórico.",
-        confirmLabel: "Excluir",
-        tone: "danger"
-      })) return;
-      const entryId = button.dataset.deleteEntry;
-      state.entries = state.entries.filter((entry) => entry.id !== entryId);
-      editingEntryId = null;
-      persist({ type: "entry-delete", entryId });
-      showToast("Registro excluído.");
-      render();
+      sessionStorage.setItem("fitbodystat-edit-entry-id", button.dataset.editEntry);
+      location.hash = location.hash.includes("/me/") ? "#/me/registro" : "#/registro";
     });
   });
 }

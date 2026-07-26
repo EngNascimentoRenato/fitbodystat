@@ -50,6 +50,10 @@ somente as medições associadas ao projeto atual.
 A criação de projeto utiliza duas etapas temporárias: linha de base e objetivo.
 Os dados não são persistidos entre as etapas; o ciclo ativo somente é criado
 depois da confirmação final do planejamento.
+Na linha de base, altura, peso e cintura são medições principais. A referência
+corporal, o pescoço e o quadril são apresentados quando a origem da gordura
+corporal utiliza estimativa por circunferências. A confirmação final permanece
+depois da prévia e da tabela de planejamento mensal.
 
 Convites e vínculos permanecem entidades separadas. `originInvitationId` registra
 a origem do relacionamento, enquanto `accessBenefit` pertence a cada documento
@@ -66,6 +70,9 @@ Atividades físicas podem ser registradas sem projeto; peso e medidas corporais
 exigem um ciclo ativo para preservar a linha de base e o contexto histórico.
 O perfil possui editores independentes para dados pessoais, linha de base,
 objetivo e preferências de atividades.
+No histórico de medidas, a exclusão fica subordinada à abertura da edição do
+registro. As listagens de medidas e atividades preservam o conteúdo completo em
+telas estreitas por meio de rolagem interna.
 
 Links de convite usam apenas o identificador aleatório do documento. Antes da
 autenticação, a página informa genericamente que existe um convite profissional,

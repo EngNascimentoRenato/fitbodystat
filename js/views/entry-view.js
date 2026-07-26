@@ -14,12 +14,14 @@ import { bodyFatMethodIsEstimated } from "../models/goal-model.js";
 let activeEntryMode = "activity";
 let selectedActivityDate = todayISO();
 let editingActivityDate = null;
+let editingMeasurementId = null;
 let entryHasPendingChanges = false;
 
 export function resetEntryMode() {
   activeEntryMode = "activity";
   selectedActivityDate = todayISO();
   editingActivityDate = null;
+  editingMeasurementId = null;
   entryHasPendingChanges = false;
 }
 
@@ -32,6 +34,15 @@ function consumeActivityEditRequest() {
   sessionStorage.removeItem("fitbodystat-edit-activity-date");
 }
 
+function consumeMeasurementEditRequest() {
+  const entryId = sessionStorage.getItem("fitbodystat-edit-entry-id");
+  if (!entryId) return;
+  activeEntryMode = "measurement";
+  editingMeasurementId = entryId;
+  editingActivityDate = null;
+  sessionStorage.removeItem("fitbodystat-edit-entry-id");
+}
+
 function renderModeSelector() {
   return `
     <div class="entry-mode" role="tablist" aria-label="Tipo de registro">
@@ -39,7 +50,8 @@ function renderModeSelector() {
         aria-selected="${activeEntryMode === "measurement"}"
         ${editingActivityDate ? "disabled" : ""}>Medidas corporais</button>
       <button data-entry-mode="activity" type="button" role="tab"
-        aria-selected="${activeEntryMode === "activity"}">Atividade física</button>
+        aria-selected="${activeEntryMode === "activity"}"
+        ${editingMeasurementId ? "disabled" : ""}>Atividade física</button>
     </div>
   `;
 }
@@ -115,12 +127,17 @@ function renderMeasurementUnavailable() {
 
 export function renderEntry(state) {
   consumeActivityEditRequest();
+  consumeMeasurementEditRequest();
+  const editingMeasurement = editingMeasurementId
+    ? state.entries.find((entry) => entry.id === editingMeasurementId)
+    : null;
+  if (editingMeasurementId && !editingMeasurement) editingMeasurementId = null;
   return `
     <div class="view-stack">
       ${renderModeSelector()}
       ${activeEntryMode === "activity" ? renderActivityForm(state) : `
         ${state.activeCycleId ? `
-          ${entryForm(state.profile)}
+          ${entryForm(state.profile, editingMeasurement || {}, { isEditing: Boolean(editingMeasurement) })}
           <section class="card">
             <h2>Como medir</h2>
             <p class="muted">Para consistência, registre pela manhã, em jejum, depois de ir ao banheiro. No método por medidas, mantenha a fita nivelada e sem apertar a pele.</p>
@@ -152,15 +169,41 @@ function bindMeasurementForm(state, persist, render) {
   };
   methodField?.addEventListener("change", updateBodyFatFields);
   updateBodyFatFields();
-  document.getElementById("cancel-measurement-entry")?.addEventListener("click", async () => {
+  const historyRoute = () => location.hash.includes("/me/") ? "#/me/historico" : "#/historico";
+  const cancelMeasurement = async () => {
     if (entryHasPendingChanges && !await confirmAction({
-      title: "Descartar registro?",
-      message: "Os dados preenchidos não serão salvos.",
+      title: editingMeasurementId ? "Cancelar edição?" : "Descartar registro?",
+      message: editingMeasurementId
+        ? "As alterações realizadas não serão salvas."
+        : "Os dados preenchidos não serão salvos.",
       confirmLabel: "Descartar",
       tone: "warning"
     })) return;
     entryHasPendingChanges = false;
-    location.hash = location.hash.includes("/me/") ? "#/me/dashboard" : "#/dashboard";
+    const destination = editingMeasurementId
+      ? historyRoute()
+      : location.hash.includes("/me/") ? "#/me/dashboard" : "#/dashboard";
+    editingMeasurementId = null;
+    location.hash = destination;
+    render();
+  };
+  document.getElementById("cancel-measurement-entry")?.addEventListener("click", cancelMeasurement);
+
+  document.getElementById("delete-measurement-edit")?.addEventListener("click", async () => {
+    if (!editingMeasurementId || !await confirmAction({
+      title: "Excluir registro?",
+      message: "Esta medição será removida do histórico.",
+      confirmLabel: "Excluir",
+      tone: "danger"
+    })) return;
+    const entryId = editingMeasurementId;
+    state.entries = state.entries.filter((entry) => entry.id !== entryId);
+    persist({ type: "entry-delete", entryId });
+    entryHasPendingChanges = false;
+    editingMeasurementId = null;
+    showToast("Registro excluído.");
+    location.hash = historyRoute();
+    render();
   });
 
   form?.addEventListener("submit", async (event) => {
@@ -171,7 +214,7 @@ function bindMeasurementForm(state, persist, render) {
       showToast("A data deve ser posterior à data inicial do perfil.");
       return;
     }
-    if (state.entries.some((item) => item.date === date)) {
+    if (state.entries.some((item) => item.id !== editingMeasurementId && item.date === date)) {
       showToast("Já existe um registro nessa data. Edite-o pelo histórico.");
       return;
     }
@@ -191,7 +234,11 @@ function bindMeasurementForm(state, persist, render) {
       return;
     }
 
+    const currentEntry = editingMeasurementId
+      ? state.entries.find((item) => item.id === editingMeasurementId)
+      : null;
     const entry = createEntry({
+      ...(currentEntry || {}),
       cycleId: state.activeCycleId || null,
       date,
       weightKg: toNumber(data.get("weightKg")),
@@ -202,7 +249,10 @@ function bindMeasurementForm(state, persist, render) {
       bodyFatManual: toNumber(data.get("bodyFatManual")),
       notes: data.get("notes").trim()
     });
-    state.entries = [...state.entries, entry].sort((a, b) => a.date.localeCompare(b.date));
+    state.entries = [
+      ...state.entries.filter((item) => item.id !== entry.id),
+      entry
+    ].sort((a, b) => a.date.localeCompare(b.date));
     const profileChanged = state.profile.baselineLocked !== true;
     if (profileChanged) {
       state.profile = {
@@ -213,8 +263,10 @@ function bindMeasurementForm(state, persist, render) {
     }
     persist({ type: "entry-upsert", entry, profileChanged });
     entryHasPendingChanges = false;
-    showToast("Registro salvo.");
-    location.hash = "#/dashboard";
+    const wasEditing = Boolean(editingMeasurementId);
+    editingMeasurementId = null;
+    showToast(wasEditing ? "Registro atualizado." : "Registro salvo.");
+    location.hash = wasEditing ? historyRoute() : "#/dashboard";
     render();
   });
 }

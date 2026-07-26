@@ -42,11 +42,13 @@ function configureTopbar(activeRoute, authState) {
   const isDataView = dataPaths.includes(activeRoute.path);
   action.hidden = !isDataView;
   action.href = activeRoute.path.startsWith("/me/") ? "#/me/registro" : "#/registro";
-  action.textContent = authState.activePatient
+  const actionLabel = authState.activePatient
     ? "Novo registro do paciente"
     : authState.role === "user" || authState.activeWorkspace === "personal"
       ? "Novo registro"
       : "Meu novo registro";
+  action.setAttribute("aria-label", actionLabel);
+  action.title = actionLabel;
 
   if (!authState.activePatient || !patientDataPaths.includes(activeRoute.path)) return;
   const patientTitles = {

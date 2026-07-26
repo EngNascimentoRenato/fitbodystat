@@ -278,6 +278,12 @@ body.menu-collapsed .nav-submenu-content {
 
 .topbar-action {
   justify-self: end;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .topbar-title {
@@ -430,9 +436,16 @@ body.menu-collapsed .nav-submenu-content {
     grid-template-columns: 42px minmax(0, 1fr) auto;
   }
 
+  .workspace-indicator {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+
   .topbar-action {
-    grid-column: 1 / -1;
-    width: 100%;
+    grid-column: 3;
+    grid-row: 1;
+    width: 42px;
   }
 }
 
@@ -535,7 +548,7 @@ body.menu-collapsed .nav-submenu-content {
 
 @media (max-width: 520px) {
   .topbar {
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
     align-items: center;
   }
 
@@ -545,12 +558,14 @@ body.menu-collapsed .nav-submenu-content {
 
   .workspace-indicator {
     grid-column: 2;
+    grid-row: 2;
     justify-self: start;
   }
 
   .topbar-action {
-    grid-column: 1 / -1;
-    width: 100%;
+    grid-column: 3;
+    grid-row: 1;
+    width: 42px;
   }
 
   .patient-context,

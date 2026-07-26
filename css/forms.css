@@ -33,6 +33,30 @@
   font-weight: 800;
 }
 
+.new-cycle-baseline-groups {
+  display: grid;
+  gap: 1rem;
+}
+
+.new-cycle-dialog .form-grid {
+  align-items: start;
+}
+
+.new-cycle-primary-measures {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.history-edit-button {
+  flex: 0 0 42px;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 760px) {
+  .new-cycle-primary-measures {
+    grid-template-columns: 1fr;
+  }
+}
+
 .measurement-method-notice {
   margin: 0.75rem 0 0;
 }
