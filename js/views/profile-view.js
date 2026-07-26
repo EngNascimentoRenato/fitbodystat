@@ -346,10 +346,12 @@ function renderProfileSummary(state, options) {
             <h2>${escapeHtml(profile.name || "Perfil corporal")}</h2>
             <p class="muted">Informações consolidadas do acompanhamento atual.</p>
           </div>
-          <button class="button primary" id="edit-profile" type="button">
-            <span class="profile-edit-label-full">${options.canEditIdentity === false ? "Editar acompanhamento" : "Editar perfil"}</span>
-            <span class="profile-edit-label-short">Editar</span>
-          </button>
+          ${options.canEditIdentity !== false || currentCycle ? `
+            <button class="button primary" id="edit-profile" type="button">
+              <span class="profile-edit-label-full">${options.canEditIdentity === false ? "Editar acompanhamento" : "Editar perfil"}</span>
+              <span class="profile-edit-label-short">Editar</span>
+            </button>
+          ` : ""}
         </div>
         <dl class="profile-summary-grid">
           ${profileValue("Sexo", sexLabels[profile.sex])}
@@ -436,6 +438,59 @@ function renderProfileSummary(state, options) {
   `;
 }
 
+function renderBasicProfileEditor(state, options) {
+  const p = state.profile;
+  return `
+    <form class="form profile-form" id="basic-profile-form">
+      <section class="card">
+        <div class="chart-header">
+          <div>
+            <p class="eyebrow">Ficha do perfil</p>
+            <h2>Dados pessoais</h2>
+            <p class="muted">Medidas, metas e planejamento serão definidos ao criar um projeto.</p>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="basic-profile-name">Nome completo</label>
+            <input id="basic-profile-name" name="name" required minlength="2"
+              value="${escapeAttribute(p.name || "")}" />
+          </div>
+          <div class="field">
+            <label for="basic-profile-birth-date">Data de nascimento</label>
+            <input id="basic-profile-birth-date" name="birthDate" type="date" max="${todayISO()}"
+              value="${escapeAttribute(p.birthDate || "")}" required />
+          </div>
+          <div class="field">
+            <label for="basic-profile-sex">Sexo</label>
+            <select id="basic-profile-sex" name="sex">
+              <option value="" ${!p.sex ? "selected" : ""}>Prefiro informar depois</option>
+              <option value="male" ${p.sex === "male" ? "selected" : ""}>Masculino</option>
+              <option value="female" ${p.sex === "female" ? "selected" : ""}>Feminino</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="basic-profile-height">Altura (cm)</label>
+            <input id="basic-profile-height" name="heightCm" inputmode="decimal"
+              value="${escapeAttribute(p.heightCm ?? "")}" />
+          </div>
+          ${options.canEditContact !== false ? `
+            <div class="field">
+              <label for="basic-profile-phone">Telefone</label>
+              <input id="basic-profile-phone" name="phone" type="tel"
+                value="${escapeAttribute(formatPhone(state.contact?.phone || ""))}" />
+            </div>
+          ` : ""}
+        </div>
+        <div class="button-row profile-card-save">
+          <button class="button" id="cancel-basic-profile" type="button">Cancelar</button>
+          <button class="button primary" type="submit">Salvar</button>
+        </div>
+      </section>
+    </form>
+  `;
+}
+
 function readProfileForm(form, currentProfile) {
   const data = new FormData(form);
   const value = (name, fallback) => data.has(name) ? data.get(name) : fallback;
@@ -493,6 +548,13 @@ export function renderProfile(state, options = {}) {
   const canEditIdentity = options.canEditIdentity !== false;
   const editing = options.forceEdit === true || profileEditMode;
   if (!editing) return renderProfileSummary(state, { canEditContact, canEditIdentity });
+  if (!state.activeCycleId && !canEditIdentity) {
+    profileEditMode = false;
+    return renderProfileSummary(state, { canEditContact, canEditIdentity });
+  }
+  if (!state.activeCycleId) {
+    return renderBasicProfileEditor(state, { canEditContact, canEditIdentity });
+  }
   const activeEntries = state.activeCycleId
     ? state.entries.filter((entry) => !entry.cycleId || entry.cycleId === state.activeCycleId)
     : [];
@@ -694,6 +756,42 @@ export function renderProfile(state, options = {}) {
 }
 
 export function bindProfile(state, persist, render) {
+  const basicForm = document.getElementById("basic-profile-form");
+  if (basicForm) {
+    document.getElementById("cancel-basic-profile")?.addEventListener("click", () => {
+      profileEditMode = false;
+      render();
+    });
+    basicForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      const heightField = event.currentTarget.elements.heightCm;
+      if (heightField.value && !await resolveHeightInput(heightField)) return;
+      if (data.has("phone") && !phoneIsValid(data.get("phone"))) {
+        showToast("Informe um telefone válido, com DDD.");
+        return;
+      }
+      const validation = await validateNumericFields(event.currentTarget, {
+        heightCm: { rule: "heightCm", label: "Altura" }
+      });
+      if (!validation.valid) return;
+      state.profile = {
+        ...state.profile,
+        name: String(data.get("name") || "").trim(),
+        birthDate: data.get("birthDate"),
+        sex: data.get("sex"),
+        heightCm: toNumber(data.get("heightCm"))
+      };
+      if (data.has("phone")) {
+        state.contact = { ...(state.contact || {}), phone: normalizePhone(data.get("phone")) };
+      }
+      profileEditMode = false;
+      persist({ type: "profile-plan" });
+      showToast("Perfil atualizado.");
+      render();
+    });
+    return;
+  }
   const form = document.getElementById("profile-form");
   if (!form) {
     document.getElementById("edit-profile")?.addEventListener("click", () => {

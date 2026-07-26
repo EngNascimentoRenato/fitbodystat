@@ -50,6 +50,18 @@ neste inventário antes de sua implementação.
 Cada novo recurso deverá indicar proprietário do dado, pessoas autorizadas,
 finalidade do acesso e eventos que encerram a autorização.
 
+Um usuário pode manter vários vínculos profissionais simultâneos. Cada vínculo
+possui permissões e eventual benefício de acesso independentes. O profissional
+que originou o cadastro pode ser registrado para atribuição, mas não se torna
+proprietário da conta nem recebe exclusividade sobre os dados ou sobre o acesso.
+O encerramento de um vínculo deve revogar somente suas permissões e concessões.
+
+A criação da conta não implica consentimento para compartilhar dados de saúde.
+Convites permanecem pendentes até uma ação afirmativa do usuário, com descrição
+das permissões solicitadas. Telefone e demais dados de contato exigem escolha
+separada, e a posse de um link de convite não substitui a correspondência com o
+e-mail autenticado.
+
 Os ciclos pertencem ao usuário. Profissionais vinculados somente poderão
 consultá-los ou editá-los conforme as permissões vigentes do vínculo. Encerrar um
 ciclo não implica eliminar suas medições; retenção, exportação e exclusão devem

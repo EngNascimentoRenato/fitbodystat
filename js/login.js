@@ -16,6 +16,8 @@ const forgotButton = document.getElementById("forgot-password");
 let handlingAuth = false;
 
 const initialStatus = new URLSearchParams(location.search).get("status");
+const invitationId = new URLSearchParams(location.search).get("invite");
+if (invitationId) localStorage.setItem("fitbodystat-pending-invitation", invitationId);
 
 function setStatus(message, type = "info") {
   statusEl.textContent = message;

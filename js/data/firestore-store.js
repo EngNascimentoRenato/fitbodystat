@@ -293,7 +293,12 @@ export async function createCareInvitation(professional, patientEmail) {
     status: "pending",
     permissions: {
       viewData: true,
-      editData: true
+      editData: true,
+      createCycles: true
+    },
+    accessBenefit: {
+      source: "professional-link",
+      activeWhileLinked: true
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -343,7 +348,13 @@ export async function respondToCareInvitation(invitation, user, response, option
       status: "active",
       permissions: {
         ...(invitation.permissions || { viewData: true, editData: true }),
+        createCycles: invitation.permissions?.createCycles !== false,
         sharePhone: options.sharePhone === true
+      },
+      originInvitationId: invitation.id,
+      accessBenefit: invitation.accessBenefit || {
+        source: "professional-link",
+        activeWhileLinked: true
       },
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -429,6 +440,7 @@ export async function updateCareLinkPhoneSharing(link, sharePhone) {
   await updateDoc(doc(db, "careLinks", link.id), {
     permissions: {
       ...(link.permissions || { viewData: true, editData: true }),
+      createCycles: link.permissions?.createCycles !== false,
       sharePhone: sharePhone === true
     },
     updatedAt: serverTimestamp()

@@ -291,7 +291,12 @@ service cloud.firestore {
         && request.resource.data.patientEmailLower is string
         && request.resource.data.patientEmailLower != request.auth.token.email.lower()
         && request.resource.data.patientId == null
-        && request.resource.data.status == "pending";
+        && request.resource.data.status == "pending"
+        && request.resource.data.permissions.viewData == true
+        && request.resource.data.permissions.editData == true
+        && request.resource.data.permissions.createCycles == true
+        && request.resource.data.accessBenefit.source == "professional-link"
+        && request.resource.data.accessBenefit.activeWhileLinked == true;
 
       allow read: if isAdmin()
         || (accountIsActive() && resource.data.professionalId == request.auth.uid)
@@ -334,7 +339,18 @@ service cloud.firestore {
           && request.resource.data.status == "active"
           && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.status == "accepted"
           && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.patientId == request.auth.uid
-          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.professionalId == request.resource.data.professionalId);
+          && getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.professionalId == request.resource.data.professionalId
+          && request.resource.data.originInvitationId == request.resource.data.invitationId
+          && request.resource.data.permissions.viewData == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions.viewData
+          && request.resource.data.permissions.editData == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions.editData
+          && ((!("createCycles" in getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions)
+                && request.resource.data.permissions.createCycles == true)
+            || request.resource.data.permissions.createCycles == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.permissions.createCycles)
+          && request.resource.data.permissions.sharePhone is bool
+          && ((!("accessBenefit" in getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data)
+                && request.resource.data.accessBenefit.source == "professional-link"
+                && request.resource.data.accessBenefit.activeWhileLinked == true)
+            || request.resource.data.accessBenefit == getAfter(/databases/$(database)/documents/careInvitations/$(request.resource.data.invitationId)).data.accessBenefit));
 
       allow update: if isAdmin()
         || (accountIsActive()
@@ -346,6 +362,9 @@ service cloud.firestore {
           && request.resource.data.invitationId == resource.data.invitationId
           && request.resource.data.permissions.viewData == resource.data.permissions.viewData
           && request.resource.data.permissions.editData == resource.data.permissions.editData
+          && ((!("createCycles" in resource.data.permissions)
+                && request.resource.data.permissions.createCycles == true)
+            || request.resource.data.permissions.createCycles == resource.data.permissions.createCycles)
           && request.resource.data.permissions.sharePhone is bool
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             "permissions", "updatedAt"

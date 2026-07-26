@@ -17,6 +17,14 @@ const invitationLabels = {
   cancelled: "Cancelado"
 };
 
+function invitationLink(invitationId) {
+  const url = new URL("login.html", location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("invite", invitationId);
+  return url.href;
+}
+
 export function renderPatients(state, authState) {
   if (authState.role !== "professional") {
     return `<section class="card empty-state"><h2>Acesso restrito</h2><p class="muted">Esta área é destinada a profissionais.</p></section>`;
@@ -83,7 +91,12 @@ export function renderPatients(state, authState) {
                 <tr>
                   <td>${escapeHtml(invitation.patientEmailLower)}</td>
                   <td>${invitationLabels[invitation.status] || invitation.status}</td>
-                  <td><button class="button" data-cancel-invitation="${invitation.id}" type="button">Cancelar</button></td>
+                  <td>
+                    <div class="button-row">
+                      <button class="button primary" data-share-invitation="${invitation.id}" type="button">Compartilhar link</button>
+                      <button class="button" data-cancel-invitation="${invitation.id}" type="button">Cancelar</button>
+                    </div>
+                  </td>
                 </tr>
               `).join("") || `<tr><td colspan="3">Nenhum convite pendente.</td></tr>`}
             </tbody>
@@ -170,6 +183,26 @@ export function bindPatients(context) {
         await refresh();
       } catch (error) {
         showToast(`Não foi possível cancelar o convite: ${error.message}`);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-share-invitation]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const invitation = (context.authState.sentInvitations || [])
+        .find((item) => item.id === button.dataset.shareInvitation);
+      if (!invitation) return;
+      const url = invitationLink(invitation.id);
+      const text = `${context.personalState.profile?.name || "Um profissional"} convidou você para o FitBodyStat.`;
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: "Convite FitBodyStat", text, url });
+        } else {
+          await navigator.clipboard.writeText(url);
+          showToast("Link do convite copiado.");
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") showToast("Não foi possível compartilhar o link.");
       }
     });
   });

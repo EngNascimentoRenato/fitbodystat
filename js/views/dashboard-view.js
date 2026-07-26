@@ -64,6 +64,46 @@ function dashboardSummary(profile, latest, activities) {
 }
 
 export function renderDashboard(state, routePrefix = "", options = {}) {
+  if (!state.activeCycleId) {
+    const pendingInvitations = Number(options.pendingInvitations) || 0;
+    return `
+      <div class="view-stack">
+        <section class="card hero-panel">
+          <div>
+            <p class="eyebrow">Próximos passos</p>
+            <h2>${pendingInvitations ? "Você recebeu um convite profissional" : "Seu perfil está pronto"}</h2>
+            <p>${pendingInvitations
+              ? "Revise o convite, conheça as permissões solicitadas e confirme o vínculo antes de compartilhar seus dados."
+              : "Crie seu projeto quando tiver as medidas necessárias ou aguarde a orientação de um profissional."}</p>
+          </div>
+        </section>
+        <section class="grid two">
+          ${pendingInvitations ? `
+            <article class="card">
+              <p class="eyebrow">Convite pendente</p>
+              <h2>Confirmar profissional</h2>
+              <p class="muted">${pendingInvitations} convite${pendingInvitations === 1 ? "" : "s"} aguardando sua decisão.</p>
+              <a class="button primary" href="#${routePrefix}/vinculos">Revisar convite</a>
+            </article>
+          ` : `
+            <article class="card">
+              <p class="eyebrow">Com acompanhamento</p>
+              <h2>Aguardar um profissional</h2>
+              <p class="muted">Quando houver um convite, ele aparecerá aqui antes de qualquer compartilhamento.</p>
+              <a class="button" href="#${routePrefix}/vinculos">Meus profissionais</a>
+            </article>
+          `}
+          <article class="card">
+            <p class="eyebrow">Por conta própria</p>
+            <h2>Criar meu projeto</h2>
+            <p class="muted">Defina linha de base, objetivo e planejamento quando estiver preparado.</p>
+            <a class="button primary" href="#${routePrefix}/perfil">Criar projeto</a>
+          </article>
+        </section>
+        ${weeklyActivityCard(state.profile, state.activities || [], routePrefix)}
+      </div>
+    `;
+  }
   const { profile, entries } = state;
   const enriched = enrichEntries(profile, entries);
   const latest = getLatestEntry(profile, entries);

@@ -36,7 +36,10 @@ export function renderConnections(authState, personalState) {
                 <tr>
                   <td>${escapeHtml(invitation.professionalName || "Profissional")}</td>
                   <td>${escapeHtml(invitation.professionalEmail || "-")}</td>
-                  <td>Visualizar e atualizar acompanhamento</td>
+                  <td>
+                    Visualizar e atualizar acompanhamento
+                    ${invitation.permissions?.createCycles !== false ? "<br><small>Criar e ajustar projetos</small>" : ""}
+                  </td>
                   <td>
                     ${ownPhone ? `
                       <label class="consent-option">
@@ -114,8 +117,17 @@ export function bindConnections(context) {
     if (!invitation) return;
     const sharePhone = response === "accepted"
       && document.querySelector(`[data-share-phone-invitation="${invitationId}"]`)?.checked === true;
+    if (response === "accepted" && !await confirmAction({
+      title: `Aceitar convite de ${invitation.professionalName || "profissional"}?`,
+      message: `Este profissional poderá visualizar e atualizar seu acompanhamento${invitation.permissions?.createCycles !== false ? ", incluindo a criação de projetos" : ""}.${sharePhone ? "\n\nSeu telefone também será compartilhado." : ""}`,
+      confirmLabel: "Aceitar e compartilhar",
+      tone: "warning"
+    })) return;
     try {
       await respondToCareInvitation(invitation, context.authState.user, response, { sharePhone });
+      if (localStorage.getItem("fitbodystat-pending-invitation") === invitation.id) {
+        localStorage.removeItem("fitbodystat-pending-invitation");
+      }
       showToast(response === "accepted" ? "Vínculo confirmado." : "Convite recusado.");
       await refresh();
     } catch (error) {

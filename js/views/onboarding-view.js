@@ -26,6 +26,52 @@ import {
   validateNumericFields
 } from "../utils/validation-utils.js";
 
+function basicUserOnboarding(state, authState) {
+  const profile = state.profile;
+  return `
+    <form class="form onboarding-form" id="basic-user-onboarding-form">
+      <section class="card">
+        <p class="eyebrow">Primeiro acesso</p>
+        <h2>Crie seu perfil</h2>
+        <p class="muted">Neste momento, precisamos apenas dos seus dados básicos. Você poderá criar o acompanhamento quando tiver suas medidas ou aguardar a orientação de um profissional.</p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="basic-name">Nome completo</label>
+            <input id="basic-name" name="name" autocomplete="name" minlength="2" required
+              value="${escapeAttribute(profile.name || authState.user?.displayName || "")}" />
+          </div>
+          <div class="field">
+            <label for="basic-birth-date">Data de nascimento</label>
+            <input id="basic-birth-date" name="birthDate" type="date" max="${todayISO()}" required />
+          </div>
+          <div class="field">
+            <label for="basic-sex">Sexo</label>
+            <select id="basic-sex" name="sex">
+              <option value="">Prefiro informar depois</option>
+              <option value="male">Masculino</option>
+              <option value="female">Feminino</option>
+            </select>
+            <span class="help-text">Será necessário apenas quando você utilizar cálculos corporais específicos.</span>
+          </div>
+          <div class="field">
+            <label for="basic-height">Altura (cm)</label>
+            <input id="basic-height" name="heightCm" inputmode="decimal" />
+            <span class="help-text">Opcional. Pode ser informada ao criar o primeiro projeto.</span>
+          </div>
+          <div class="field">
+            <label for="basic-phone">Telefone</label>
+            <input id="basic-phone" name="phone" type="tel" autocomplete="tel" placeholder="(65) 99999-9999" />
+            <span class="help-text">Opcional. O compartilhamento com profissionais será solicitado separadamente.</span>
+          </div>
+        </div>
+      </section>
+      <div class="button-row onboarding-submit">
+        <button class="button primary" type="submit">Concluir perfil</button>
+      </div>
+    </form>
+  `;
+}
+
 function userOnboarding(state, authState) {
   const profile = state.profile;
   return `
@@ -250,7 +296,7 @@ function professionalOnboarding(authState) {
 export function renderOnboarding(state, authState) {
   return authState.role === "professional" && authState.activeWorkspace !== "personal"
     ? professionalOnboarding(authState)
-    : userOnboarding(state, authState);
+    : basicUserOnboarding(state, authState);
 }
 
 function updateInsight(form) {
@@ -371,6 +417,44 @@ function goalDirectionIsValid(profile, field) {
 }
 
 export function bindOnboarding(context) {
+  const basicForm = document.getElementById("basic-user-onboarding-form");
+  basicForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const heightField = event.currentTarget.elements.heightCm;
+    if (heightField.value && !await resolveHeightInput(heightField)) return;
+    if (!phoneIsValid(data.get("phone"))) {
+      showToast("Informe um telefone válido, com DDD.");
+      return;
+    }
+    const validation = await validateNumericFields(event.currentTarget, {
+      heightCm: { rule: "heightCm", label: "Altura" }
+    });
+    if (!validation.valid) {
+      showToast("Revise os campos destacados.");
+      return;
+    }
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      await context.completeOnboarding({
+        profile: {
+          ...context.personalState.profile,
+          name: String(data.get("name") || "").trim(),
+          birthDate: data.get("birthDate"),
+          sex: data.get("sex"),
+          heightCm: toNumber(data.get("heightCm"))
+        },
+        contact: { phone: normalizePhone(data.get("phone")) }
+      });
+      showToast("Perfil criado.");
+    } catch (error) {
+      showToast(`Não foi possível concluir o cadastro: ${error.message}`);
+      button.disabled = false;
+    }
+  });
+  if (basicForm) return;
+
   const userForm = document.getElementById("onboarding-user-form");
   const sexField = document.getElementById("onboarding-sex");
   const hipField = document.getElementById("onboarding-hip");

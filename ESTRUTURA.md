@@ -46,6 +46,15 @@ O ciclo pode ser encerrado como concluído, abandonado ou expirado. Um novo cicl
 só pode ser iniciado quando não houver outro ativo, e seus cálculos consideram
 somente as medições associadas ao projeto atual.
 
+Convites e vínculos permanecem entidades separadas. `originInvitationId` registra
+a origem do relacionamento, enquanto `accessBenefit` pertence a cada documento
+de vínculo. O direito de acesso futuro deverá considerar o conjunto de vínculos
+ativos e assinaturas, sem depender de um único profissional.
+
+O primeiro acesso do usuário cria apenas o perfil básico. A ausência de ciclo
+ativo é um estado válido: o Dashboard apresenta próximos passos, e o projeto pode
+ser criado posteriormente pelo usuário ou por profissional vinculado e autorizado.
+
 ## Estilos
 
 ```text

@@ -6,6 +6,8 @@ import {
   ensureUserDocument,
   getUser,
   loadProfessionalProfile,
+  listInvitationsForUser,
+  listProfessionalsForUser,
   loadCloudState,
   saveCloudState,
   saveActivity,
@@ -69,6 +71,7 @@ let authState = {
 };
 let isApplyingCloudState = false;
 let authReady = false;
+const pendingInvitationId = () => localStorage.getItem("fitbodystat-pending-invitation");
 
 function usesGoogle(user) {
   return user?.providerData?.some((provider) => provider.providerId === "google.com");
@@ -206,12 +209,10 @@ function closePatient() {
   render();
 }
 
-function hasPersonalBaseline() {
+function hasPersonalProfile() {
   return Boolean(
     personalState.profile.name
-    && personalState.profile.sex
-    && personalState.profile.heightCm
-    && personalState.profile.startWeightKg
+    && personalState.profile.birthDate
   );
 }
 
@@ -222,7 +223,7 @@ function setActiveWorkspace(workspace, shouldNavigate = true) {
     : "professional";
   leavePatientContext();
   authState.activeWorkspace = next;
-  authState.needsPersonalOnboarding = next === "personal" && !hasPersonalBaseline();
+  authState.needsPersonalOnboarding = next === "personal" && !hasPersonalProfile();
   state = personalState;
   saveDeviceWorkspace(authState.user?.uid, next);
   if (shouldNavigate) {
@@ -392,7 +393,7 @@ async function completeOnboarding(payload) {
   authState.syncStatus = "Cadastro concluído e sincronizado.";
   location.hash = authState.role === "professional"
     ? authState.activeWorkspace === "personal" ? "#/dashboard" : "#/agenda"
-    : "#/dashboard";
+    : pendingInvitationId() ? "#/vinculos" : "#/dashboard";
   render();
 }
 
@@ -473,11 +474,19 @@ observeAuth(async (user) => {
     const accountName = user.displayName || userDoc.name || "";
     if (!personalState.profile.name && accountName) personalState.profile.name = accountName;
     authState.needsName = !String(personalState.profile.name || "").trim();
-    const personalBaselineReady = Boolean(
+    try {
+      [authState.invitations, authState.professionals] = await Promise.all([
+        listInvitationsForUser(user.email),
+        listProfessionalsForUser(user.uid)
+      ]);
+    } catch (error) {
+      console.warn("Não foi possível carregar vínculos durante a inicialização.", error);
+      authState.invitations = [];
+      authState.professionals = [];
+    }
+    const personalProfileReady = Boolean(
       personalState.profile.name
-      && personalState.profile.sex
-      && personalState.profile.heightCm
-      && personalState.profile.startWeightKg
+      && personalState.profile.birthDate
     );
     const hasProfessionalRegistration = Boolean(
       authState.professionalProfile?.name
@@ -486,12 +495,12 @@ observeAuth(async (user) => {
     authState.needsPersonalOnboarding = authState.role === "professional"
       && authState.activeWorkspace === "personal"
       && hasProfessionalRegistration
-      && !personalBaselineReady;
+      && !personalProfileReady;
     authState.needsOnboarding = authState.role === "professional"
       ? !hasProfessionalRegistration || authState.needsPersonalOnboarding
       : authState.role !== "admin"
         && userDoc.onboardingCompleted !== true
-        && !personalBaselineReady;
+        && !personalProfileReady;
     if (!authState.needsName && user.displayName !== personalState.profile.name) {
       await updateCurrentUserName(personalState.profile.name);
       await updateOwnDirectoryName(user.uid, personalState.profile.name);
@@ -512,8 +521,15 @@ observeAuth(async (user) => {
     isApplyingCloudState = false;
 
     if (!location.hash) {
+      const hasPendingSharedInvitation = (authState.invitations || [])
+        .some((invitation) => invitation.id === pendingInvitationId() && invitation.status === "pending");
+      if (hasPendingSharedInvitation && !authState.needsOnboarding) {
+        localStorage.removeItem("fitbodystat-pending-invitation");
+      }
       location.hash = authState.needsOnboarding
         ? "#/primeiro-acesso"
+        : hasPendingSharedInvitation
+        ? "#/vinculos"
         : authState.needsName
         ? "#/perfil"
         : authState.role === "professional"
