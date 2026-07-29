@@ -3,6 +3,11 @@ import { bodyFatMethodLabel } from "../models/goal-model.js";
 import { formatDate } from "../utils/date-utils.js";
 import { formatCm, formatDecimal, formatKg, formatPercent } from "../utils/number-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+import {
+  circumferenceCatalog,
+  circumferenceValue,
+  normalizeCircumferenceKeys
+} from "../data/circumference-catalog.js";
 
 function renderBodyFat(entry) {
   return `
@@ -31,6 +36,9 @@ function renderActions(entry, baselineLocked) {
 
 export function renderHistory(state) {
   const rows = enrichEntries(state.profile, state.entries).reverse();
+  const extraCircumferences = normalizeCircumferenceKeys(state.profile.trackedCircumferences)
+    .map((key) => circumferenceCatalog.find((item) => item.key === key))
+    .filter((item) => item && !["waist", "neck", "hip"].includes(item.key));
   const baselineLocked = state.profile.baselineLocked === true || state.entries.length > 0;
   if (!rows.length) {
     return `<section class="card empty-state"><h2>Nenhum registro ainda</h2><p class="muted">Preencha o perfil para criar a linha inicial.</p></section>`;
@@ -53,6 +61,10 @@ export function renderHistory(state) {
               <th class="number">Cintura</th>
               <th class="number">Pescoço</th>
               <th class="number">Quadril</th>
+              ${extraCircumferences.map((item) => item.bilateral
+                ? `<th class="number">${escapeHtml(item.label)} D</th><th class="number">${escapeHtml(item.label)} E</th>`
+                : `<th class="number">${escapeHtml(item.label)}</th>`
+              ).join("")}
               <th class="number">IMC</th>
               <th class="number">Gordura</th>
               <th class="number">Semana</th>
@@ -69,6 +81,11 @@ export function renderHistory(state) {
                   <td class="number">${formatCm(entry.waistCm)}</td>
                   <td class="number">${formatCm(entry.neckCm)}</td>
                   <td class="number">${formatCm(entry.hipCm)}</td>
+                  ${extraCircumferences.map((item) => item.bilateral
+                    ? `<td class="number">${formatCm(circumferenceValue(entry, item.key, "", "right"))}</td>
+                       <td class="number">${formatCm(circumferenceValue(entry, item.key, "", "left"))}</td>`
+                    : `<td class="number">${formatCm(circumferenceValue(entry, item.key))}</td>`
+                  ).join("")}
                   <td class="number">${formatDecimal(entry.bmi, 1)}</td>
                   <td class="number">${renderBodyFat(entry)}</td>
                   <td class="number">${formatKg(entry.weekDiff)}</td>

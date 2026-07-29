@@ -27,7 +27,8 @@ O FitBodyStat poderá tratar:
 
 - dados cadastrais e de autenticação;
 - dados de contato;
-- peso, medidas corporais, percentual de gordura e objetivos;
+- peso, circunferencias corporais, dobras cutaneas, percentual de gordura e
+  objetivos;
 - atividades físicas e informações de evolução;
 - ciclos de acompanhamento, suas linhas de base, objetivos, estados e encerramentos;
 - vínculos entre usuários e profissionais;
@@ -38,6 +39,13 @@ O FitBodyStat poderá tratar:
 Peso, medidas, evolução corporal e outras informações relacionadas à saúde devem
 ser tratadas como dados pessoais sensíveis. Novas categorias deverão ser incluídas
 neste inventário antes de sua implementação.
+
+As leituras brutas de adipometro, o protocolo de calculo, a idade usada na
+equacao e as circunferencias opcionais tambem sao dados pessoais sensiveis.
+Devem seguir as mesmas regras de acesso, exportacao, retencao e eliminacao das
+demais medicoes corporais.
+Quando aplicavel, o inventario preserva separadamente as leituras dos lados
+direito e esquerdo para permitir a avaliacao de assimetrias.
 
 ## Matriz de acesso
 

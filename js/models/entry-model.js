@@ -8,6 +8,8 @@ export function createEntry(overrides = {}) {
     waistCm: null,
     neckCm: null,
     hipCm: null,
+    circumferences: {},
+    skinfolds: null,
     bodyFatManual: null,
     bodyFatMethod: "circumference",
     notes: "",

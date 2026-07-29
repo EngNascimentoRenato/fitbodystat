@@ -60,6 +60,25 @@ corporal, o pescoço e o quadril são apresentados quando a origem da gordura
 corporal utiliza estimativa por circunferências. A confirmação final permanece
 depois da prévia e da tabela de planejamento mensal.
 
+Cada ciclo tambem define as circunferencias opcionais que serao acompanhadas.
+O catalogo central fica em `js/data/circumference-catalog.js`; os valores iniciais
+ficam no ciclo e os posteriores em cada medicao. O formulario de registro e o
+historico exibem somente as medidas selecionadas para aquele projeto, preservando
+os campos legados de cintura, pescoco e quadril.
+A cintura e obrigatoria em todos os projetos. As demais circunferencias sao
+selecionadas conforme o objetivo e apresentadas em uma grade compacta.
+Braco relaxado, braco contraido, antebraco, coxa e panturrilha possuem leituras
+separadas para os lados direito e esquerdo. Valores numericos antigos continuam
+sendo interpretados como leitura do lado direito.
+
+Quando a origem da gordura corporal e adipometro, o componente
+`js/components/skinfold-calculator.js` oferece o protocolo Jackson-Pollock de
+tres dobras. Ele usa idade e sexo corporal, calcula a densidade e aplica a
+conversao de Siri. O percentual calculado, o protocolo e as leituras em
+milimetros sao armazenados com a linha de base ou medicao correspondente.
+O modal calcula e apresenta a estimativa antes da confirmacao; somente a acao
+`Usar valor` substitui o percentual de gordura no formulario principal.
+
 Convites e vínculos permanecem entidades separadas. `originInvitationId` registra
 a origem do relacionamento, enquanto `accessBenefit` pertence a cada documento
 de vínculo. O direito de acesso futuro deverá considerar o conjunto de vínculos

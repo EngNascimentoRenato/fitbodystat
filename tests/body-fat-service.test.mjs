@@ -8,6 +8,7 @@ import {
 } from "../js/models/goal-model.js";
 import {
   calculateBodyFatByNavy,
+  calculateBodyFatBySkinfoldThreeSite,
   classifyBodyFat,
   resolveBodyFat,
   resolveProfileBodyFat
@@ -54,4 +55,36 @@ test("resolve a gordura inicial com o mesmo critério dos registros", () => {
     neckCm: profile.startNeckCm,
     hipCm: profile.startHipCm
   }) > 0);
+});
+
+test("calcula Jackson-Pollock de três dobras e converte por Siri", () => {
+  const male = calculateBodyFatBySkinfoldThreeSite({
+    sex: "male",
+    age: 39,
+    chestMm: 15,
+    abdomenMm: 25,
+    thighMm: 20
+  });
+  const female = calculateBodyFatBySkinfoldThreeSite({
+    sex: "female",
+    age: 39,
+    tricepsMm: 20,
+    suprailiacMm: 25,
+    thighMm: 30
+  });
+
+  assert.equal(male.bodyFatPercent, 19);
+  assert.equal(male.sumMm, 60);
+  assert.equal(female.bodyFatPercent, 29.4);
+  assert.equal(female.conversion, "siri");
+});
+
+test("recusa dobras inválidas ou idade fora do protocolo", () => {
+  assert.equal(calculateBodyFatBySkinfoldThreeSite({
+    sex: "male",
+    age: 17,
+    chestMm: 15,
+    abdomenMm: 25,
+    thighMm: 20
+  }), null);
 });

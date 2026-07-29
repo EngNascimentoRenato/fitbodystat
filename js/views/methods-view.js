@@ -26,6 +26,23 @@ export function renderMethods() {
       </section>
 
       <section class="card">
+        <h2>Percentual de gordura por adipômetro</h2>
+        <p>O protocolo Jackson-Pollock de três dobras estima a densidade corporal usando a soma das leituras em milímetros e a idade.</p>
+        <div class="grid two">
+          <div>
+            <h3>Masculino</h3>
+            <p>Peitoral, abdômen e coxa.</p>
+          </div>
+          <div>
+            <h3>Feminino</h3>
+            <p>Tríceps, supra-ilíaca e coxa.</p>
+          </div>
+        </div>
+        <p class="formula-block">Gordura (%) = (495 ÷ densidade corporal) − 450</p>
+        <p class="form-notice">O resultado depende da técnica, do ponto anatômico e da calibração do adipômetro. O app preserva as leituras utilizadas para permitir conferência posterior.</p>
+      </section>
+
+      <section class="card">
         <h2>Medição informada</h2>
         <p>Quando um percentual for informado, ele terá prioridade sobre a estimativa por medidas. Para acompanhar tendências, procure repetir o mesmo método e condições.</p>
         <p class="muted">Métodos diferentes não são diretamente intercambiáveis. Para acompanhar evolução, prefira repetir o mesmo método e condições de medição.</p>

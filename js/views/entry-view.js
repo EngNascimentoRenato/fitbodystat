@@ -10,6 +10,14 @@ import { mergeDailyActivity } from "../services/activity-service.js";
 import { validateNumericFields } from "../utils/validation-utils.js";
 import { confirmAction } from "../components/modal.js";
 import { bodyFatMethodIsEstimated } from "../models/goal-model.js";
+import {
+  bindSkinfoldCalculator,
+  parseSkinfoldData
+} from "../components/skinfold-calculator.js";
+import {
+  circumferenceCatalog,
+  normalizeCircumferenceKeys
+} from "../data/circumference-catalog.js";
 
 let activeEntryMode = "activity";
 let selectedActivityDate = todayISO();
@@ -157,6 +165,7 @@ function bindMeasurementForm(state, persist, render) {
     const field = form?.querySelector("[data-body-fat-value-field]");
     const help = form?.querySelector("[data-body-fat-help]");
     const notice = form?.querySelector("[data-body-fat-notice]");
+    const calculator = form?.querySelector("[data-skinfold-calculator]");
     if (field) field.hidden = estimated;
     if (valueField) {
       valueField.disabled = estimated;
@@ -166,9 +175,31 @@ function bindMeasurementForm(state, persist, render) {
     if (notice) notice.textContent = estimated
       ? "O aplicativo calculará uma estimativa pelas circunferências. O resultado não substitui uma avaliação profissional."
       : "O valor informado será priorizado. Para comparar a evolução, procure repetir o mesmo método e condições.";
+    if (calculator) calculator.hidden = methodField?.value !== "caliper";
+    const tracked = new Set(normalizeCircumferenceKeys(state.profile.trackedCircumferences));
+    form?.querySelectorAll("[data-circumference-field]").forEach((field) => {
+      const key = field.dataset.circumferenceField;
+      const requiredForEstimate = estimated
+        && ["waist", "neck"].includes(key)
+        || estimated && state.profile.sex === "female" && key === "hip";
+      field.hidden = !tracked.has(key) && !requiredForEstimate;
+      field.querySelectorAll("input").forEach((input) => {
+        input.disabled = field.hidden;
+        input.required = requiredForEstimate;
+      });
+    });
   };
   methodField?.addEventListener("change", updateBodyFatFields);
   updateBodyFatFields();
+  bindSkinfoldCalculator({
+    prefix: "entry",
+    profile: state.profile,
+    measurementDate: () => form?.elements.date?.value,
+    targetInput: valueField,
+    onResult: () => {
+      entryHasPendingChanges = true;
+    }
+  });
   const historyRoute = () => location.hash.includes("/me/") ? "#/me/historico" : "#/historico";
   const dashboardRoute = () => location.hash.includes("/me/") ? "#/me/dashboard" : "#/dashboard";
   const cancelMeasurement = async () => {
@@ -219,11 +250,23 @@ function bindMeasurementForm(state, persist, render) {
       showToast("Já existe um registro nessa data. Edite-o pelo histórico.");
       return;
     }
+    const circumferenceRules = {};
+    event.currentTarget.querySelectorAll("[data-circumference-field] input:not(:disabled)")
+      .forEach((input) => {
+        const item = circumferenceCatalog.find((candidate) =>
+          candidate.legacyField === input.name
+          || `circumference_${candidate.key}` === input.name
+          || input.name.startsWith(`circumference_${candidate.key}_`)
+        );
+        circumferenceRules[input.name] = {
+          rule: "circumferenceCm",
+          label: item?.label || "Circunferência",
+          required: input.required
+        };
+      });
     const validation = await validateNumericFields(event.currentTarget, {
       weightKg: { rule: "weightKg", label: "Peso", required: true },
-      waistCm: { rule: "circumferenceCm", label: "Cintura", required: true },
-      neckCm: { rule: "circumferenceCm", label: "Pescoço" },
-      hipCm: { rule: "circumferenceCm", label: "Quadril", required: state.profile.sex === "female" },
+      ...circumferenceRules,
       bodyFatManual: {
         rule: "bodyFatPercent",
         label: "Gordura corporal",
@@ -238,6 +281,17 @@ function bindMeasurementForm(state, persist, render) {
     const currentEntry = editingMeasurementId
       ? state.entries.find((item) => item.id === editingMeasurementId)
       : null;
+    const circumferences = { ...(currentEntry?.circumferences || {}) };
+    normalizeCircumferenceKeys(state.profile.trackedCircumferences).forEach((key) => {
+      const item = circumferenceCatalog.find((candidate) => candidate.key === key);
+      if (!item || item.legacyField) return;
+      circumferences[key] = item.bilateral
+        ? {
+            right: toNumber(data.get(`circumference_${key}_right`)),
+            left: toNumber(data.get(`circumference_${key}_left`))
+          }
+        : toNumber(data.get(`circumference_${key}`));
+    });
     const entry = createEntry({
       ...(currentEntry || {}),
       cycleId: state.activeCycleId || null,
@@ -246,8 +300,12 @@ function bindMeasurementForm(state, persist, render) {
       waistCm: toNumber(data.get("waistCm")),
       neckCm: toNumber(data.get("neckCm")),
       hipCm: toNumber(data.get("hipCm")),
+      circumferences,
       bodyFatMethod: data.get("bodyFatMethod"),
       bodyFatManual: toNumber(data.get("bodyFatManual")),
+      skinfolds: data.get("bodyFatMethod") === "caliper"
+        ? parseSkinfoldData(data.get("skinfoldData"))
+        : null,
       notes: data.get("notes").trim()
     });
     state.entries = [

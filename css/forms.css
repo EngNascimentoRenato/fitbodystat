@@ -371,6 +371,88 @@
   color: var(--muted);
 }
 
+.circumference-tracking-field {
+  grid-column: 1 / -1;
+}
+
+.circumference-picker {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.circumference-picker label {
+  position: relative;
+}
+
+.circumference-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.circumference-picker span {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  padding: 0.45rem 0.7rem;
+  color: var(--muted);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.circumference-picker input:checked + span {
+  color: var(--text);
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+.circumference-picker input:focus-visible + span {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.circumference-baseline-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.compact-measurement-grid {
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 0.75rem;
+}
+
+.measurement-compact-item {
+  min-width: 0;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.measurement-compact-item > input {
+  width: 100%;
+  max-width: 10rem;
+}
+
+.body-measure-field > input {
+  width: 100%;
+  max-width: 10rem;
+}
+
+.skinfold-open {
+  margin-top: 0.6rem;
+}
+
+.skinfold-dialog {
+  width: min(680px, calc(100vw - 2rem));
+}
+
 .cycle-details-dialog {
   width: min(920px, calc(100vw - 2rem));
 }
@@ -566,6 +648,69 @@
   padding: 1rem;
 }
 
+.skinfold-dialog {
+  border: 2px solid var(--border);
+}
+
+.skinfold-dialog-content {
+  padding: 1rem;
+}
+
+.skinfold-result {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.skinfold-result[hidden] {
+  display: none;
+}
+
+.skinfold-result span,
+.skinfold-result small {
+  color: var(--muted);
+}
+
+.skinfold-result strong {
+  color: var(--primary);
+  font-size: 1.65rem;
+}
+
+.skinfold-dialog .account-dialog-actions {
+  flex-wrap: wrap;
+}
+
+.bilateral-circumference {
+  grid-column: span 2;
+  min-width: 0;
+  margin: 0;
+}
+
+.bilateral-circumference > legend {
+  margin-bottom: 0.45rem;
+  font-weight: 700;
+}
+
+.bilateral-circumference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.bilateral-circumference-grid input {
+  width: 100%;
+  min-width: 0;
+}
+
+.bilateral-circumference-grid label {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .account-dialog-header,
 .account-dialog-actions {
   display: flex;
@@ -697,6 +842,11 @@ tr:last-child td {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .compact-measurement-grid,
+  .circumference-baseline-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .profile-summary-grid {

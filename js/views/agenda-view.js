@@ -60,6 +60,7 @@ const agendaUi = {
   view: "week",
   anchor: todayISO(),
   filters: { status: "", patient: "", location: "" },
+  filtersOpen: false,
   detailOpen: false,
   detailEventId: null,
   detailOccurrenceDate: null,
@@ -171,7 +172,10 @@ function renderDayView(days, groups, patients, availability) {
           <h2>${events.length} ${events.length === 1 ? "item" : "itens"}</h2>
           <small class="agenda-availability-label">${escapeHtml(availabilityLabel(date, availability))}</small>
         </div>
-        <button class="button" type="button" data-create-on-date="${escapeAttribute(date)}">Adicionar</button>
+        <button class="icon-button agenda-add-date" type="button"
+          data-create-on-date="${escapeAttribute(date)}"
+          aria-label="Adicionar compromisso em ${escapeAttribute(formatDate(date))}"
+          title="Adicionar compromisso">+</button>
       </header>
       <div class="agenda-day-list">
         ${events.map((event) => {
@@ -179,7 +183,8 @@ function renderDayView(days, groups, patients, availability) {
           const sourceId = event.sourceEventId || event.id;
           return `
             <article class="agenda-day-event" style="--event-color:${eventColor(event)}">
-              <button type="button" data-agenda-event="${escapeAttribute(sourceId)}">
+              <button type="button" data-agenda-event="${escapeAttribute(sourceId)}"
+                data-occurrence-date="${escapeAttribute(event.date)}">
                 <span class="agenda-day-time">${escapeHtml(event.startTime)}<small>${event.durationMinutes} min</small></span>
                 <span class="agenda-day-main">
                   <strong>${escapeHtml(eventTitle(event))}</strong>
@@ -193,7 +198,7 @@ function renderDayView(days, groups, patients, availability) {
               ${patient?.phone ? `<a class="agenda-phone" href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>` : ""}
             </article>
           `;
-        }).join("") || `<div class="agenda-empty-day"><p>Nenhum compromisso neste dia.</p><button class="button primary" type="button" data-create-on-date="${escapeAttribute(date)}">Criar compromisso</button></div>`}
+        }).join("") || `<div class="agenda-empty-day"><p>Nenhum compromisso neste dia.</p><button class="icon-button agenda-add-date" type="button" data-create-on-date="${escapeAttribute(date)}" aria-label="Adicionar compromisso" title="Adicionar compromisso">+</button></div>`}
       </div>
     </section>
   `;
@@ -207,12 +212,12 @@ function renderWeekView(days, groups, availability) {
         return `
           <section class="agenda-week-day ${date === todayISO() ? "today" : ""}">
             <button class="agenda-day-heading" type="button" data-open-day="${escapeAttribute(date)}">
-              <span>${escapeHtml(shortDayLabel(date))}<small>${escapeHtml(availabilityLabel(date, availability))}</small></span>
+              <span><b>${escapeHtml(shortDayLabel(date))}</b><small>${escapeHtml(availabilityLabel(date, availability))}</small></span>
               <strong>${events.length}</strong>
             </button>
             <div class="agenda-week-events">
               ${events.map((event) => renderEventButton(event)).join("")
-                || `<button class="agenda-empty-slot" type="button" data-create-on-date="${escapeAttribute(date)}">Adicionar</button>`}
+                || `<button class="agenda-empty-slot" type="button" data-create-on-date="${escapeAttribute(date)}" aria-label="Adicionar compromisso em ${escapeAttribute(formatDate(date))}" title="Adicionar compromisso">+</button>`}
             </div>
           </section>
         `;
@@ -252,7 +257,7 @@ function renderMonthView(days, groups, anchor) {
 function renderFilters(events, patients) {
   const locations = [...new Set(events.map((event) => event.location).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   return `
-    <div class="agenda-filters" aria-label="Filtros da agenda">
+    <div class="agenda-filters" aria-label="Filtros da agenda" ${agendaUi.filtersOpen ? "" : "hidden"}>
       <div class="field">
         <label for="agenda-filter-status">Estado</label>
         <select id="agenda-filter-status">
@@ -635,6 +640,7 @@ function renderEventDetails(event, patients) {
               ${isRecurring ? `
                 <select name="statusScope" aria-label="Aplicar estado">
                   <option value="occurrence">Somente esta ocorrência</option>
+                  <option value="future">Esta e as próximas</option>
                   <option value="series">Toda a série</option>
                 </select>
               ` : ""}
@@ -702,6 +708,7 @@ function renderCancellationDialog(event) {
             <label for="agenda-cancel-scope">Aplicar cancelamento</label>
             <select id="agenda-cancel-scope" name="cancelScope">
               <option value="occurrence">Somente esta ocorrência</option>
+              <option value="future">Esta e as próximas</option>
               <option value="series">Toda a série</option>
             </select>
           </div>
@@ -892,9 +899,6 @@ export function renderAgenda(authState) {
       && event.relatedEventId === detailEvent.id
     ) || null
     : null;
-  const availabilityConfigured = Object.values(authState.agendaAvailability?.weekly || {})
-    .some((intervals) => intervals.length);
-
   const calendar = agendaUi.view === "day"
     ? renderDayView(days, groups, patients, authState.agendaAvailability)
     : agendaUi.view === "month"
@@ -909,6 +913,20 @@ export function renderAgenda(authState) {
             <button class="icon-button" id="agenda-previous" type="button" aria-label="Período anterior">‹</button>
             <button class="button" id="agenda-today" type="button">Hoje</button>
             <button class="icon-button" id="agenda-next" type="button" aria-label="Próximo período">›</button>
+            <button class="icon-button agenda-refresh-button" id="refresh-agenda" type="button"
+              aria-label="Atualizar agenda" title="Atualizar agenda">
+              <span aria-hidden="true">⟳</span>
+            </button>
+            <button class="icon-button agenda-filter-toggle" id="toggle-agenda-filters" type="button"
+              aria-label="Filtros" title="Filtros" aria-expanded="${agendaUi.filtersOpen}">
+              <span class="filter-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+              ${activeFilterLabels(patients).length ? `<b>${activeFilterLabels(patients).length}</b>` : ""}
+            </button>
+            <button class="button agenda-availability-button" id="open-availability" type="button"
+              aria-label="Horários de atendimento" title="Horários de atendimento">
+              <span class="agenda-availability-label-full">Horários de atendimento</span>
+              <span class="agenda-availability-label-mobile" aria-hidden="true">⋮</span>
+            </button>
           </div>
           <h2>${escapeHtml(capitalizeFirst(agendaPeriodLabel(agendaUi.anchor, agendaUi.view)))}</h2>
           <div class="agenda-view-switch" role="group" aria-label="Visualização da agenda">
@@ -922,17 +940,9 @@ export function renderAgenda(authState) {
         <div class="agenda-toolbar-actions">
           <p>${appointmentCount} ${appointmentCount === 1 ? "compromisso" : "compromissos"} · ${blockCount} ${blockCount === 1 ? "bloqueio" : "bloqueios"}</p>
           <div class="button-row">
-            <button class="button" id="refresh-agenda" type="button">Atualizar</button>
-            <button class="button" id="open-availability" type="button">Horários de atendimento</button>
-            <button class="button" data-new-agenda-event="block" type="button">Indisponibilidade</button>
             <button class="button primary" data-new-agenda-event="appointment" type="button">Novo compromisso</button>
           </div>
         </div>
-        <p class="agenda-availability-status">
-          <span class="agenda-status ${availabilityConfigured ? "success" : "neutral"}">
-            ${availabilityConfigured ? "Disponibilidade configurada" : "Disponibilidade ainda não configurada"}
-          </span>
-        </p>
         ${renderFilters(events, patients)}
         ${renderActiveFilters(patients, visibleEvents.length)}
       </section>
@@ -1197,6 +1207,10 @@ export function bindAgenda(context) {
     button.addEventListener("click", () => openEditor(context, null, button.dataset.newAgendaEvent));
   });
   document.getElementById("open-availability")?.addEventListener("click", () => openAvailabilityEditor(context));
+  document.getElementById("toggle-agenda-filters")?.addEventListener("click", () => {
+    agendaUi.filtersOpen = !agendaUi.filtersOpen;
+    context.render();
+  });
   document.querySelectorAll("[data-agenda-event]").forEach((button) => {
     button.addEventListener("click", () => {
       const event = (context.authState.agendaEvents || []).find((item) => item.id === button.dataset.agendaEvent);
@@ -1247,6 +1261,31 @@ export function bindAgenda(context) {
     }
     submit.disabled = true;
     const statusScope = form.elements.statusScope?.value || "series";
+    if (source.recurrence?.frequency === "weekly" && statusScope === "future") {
+      try {
+        const occurrenceDate = agendaUi.detailOccurrenceDate || source.date;
+        const occurrence = expandRecurringEvents([source], [occurrenceDate])[0] || source;
+        const result = await splitAgendaSeries(
+          context.authState.user.uid,
+          source,
+          occurrenceDate,
+          { ...occurrence, status: form.elements.status.value }
+        );
+        context.authState.agendaEvents = (context.authState.agendaEvents || [])
+          .map((item) => item.id === source.id ? result.source : item)
+          .concat(...(result.nextSeries ? [result.nextSeries] : []))
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+        agendaUi.detailOpen = false;
+        agendaUi.detailEventId = null;
+        agendaUi.detailOccurrenceDate = null;
+        showToast("Estado atualizado nesta e nas próximas ocorrências.");
+        context.render();
+      } catch (error) {
+        submit.disabled = false;
+        showToast(`Não foi possível atualizar o estado: ${error.message}`);
+      }
+      return;
+    }
     if (source.recurrence?.frequency === "weekly" && statusScope === "occurrence") {
       try {
         const occurrenceDate = agendaUi.detailOccurrenceDate || source.date;
@@ -1273,6 +1312,7 @@ export function bindAgenda(context) {
       return;
     }
     const previousEvents = [...context.authState.agendaEvents];
+    const previousOccurrenceDate = agendaUi.detailOccurrenceDate;
     const candidate = normalizeAgendaEvent(
       { ...source, status: form.elements.status.value },
       context.authState.user.uid,
@@ -1280,6 +1320,9 @@ export function bindAgenda(context) {
     );
     context.authState.agendaEvents = previousEvents
       .map((item) => item.id === source.id ? { id: source.id, ...candidate } : item);
+    agendaUi.detailOpen = false;
+    agendaUi.detailEventId = null;
+    agendaUi.detailOccurrenceDate = null;
     context.render();
     try {
       const saved = await saveAgendaEvent(context.authState.user.uid, candidate, source);
@@ -1289,6 +1332,9 @@ export function bindAgenda(context) {
       context.render();
     } catch (error) {
       context.authState.agendaEvents = previousEvents;
+      agendaUi.detailOpen = true;
+      agendaUi.detailEventId = source.id;
+      agendaUi.detailOccurrenceDate = previousOccurrenceDate;
       context.render();
       showToast(`Não foi possível atualizar o estado: ${error.message}`);
     }
@@ -1332,7 +1378,7 @@ export function bindAgenda(context) {
       const cancelScope = form.elements.cancelScope?.value || "series";
       const occurrenceDate = agendaUi.detailOccurrenceDate || source.date;
       const cancellationTarget = source.recurrence?.frequency === "weekly"
-        && cancelScope === "occurrence"
+        && cancelScope !== "series"
         ? expandRecurringEvents([source], [occurrenceDate])[0] || source
         : source;
       const blockDetails = {
@@ -1361,6 +1407,41 @@ export function bindAgenda(context) {
           submit.disabled = false;
           return;
         }
+      }
+      if (source.recurrence?.frequency === "weekly" && cancelScope === "future") {
+        const result = await splitAgendaSeries(
+          context.authState.user.uid,
+          source,
+          occurrenceDate,
+          {
+            ...cancellationTarget,
+            status: "cancelled",
+            cancellationReason: form.elements.reason.value
+          }
+        );
+        let savedBlock = null;
+        if (blockInput) {
+          savedBlock = await saveAgendaEvent(
+            context.authState.user.uid,
+            { ...blockInput, relatedEventId: result.nextSeries?.id || result.source.id }
+          );
+        }
+        context.authState.agendaEvents = (context.authState.agendaEvents || [])
+          .map((item) => item.id === source.id ? result.source : item)
+          .concat(
+            ...(result.nextSeries ? [result.nextSeries] : []),
+            ...(savedBlock ? [savedBlock] : [])
+          )
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+        agendaUi.detailOpen = false;
+        agendaUi.cancelOpen = false;
+        agendaUi.detailEventId = null;
+        agendaUi.detailOccurrenceDate = null;
+        showToast(savedBlock
+          ? "Esta e as próximas ocorrências foram canceladas; o horário atual foi bloqueado."
+          : "Esta e as próximas ocorrências foram canceladas.");
+        context.render();
+        return;
       }
       if (source.recurrence?.frequency === "weekly" && cancelScope === "occurrence") {
         const occurrenceResult = await saveAgendaOccurrence(

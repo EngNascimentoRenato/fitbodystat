@@ -30,10 +30,6 @@
   color: var(--muted);
 }
 
-.agenda-availability-status {
-  margin: 0;
-}
-
 .agenda-navigation,
 .agenda-view-switch {
   display: inline-flex;
@@ -42,6 +38,22 @@
 
 .agenda-navigation {
   gap: 0.4rem;
+}
+
+.agenda-availability-label-mobile {
+  display: none;
+}
+
+.agenda-refresh-button {
+  font-size: 1.25rem;
+}
+
+.agenda-add-date {
+  color: white;
+  background: var(--primary-action);
+  border-color: var(--primary-action);
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 .agenda-view-switch {
@@ -77,6 +89,52 @@
 
 .agenda-clear-filters {
   margin-bottom: 0.25rem;
+}
+
+.agenda-filter-toggle {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.agenda-filter-toggle b {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 4px;
+  color: white;
+  background: var(--danger);
+  border-radius: 999px;
+  font-size: 0.68rem;
+}
+
+.filter-icon {
+  display: grid;
+  width: 18px;
+  gap: 3px;
+}
+
+.filter-icon i {
+  display: block;
+  height: 2px;
+  margin-inline: auto;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+.filter-icon i:nth-child(1) {
+  width: 18px;
+}
+
+.filter-icon i:nth-child(2) {
+  width: 12px;
+}
+
+.filter-icon i:nth-child(3) {
+  width: 6px;
 }
 
 .agenda-active-filters {
@@ -166,11 +224,16 @@
   text-align: left;
 }
 
+.agenda-day-heading b {
+  color: var(--text);
+  font-weight: 800;
+}
+
 .agenda-day-heading small,
 .agenda-availability-label {
   color: var(--muted);
   font-size: 0.66rem;
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1.25;
 }
 
@@ -183,6 +246,7 @@
   background: var(--primary-soft);
   border-radius: 50%;
   font-size: 0.75rem;
+  font-weight: 900;
 }
 
 .agenda-week-events {
@@ -261,10 +325,12 @@
 
 .agenda-empty-slot {
   min-height: 42px;
-  color: var(--muted);
-  background: transparent;
-  border: 1px dashed var(--border);
+  color: white;
+  background: var(--primary-action);
+  border: 1px solid var(--primary-action);
   border-radius: var(--radius);
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 .agenda-month-weekdays,
@@ -863,12 +929,30 @@
 @media (max-width: 900px) {
   .agenda-week {
     grid-template-columns: 1fr;
+    gap: 0.75rem;
     min-height: 0;
+    padding: 0.75rem;
+    background: var(--surface-strong);
   }
 
   .agenda-week-day {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .agenda-week-day:last-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .agenda-day-heading {
+    min-height: 62px;
+    background: color-mix(in srgb, var(--surface-strong) 70%, var(--surface));
+  }
+
+  .agenda-week-day.today .agenda-day-heading {
+    background: var(--primary-soft);
   }
 
   .agenda-week-events {
@@ -890,6 +974,38 @@
   .agenda-navigation {
     grid-column: 1;
     grid-row: 2;
+    width: 100%;
+    gap: 0.25rem;
+    justify-content: space-between;
+  }
+
+  .agenda-navigation > .icon-button,
+  .agenda-navigation > .agenda-availability-button {
+    width: 38px;
+    min-width: 38px;
+  }
+
+  .agenda-navigation #agenda-today {
+    min-width: 52px;
+    padding-inline: 0.55rem;
+  }
+
+  .agenda-availability-button {
+    width: 42px;
+    min-width: 42px;
+    padding: 0;
+    color: var(--text);
+    background: var(--surface-strong);
+  }
+
+  .agenda-availability-label-full {
+    display: none;
+  }
+
+  .agenda-availability-label-mobile {
+    display: inline;
+    font-size: 1.45rem;
+    line-height: 1;
   }
 
   .agenda-view-switch {
@@ -903,26 +1019,15 @@
   }
 
   .agenda-toolbar-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .agenda-toolbar-actions .button-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .agenda-toolbar-actions .button-row .primary {
-    grid-column: 1 / -1;
-  }
-
-  .agenda-toolbar-actions [data-new-agenda-event="block"] {
-    grid-column: 1 / -1;
-    width: 100%;
+    display: none;
   }
 
   .agenda-filters {
     grid-template-columns: 1fr;
+    padding: 0.85rem;
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
   }
 
   .agenda-clear-filters {

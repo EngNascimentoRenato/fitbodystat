@@ -98,7 +98,26 @@ export async function splitAgendaSeries(professionalId, source, occurrenceDate, 
   }
   const previousDate = addCalendarDays(occurrenceDate, -1);
   if (previousDate < source.date) {
-    throw new Error("Use a opção de editar toda a série para a primeira ocorrência.");
+    const updatedSource = normalizeAgendaEvent({
+      ...input,
+      date: source.date,
+      recurrence: {
+        ...source.recurrence,
+        ...input.recurrence,
+        frequency: "weekly",
+        untilDate: source.recurrence.untilDate
+      },
+      seriesId: source.seriesId
+    }, professionalId, source);
+    await setDoc(
+      doc(db, "professionalAgendas", professionalId, "events", source.id),
+      { ...updatedSource, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    return {
+      source: { id: source.id, ...updatedSource },
+      nextSeries: null
+    };
   }
   const originalUntilDate = source.recurrence.untilDate;
   const updatedSource = normalizeAgendaEvent({

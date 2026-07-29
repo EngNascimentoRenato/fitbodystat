@@ -10,6 +10,41 @@ export function calculateBodyFatByNavy({ sex, heightCm, waistCm, neckCm, hipCm }
   return 495 / (1.0324 - 0.19077 * Math.log10(waistCm - neckCm) + 0.15456 * Math.log10(heightCm)) - 450;
 }
 
+export function calculateBodyFatBySkinfoldThreeSite(input = {}) {
+  const age = Number(input.age);
+  if (!["male", "female"].includes(input.sex)
+    || !Number.isFinite(age)
+    || age < 18
+    || age > 100) return null;
+
+  const siteKeys = input.sex === "male"
+    ? ["chestMm", "abdomenMm", "thighMm"]
+    : ["tricepsMm", "suprailiacMm", "thighMm"];
+  const readings = siteKeys.map((key) => Number(input[key]));
+  if (readings.some((value) => !Number.isFinite(value) || value <= 0 || value > 100)) {
+    return null;
+  }
+
+  const sum = readings.reduce((total, value) => total + value, 0);
+  const density = input.sex === "male"
+    ? 1.10938 - 0.0008267 * sum + 0.0000016 * sum ** 2 - 0.0002574 * age
+    : 1.0994921 - 0.0009929 * sum + 0.0000023 * sum ** 2 - 0.0001392 * age;
+  const bodyFatPercent = 495 / density - 450;
+  if (!Number.isFinite(bodyFatPercent) || bodyFatPercent <= 0 || bodyFatPercent >= 75) {
+    return null;
+  }
+  return {
+    protocol: "jackson-pollock-3",
+    sex: input.sex,
+    age,
+    readingsMm: Object.fromEntries(siteKeys.map((key, index) => [key, readings[index]])),
+    sumMm: Number(sum.toFixed(1)),
+    density: Number(density.toFixed(6)),
+    bodyFatPercent: Number(bodyFatPercent.toFixed(1)),
+    conversion: "siri"
+  };
+}
+
 export function classifyBodyFat(sex, bodyFat) {
   if (!bodyFat) return "Sem dados";
   if (!["male", "female"].includes(sex)) return "Referência não informada";

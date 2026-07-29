@@ -22,3 +22,10 @@ test("consulta apresenta resultado final do projeto", () => {
   assert.match(source, /IMC final/);
   assert.match(source, /Motivo do encerramento/);
 });
+
+test("avanço da linha de base não depende da validação nativa do navegador", () => {
+  assert.match(source, /id="new-cycle-baseline-form" novalidate/);
+  assert.match(source, /id="continue-new-cycle-goal" type="button"/);
+  assert.match(source, /addEventListener\("click", continueToGoal\)/);
+  assert.match(source, /Não foi possível avançar\. Revise os dados e tente novamente\./);
+});

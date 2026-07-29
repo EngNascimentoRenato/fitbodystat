@@ -35,6 +35,16 @@ import {
   closeActiveCycle,
   startNewCycle
 } from "../models/cycle-model.js";
+import {
+  circumferenceCatalog,
+  defaultCircumferenceKeys,
+  normalizeCircumferenceKeys
+} from "../data/circumference-catalog.js";
+import {
+  bindSkinfoldCalculator,
+  parseSkinfoldData,
+  skinfoldCalculator
+} from "../components/skinfold-calculator.js";
 
 let profileHasPendingChanges = false;
 let profileEditMode = false;
@@ -65,6 +75,91 @@ const cycleStatusLabels = {
   expired: "Expirado",
   archived: "Arquivado"
 };
+
+function renderCircumferenceTracking(profile, baselineDisabled = "") {
+  const selected = new Set(normalizeCircumferenceKeys(
+    profile.trackedCircumferences || defaultCircumferenceKeys
+  ));
+  const startValues = profile.startCircumferences || {};
+  const options = circumferenceCatalog.filter((item) =>
+    !item.calculationOnly && item.key !== "waist"
+  );
+  const baselineItems = circumferenceCatalog.filter((item) =>
+    item.key === "hip" || (!item.legacyField && !item.calculationOnly)
+  );
+  return `
+    <div class="field circumference-tracking-field">
+      <input type="hidden" name="trackedCircumferencesEditor" value="true" />
+      <label>Medidas adicionais acompanhadas</label>
+      <span class="help-text">A cintura faz parte de todos os projetos.</span>
+      <div class="circumference-picker">
+        ${options.map((item) => `
+          <label>
+            <input type="checkbox" name="trackedCircumferences" value="${item.key}"
+              ${selected.has(item.key) ? "checked" : ""} />
+            <span>${item.label}</span>
+          </label>
+        `).join("")}
+      </div>
+      <span class="help-text">As medidas selecionadas aparecerão nos próximos registros.</span>
+      <div class="circumference-baseline-values">
+        ${baselineItems.map((item) => item.bilateral ? `
+          <fieldset class="field bilateral-circumference measurement-compact-item"
+            data-start-circumference="${item.key}"
+            ${selected.has(item.key) ? "" : "hidden"}>
+            <legend>${item.label} inicial (cm)</legend>
+            <div class="bilateral-circumference-grid">
+              <div class="field">
+                <label for="startCircumference_${item.key}_right">Direito</label>
+                <input id="startCircumference_${item.key}_right"
+                  name="startCircumference_${item.key}_right" inputmode="decimal" ${baselineDisabled}
+                  ${baselineDisabled ? 'data-baseline-locked="true"' : ""}
+                  value="${escapeAttribute(
+                    typeof startValues[item.key] === "object"
+                      ? startValues[item.key]?.right ?? ""
+                      : startValues[item.key] ?? ""
+                  )}" />
+              </div>
+              <div class="field">
+                <label for="startCircumference_${item.key}_left">Esquerdo</label>
+                <input id="startCircumference_${item.key}_left"
+                  name="startCircumference_${item.key}_left" inputmode="decimal" ${baselineDisabled}
+                  ${baselineDisabled ? 'data-baseline-locked="true"' : ""}
+                  value="${escapeAttribute(
+                    typeof startValues[item.key] === "object"
+                      ? startValues[item.key]?.left ?? ""
+                      : ""
+                  )}" />
+              </div>
+            </div>
+          </fieldset>
+        ` : `
+          <div class="field measurement-compact-item"
+            data-start-circumference="${item.key}"
+            ${item.key === "hip" ? "data-new-cycle-estimated-field" : ""}
+            ${selected.has(item.key) ? "" : "hidden"}>
+            <label for="startCircumference_${item.key}">${item.label} inicial (cm)</label>
+            <input id="startCircumference_${item.key}"
+              name="${item.legacyField || `startCircumference_${item.key}`}"
+              inputmode="decimal" ${baselineDisabled}
+              ${baselineDisabled ? 'data-baseline-locked="true"' : ""}
+              value="${escapeAttribute(
+                item.legacyField
+                  ? profile[`start${item.legacyField[0].toUpperCase()}${item.legacyField.slice(1)}`] ?? ""
+                  : startValues[item.key] ?? ""
+              )}" />
+            ${item.key === "hip"
+              ? `<span class="help-text" data-hip-required-help
+                  ${profile.sex === "female" && bodyFatMethodIsEstimated(profile.startBodyFatMethod) ? "" : "hidden"}>
+                  Obrigatório na estimativa feminina por circunferências.
+                </span>`
+              : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
 
 window.addEventListener("beforeunload", (event) => {
   if (!profileHasPendingChanges) return;
@@ -224,6 +319,7 @@ function initialNewCycleDraft(state) {
     name: "",
     startDate: todayISO(),
     sex: state.profile.sex || "",
+    birthDate: state.profile.birthDate || "",
     heightCm: state.profile.heightCm ?? null,
     startWeightKg: reference.weightKg ?? reference.startWeightKg ?? null,
     startWaistCm: reference.waistCm ?? reference.startWaistCm ?? null,
@@ -231,6 +327,11 @@ function initialNewCycleDraft(state) {
     startHipCm: reference.hipCm ?? reference.startHipCm ?? null,
     startBodyFatMethod: normalizeBodyFatMethod(reference.bodyFatMethod || reference.startBodyFatMethod),
     startBodyFatManual: reference.bodyFatManual ?? reference.startBodyFatManual ?? null,
+    startSkinfolds: reference.skinfolds ?? reference.startSkinfolds ?? null,
+    trackedCircumferences: normalizeCircumferenceKeys(
+      state.profile.trackedCircumferences || defaultCircumferenceKeys
+    ),
+    startCircumferences: { ...(reference.circumferences || reference.startCircumferences || {}) },
     goalType: "weight-loss",
     customGoalLabel: "",
     targetBmi: 24.9,
@@ -470,7 +571,7 @@ function renderCycleDialog(state) {
 
   return `
     <dialog class="account-dialog new-cycle-dialog" id="cycle-dialog">
-      <form id="new-cycle-baseline-form">
+      <form id="new-cycle-baseline-form" novalidate>
         <div class="account-dialog-header">
           <div>
             <p class="eyebrow">Etapa 1 de 2</p>
@@ -508,7 +609,7 @@ function renderCycleDialog(state) {
             <input id="cycle-start-weight" name="startWeightKg" inputmode="decimal"
               value="${escapeAttribute(draft.startWeightKg ?? "")}" required />
           </div>
-          <div class="field">
+          <div class="field body-measure-field" data-new-cycle-waist-field>
             <label for="cycle-start-waist">Cintura inicial (cm)</label>
             <input id="cycle-start-waist" name="startWaistCm" inputmode="decimal"
               value="${escapeAttribute(draft.startWaistCm ?? "")}" required />
@@ -531,18 +632,16 @@ function renderCycleDialog(state) {
             <input id="cycle-body-fat-manual" name="startBodyFatManual" inputmode="decimal"
               value="${escapeAttribute(draft.startBodyFatManual ?? "")}" />
             <span class="help-text">O valor obtido por avaliação externa substitui a estimativa por circunferências.</span>
+            <div data-new-cycle-skinfold-calculator>
+              ${skinfoldCalculator("new-cycle", draft, draft.startSkinfolds)}
+            </div>
           </div>
-          <div class="field" data-new-cycle-estimated-field>
+          <div class="field body-measure-field" data-new-cycle-estimated-field>
             <label for="cycle-start-neck">Pescoço inicial (cm)</label>
             <input id="cycle-start-neck" name="startNeckCm" inputmode="decimal"
               value="${escapeAttribute(draft.startNeckCm ?? "")}" />
           </div>
-          <div class="field" data-new-cycle-estimated-field>
-            <label for="cycle-start-hip">Quadril inicial (cm)</label>
-            <input id="cycle-start-hip" name="startHipCm" inputmode="decimal"
-              value="${escapeAttribute(draft.startHipCm ?? "")}" />
-            <span class="help-text">Obrigatório somente para a equação feminina.</span>
-          </div>
+          ${renderCircumferenceTracking(draft)}
             </div>
           </fieldset>
         </div>
@@ -551,7 +650,9 @@ function renderCycleDialog(state) {
         </div>
         <div class="account-dialog-actions">
           <button class="button" data-close-cycle-dialog type="button">Cancelar</button>
-          <button class="button primary" type="submit">Continuar para objetivo</button>
+          <button class="button primary" id="continue-new-cycle-goal" type="button">
+            Continuar para objetivo
+          </button>
         </div>
       </form>
     </dialog>
@@ -565,6 +666,9 @@ function renderProfileSummary(state, options) {
     .filter((cycle) => cycle.id !== currentCycle?.id)
     .sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || "")));
   const preferred = (profile.preferredActivities || []).map(activityLabel).filter(Boolean);
+  const trackedCircumferenceLabels = normalizeCircumferenceKeys(profile.trackedCircumferences)
+    .map((key) => circumferenceCatalog.find((item) => item.key === key)?.label)
+    .filter(Boolean);
   const activityMinutes = Number(profile.averageActivityDurationMinutes) || 0;
   const goalWeight = currentCycle ? getGoalWeight(profile) : null;
   const bodyFat = currentCycle ? resolveProfileBodyFat(profile) : null;
@@ -616,6 +720,7 @@ function renderProfileSummary(state, options) {
           ${profileValue("Quadril inicial", currentCycle ? formatCm(profile.startHipCm) : "-")}
           ${profileValue("Gordura corporal", formatPercent(bodyFat))}
           ${profileValue("Origem da gordura", currentCycle ? bodyFatMethodLabel(profile.startBodyFatMethod) : "-")}
+          ${profileValue("Medidas acompanhadas", trackedCircumferenceLabels.join(", ") || "Nenhuma selecionada")}
         </dl>
         <div class="button-row profile-card-save">
           ${currentCycle
@@ -798,6 +903,21 @@ function renderActivityProfileEditor(state) {
 function readProfileForm(form, currentProfile) {
   const data = new FormData(form);
   const value = (name, fallback) => data.has(name) ? data.get(name) : fallback;
+  const trackedCircumferences = data.has("trackedCircumferencesEditor")
+    ? normalizeCircumferenceKeys(data.getAll("trackedCircumferences"))
+    : normalizeCircumferenceKeys(currentProfile.trackedCircumferences);
+  const startCircumferences = { ...(currentProfile.startCircumferences || {}) };
+  circumferenceCatalog.filter((item) => !item.legacyField).forEach((item) => {
+    const field = `startCircumference_${item.key}`;
+    if (item.bilateral && data.has(`${field}_right`)) {
+      startCircumferences[item.key] = {
+        right: toNumber(data.get(`${field}_right`)),
+        left: toNumber(data.get(`${field}_left`))
+      };
+    } else if (data.has(field)) {
+      startCircumferences[item.key] = toNumber(data.get(field));
+    }
+  });
   return resolveGoalTiming({
     ...currentProfile,
     name: data.get("name").trim(),
@@ -813,6 +933,11 @@ function readProfileForm(form, currentProfile) {
     startBodyFatManual: bodyFatMethodIsEstimated(value("startBodyFatMethod", currentProfile.startBodyFatMethod))
       ? null
       : toNumber(value("startBodyFatManual", currentProfile.startBodyFatManual)),
+    startSkinfolds: value("startBodyFatMethod", currentProfile.startBodyFatMethod) === "caliper"
+      ? parseSkinfoldData(value("skinfoldData", ""))
+      : null,
+    trackedCircumferences,
+    startCircumferences,
     targetBmi: toNumber(data.get("targetBmi")) || 24.9,
     goalWeightKg: toNumber(data.get("goalWeightKg")),
     goalType: data.get("goalType") || "",
@@ -931,18 +1056,14 @@ export function renderProfile(state, options = {}) {
             <label for="startWeightKg">Peso inicial (kg)</label>
             <input id="startWeightKg" name="startWeightKg" inputmode="decimal" required ${baselineDisabled} value="${escapeAttribute(p.startWeightKg ?? "")}" />
           </div>
-          <div class="field">
+          <div class="field body-measure-field">
             <label for="startWaistCm">Cintura inicial (cm) ${measurementHelpButton("waist")}</label>
-            <input id="startWaistCm" name="startWaistCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startWaistCm ?? "")}" />
+            <input id="startWaistCm" name="startWaistCm" inputmode="decimal" required
+              ${baselineDisabled} value="${escapeAttribute(p.startWaistCm ?? "")}" />
           </div>
-          <div class="field">
+          <div class="field body-measure-field">
             <label for="startNeckCm">Pescoço inicial (cm) ${measurementHelpButton("neck")}</label>
             <input id="startNeckCm" name="startNeckCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startNeckCm ?? "")}" />
-          </div>
-          <div class="field">
-            <label for="startHipCm">Quadril inicial (cm) ${measurementHelpButton("hip")}</label>
-            <input id="startHipCm" name="startHipCm" inputmode="decimal" ${baselineDisabled} value="${escapeAttribute(p.startHipCm ?? "")}" />
-            <span class="help-text">Usado na estimativa feminina por medidas e opcional no acompanhamento geral.</span>
           </div>
           <div class="field">
             <label for="startBodyFatMethod">Origem da gordura corporal</label>
@@ -957,7 +1078,11 @@ export function renderProfile(state, options = {}) {
             <input id="startBodyFatManual" name="startBodyFatManual" inputmode="decimal" ${baselineDisabled}
               value="${escapeAttribute(p.startBodyFatManual ?? "")}" />
             <span class="help-text">Preencha quando o resultado vier de medição ou avaliação externa.</span>
+            <div data-profile-skinfold-calculator>
+              ${skinfoldCalculator("profile", p, p.startSkinfolds)}
+            </div>
           </div>
+          ${renderCircumferenceTracking(p, baselineDisabled)}
           <div class="field">
             <label for="goalType">Objetivo principal</label>
             <select id="goalType" name="goalType">
@@ -1077,7 +1202,9 @@ function configureProfileSectionEditor(form) {
   const editor = form.dataset.profileEditor;
   const baselineFields = new Set([
     "sex", "heightCm", "startDate", "startWeightKg", "startWaistCm", "startNeckCm",
-    "startHipCm", "startBodyFatMethod", "startBodyFatManual"
+    "startHipCm", "startBodyFatMethod", "startBodyFatManual",
+    "trackedCircumferences", "trackedCircumferencesEditor",
+    ...circumferenceCatalog.map((item) => `startCircumference_${item.key}`)
   ]);
   const goalFields = new Set([
     "goalType", "customGoalLabel", "targetBmi", "goalWeightKg",
@@ -1238,6 +1365,17 @@ export function bindProfile(state, persist, render) {
     const baselineForm = document.getElementById("new-cycle-baseline-form");
     const readBaselineDraft = () => {
       const data = new FormData(baselineForm);
+      const trackedCircumferences = normalizeCircumferenceKeys(data.getAll("trackedCircumferences"));
+      const startCircumferences = {};
+      circumferenceCatalog.filter((item) => !item.legacyField).forEach((item) => {
+        const field = `startCircumference_${item.key}`;
+        startCircumferences[item.key] = item.bilateral
+          ? {
+              right: toNumber(data.get(`${field}_right`)),
+              left: toNumber(data.get(`${field}_left`))
+            }
+          : toNumber(data.get(field));
+      });
       return {
         ...(newCycleDraft || initialNewCycleDraft(state)),
         name: String(data.get("name") || "").trim(),
@@ -1251,7 +1389,12 @@ export function bindProfile(state, persist, render) {
         startBodyFatMethod: normalizeBodyFatMethod(data.get("startBodyFatMethod")),
         startBodyFatManual: bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
           ? null
-          : toNumber(data.get("startBodyFatManual"))
+          : toNumber(data.get("startBodyFatManual")),
+        startSkinfolds: data.get("startBodyFatMethod") === "caliper"
+          ? parseSkinfoldData(data.get("skinfoldData"))
+          : null,
+        trackedCircumferences,
+        startCircumferences
       };
     };
     const updateBaselinePreview = () => {
@@ -1260,35 +1403,67 @@ export function bindProfile(state, persist, render) {
       const estimated = bodyFatMethodIsEstimated(draft.startBodyFatMethod);
       const valueField = baselineForm.querySelector("[data-new-cycle-body-fat-value]");
       const valueInput = baselineForm.elements.startBodyFatManual;
+      const calculator = baselineForm.querySelector("[data-new-cycle-skinfold-calculator]");
+      const tracked = new Set(draft.trackedCircumferences);
       if (valueField) valueField.hidden = estimated;
-      baselineForm.querySelectorAll("[data-new-cycle-estimated-field]").forEach((field) => {
-        field.hidden = !estimated;
+      const neckField = baselineForm.elements.startNeckCm?.closest("[data-new-cycle-estimated-field]");
+      const hipField = baselineForm.elements.startHipCm?.closest("[data-new-cycle-estimated-field]");
+      if (neckField) neckField.hidden = !estimated;
+      if (hipField) hipField.hidden = !estimated && !tracked.has("hip");
+      const hipHelp = baselineForm.querySelector("[data-hip-required-help]");
+      if (hipHelp) hipHelp.hidden = !(estimated && draft.sex === "female");
+      const waistField = baselineForm.querySelector("[data-new-cycle-waist-field]");
+      if (waistField) waistField.hidden = !estimated && !tracked.has("waist");
+      baselineForm.querySelectorAll("[data-start-circumference]").forEach((field) => {
+        const key = field.dataset.startCircumference;
+        const visible = tracked.has(key)
+          || (key === "hip" && estimated && draft.sex === "female");
+        field.hidden = !visible;
+        field.querySelectorAll("input").forEach((input) => {
+          input.disabled = !visible;
+        });
       });
+      if (calculator) calculator.hidden = draft.startBodyFatMethod !== "caliper";
       if (valueInput) {
         valueInput.disabled = estimated;
         valueInput.required = !estimated;
       }
-      if (baselineForm.elements.startNeckCm) baselineForm.elements.startNeckCm.required = estimated;
+      if (baselineForm.elements.startWaistCm) {
+        baselineForm.elements.startWaistCm.required = true;
+        baselineForm.elements.startWaistCm.disabled = false;
+      }
+      if (baselineForm.elements.startNeckCm) {
+        baselineForm.elements.startNeckCm.required = estimated;
+        baselineForm.elements.startNeckCm.disabled = !estimated;
+      }
       if (baselineForm.elements.startHipCm) {
         baselineForm.elements.startHipCm.required = estimated && draft.sex === "female";
+        baselineForm.elements.startHipCm.disabled = !estimated && !tracked.has("hip");
       }
       document.getElementById("new-cycle-baseline-preview").innerHTML =
         renderNewCycleBaselinePreview(draft);
     };
     baselineForm?.addEventListener("input", updateBaselinePreview);
     baselineForm?.elements.startBodyFatMethod?.addEventListener("change", updateBaselinePreview);
+    bindSkinfoldCalculator({
+      prefix: "new-cycle",
+      profile: { ...state.profile, sex: newCycleDraft?.sex || state.profile.sex },
+      measurementDate: () => baselineForm?.elements.startDate?.value,
+      targetInput: baselineForm?.elements.startBodyFatManual,
+      onResult: updateBaselinePreview
+    });
     updateBaselinePreview();
-    baselineForm?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const heightField = baselineForm.elements.heightCm;
-      if (!await resolveHeightInput(heightField)) return;
-      const draft = readBaselineDraft();
-      const estimated = bodyFatMethodIsEstimated(draft.startBodyFatMethod);
-      if (estimated && !draft.sex) {
-        showToast("Informe o sexo no perfil para usar a estimativa por circunferências.");
-        return;
-      }
-      const validation = await validateNumericFields(baselineForm, {
+    const continueToGoal = async () => {
+      try {
+        const heightField = baselineForm.elements.heightCm;
+        if (!await resolveHeightInput(heightField)) return;
+        const draft = readBaselineDraft();
+        const estimated = bodyFatMethodIsEstimated(draft.startBodyFatMethod);
+        if (estimated && !draft.sex) {
+          showToast("Informe o sexo no perfil para usar a estimativa por circunferências.");
+          return;
+        }
+        const validation = await validateNumericFields(baselineForm, {
         heightCm: { rule: "heightCm", label: "Altura", required: true },
         startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
         startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial", required: true },
@@ -1302,18 +1477,48 @@ export function bindProfile(state, persist, render) {
           rule: "bodyFatPercent",
           label: "Gordura corporal",
           required: !estimated
+        },
+        ...Object.fromEntries(
+          circumferenceCatalog
+            .filter((item) => !item.legacyField && draft.trackedCircumferences.includes(item.key))
+            .flatMap((item) => item.bilateral
+              ? [
+                  [`startCircumference_${item.key}_right`, {
+                    rule: "circumferenceCm",
+                    label: `${item.label} direito inicial`
+                  }],
+                  [`startCircumference_${item.key}_left`, {
+                    rule: "circumferenceCm",
+                    label: `${item.label} esquerdo inicial`
+                  }]
+                ]
+              : [[`startCircumference_${item.key}`, {
+                  rule: "circumferenceCm",
+                  label: `${item.label} inicial`
+                }]]
+            )
+        )
+        });
+        if (!validation.valid) {
+          showToast("Revise os dados da linha de base.");
+          return;
         }
-      });
-      if (!validation.valid) {
-        showToast("Revise os dados da linha de base.");
-        return;
+        newCycleDraft = {
+          ...draft,
+          goalWeightKg: draft.goalWeightKg ?? getSuggestedGoalWeight(draft)
+        };
+        newCycleStep = 2;
+        render();
+      } catch (error) {
+        console.error("Falha ao avançar para o objetivo:", error);
+        showToast("Não foi possível avançar. Revise os dados e tente novamente.");
       }
-      newCycleDraft = {
-        ...draft,
-        goalWeightKg: draft.goalWeightKg ?? getSuggestedGoalWeight(draft)
-      };
-      newCycleStep = 2;
-      render();
+    };
+    document.getElementById("continue-new-cycle-goal")
+      ?.addEventListener("click", continueToGoal);
+    baselineForm?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      continueToGoal();
     });
 
     const goalForm = document.getElementById("new-cycle-goal-form");
@@ -1432,15 +1637,61 @@ export function bindProfile(state, persist, render) {
     const estimated = bodyFatMethodIsEstimated(form.elements.startBodyFatMethod?.value);
     const field = form.querySelector("[data-profile-body-fat-value]");
     const input = form.elements.startBodyFatManual;
+    const calculator = form.querySelector("[data-profile-skinfold-calculator]");
     if (field) field.hidden = estimated;
     if (input) {
       input.disabled = bodyFatInputLocked || estimated;
       input.required = !estimated;
     }
+    if (calculator) {
+      calculator.hidden = bodyFatInputLocked || form.elements.startBodyFatMethod?.value !== "caliper";
+    }
   };
   form.elements.startBodyFatMethod?.addEventListener("change", updateBodyFatFields);
   updateBodyFatFields();
+  bindSkinfoldCalculator({
+    prefix: "profile",
+    profile: state.profile,
+    measurementDate: () => form.elements.startDate?.value,
+    targetInput: form.elements.startBodyFatManual,
+    onResult: () => {
+      profileHasPendingChanges = true;
+      mobileSave.hidden = false;
+    }
+  });
   configureProfileSectionEditor(form);
+  const updateCircumferenceTracking = () => {
+    const selected = new Set(
+      [...form.querySelectorAll('input[name="trackedCircumferences"]:checked')]
+        .map((input) => input.value)
+    );
+    form.querySelectorAll("[data-start-circumference]").forEach((field) => {
+      const key = field.dataset.startCircumference;
+      const requiredForFemaleEstimate = key === "hip"
+        && bodyFatMethodIsEstimated(form.elements.startBodyFatMethod?.value)
+        && form.elements.sex?.value === "female";
+      field.hidden = !selected.has(key) && !requiredForFemaleEstimate;
+      field.querySelectorAll("input").forEach((input) => {
+        if (!input.hasAttribute("data-baseline-locked")) input.disabled = field.hidden;
+      });
+    });
+    const hipHelp = form.querySelector("[data-hip-required-help]");
+    if (hipHelp) {
+      hipHelp.hidden = !(
+        bodyFatMethodIsEstimated(form.elements.startBodyFatMethod?.value)
+        && form.elements.sex?.value === "female"
+      );
+    }
+  };
+  form.querySelectorAll('input[name="trackedCircumferences"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      updateCircumferenceTracking();
+      markDirty();
+    });
+  });
+  form.elements.startBodyFatMethod?.addEventListener("change", updateCircumferenceTracking);
+  form.elements.sex?.addEventListener("change", updateCircumferenceTracking);
+  updateCircumferenceTracking();
 
   const setDurationGoalVisibility = () => {
     const enabled = form.elements.trackActivityDuration?.checked === true;
@@ -1569,11 +1820,28 @@ export function bindProfile(state, persist, render) {
       form.elements.sex?.focus();
       return;
     }
+    const startCircumferenceRules = {};
+    form.querySelectorAll("[data-start-circumference] input:not(:disabled)").forEach((input) => {
+      const key = input.closest("[data-start-circumference]")?.dataset.startCircumference;
+      const item = circumferenceCatalog.find((candidate) => candidate.key === key);
+      startCircumferenceRules[input.name] = {
+        rule: "circumferenceCm",
+        label: `${item?.label || "Medida"} inicial`
+      };
+    });
     const validation = await validateNumericFields(form, {
       heightCm: { rule: "heightCm", label: "Altura", required: true },
       startWeightKg: { rule: "weightKg", label: "Peso inicial", required: true },
-      startWaistCm: { rule: "circumferenceCm", label: "Cintura inicial" },
-      startNeckCm: { rule: "circumferenceCm", label: "Pescoço inicial" },
+      startWaistCm: {
+        rule: "circumferenceCm",
+        label: "Cintura inicial",
+        required: true
+      },
+      startNeckCm: {
+        rule: "circumferenceCm",
+        label: "Pescoço inicial",
+        required: bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
+      },
       startHipCm: {
         rule: "circumferenceCm",
         label: "Quadril inicial",
@@ -1584,6 +1852,7 @@ export function bindProfile(state, persist, render) {
         label: "Gordura corporal inicial",
         required: !bodyFatMethodIsEstimated(data.get("startBodyFatMethod"))
       },
+      ...startCircumferenceRules,
       targetBmi: { rule: "targetBmi", label: "IMC de referência", required: true },
       goalWeightKg: { rule: "weightKg", label: "Peso final", required: true },
       weeklyChangeGoalKg: { rule: "weeklyChangeKg", label: "Mudança semanal", required: deadlineMode === "auto" && !maintenanceGoal },
