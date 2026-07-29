@@ -8,6 +8,7 @@ import {
 } from "../models/goal-model.js";
 import { calculateBmi, classifyBmi, getBmiTargets } from "../services/bmi-service.js";
 import {
+  enrichEntries,
   getGoalDirection,
   getGoalWeight,
   getProgressMode,
@@ -246,8 +247,29 @@ function renderCycleDialog(state) {
   if (cycleDialogMode === "view") {
     const cycle = (state.cycles || []).find((item) => item.id === selectedCycleId);
     if (!cycle) return "";
+    const cycleEntries = enrichEntries(
+      { ...cycle, activeCycleId: cycle.id },
+      (state.entries || []).filter((entry) => entry.cycleId === cycle.id)
+    );
+    const firstEntry = cycleEntries[0] || null;
+    const lastEntry = cycleEntries.at(-1) || null;
+    const hasMetric = (value) => value !== null
+      && value !== undefined
+      && value !== ""
+      && Number.isFinite(Number(value));
+    const weightChange = firstEntry && lastEntry
+      ? Number(lastEntry.weightKg) - Number(firstEntry.weightKg)
+      : null;
+    const waistChange = firstEntry && lastEntry
+      && hasMetric(firstEntry.waistCm)
+      && hasMetric(lastEntry.waistCm)
+      ? Number(lastEntry.waistCm) - Number(firstEntry.waistCm)
+      : null;
+    const signedMetric = (value, unit) => Number.isFinite(value)
+      ? `${value > 0 ? "+" : ""}${formatDecimal(value, 1)} ${unit}`
+      : "-";
     return `
-      <dialog class="account-dialog" id="cycle-dialog">
+      <dialog class="account-dialog cycle-details-dialog" id="cycle-dialog">
         <form method="dialog">
           <div class="account-dialog-header">
             <h2>${escapeHtml(cycle.name || "Projeto anterior")}</h2>
@@ -262,6 +284,62 @@ function renderCycleDialog(state) {
             ${profileValue("Cintura inicial", formatCm(cycle.startWaistCm))}
             ${profileValue("Motivo do encerramento", cycle.endReason || "Não informado")}
           </dl>
+          <section class="cycle-result">
+            <div>
+              <span>Peso final registrado</span>
+              <strong>${formatKg(lastEntry?.weightKg)}</strong>
+              <small>${signedMetric(weightChange, "kg")} no projeto</small>
+            </div>
+            <div>
+              <span>Cintura final registrada</span>
+              <strong>${formatCm(lastEntry?.waistCm)}</strong>
+              <small>${signedMetric(waistChange, "cm")} no projeto</small>
+            </div>
+            <div>
+              <span>IMC final</span>
+              <strong>${formatDecimal(lastEntry?.bmi, 1)}</strong>
+              <small>${escapeHtml(lastEntry?.bmiClass || "Sem dados suficientes")}</small>
+            </div>
+            <div>
+              <span>Registros</span>
+              <strong>${cycleEntries.length}</strong>
+              <small>incluindo a linha de base</small>
+            </div>
+          </section>
+          <section class="cycle-history">
+            <div class="chart-header">
+              <div>
+                <h3>Histórico deste projeto</h3>
+                <p class="muted">Medições isoladas dos demais ciclos.</p>
+              </div>
+            </div>
+            ${cycleEntries.length ? `
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th class="number">Peso</th>
+                      <th class="number">Cintura</th>
+                      <th class="number">IMC</th>
+                      <th class="number">Gordura</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${cycleEntries.slice().reverse().map((entry) => `
+                      <tr>
+                        <td>${formatDate(entry.date)}</td>
+                        <td class="number">${formatKg(entry.weightKg)}</td>
+                        <td class="number">${formatCm(entry.waistCm)}</td>
+                        <td class="number">${formatDecimal(entry.bmi, 1)}</td>
+                        <td class="number">${formatPercent(entry.bodyFat)}</td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            ` : `<p class="empty-inline">Este projeto não possui medições registradas.</p>`}
+          </section>
           <div class="account-dialog-actions">
             <button class="button primary" data-close-cycle-dialog type="button">Fechar</button>
           </div>

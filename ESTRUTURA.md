@@ -47,6 +47,11 @@ O ciclo pode ser encerrado como concluído, abandonado ou expirado. Um novo cicl
 só pode ser iniciado quando não houver outro ativo, e seus cálculos consideram
 somente as medições associadas ao projeto atual.
 
+No Perfil, projetos encerrados permanecem disponíveis para consulta detalhada.
+A consulta reconstrói a linha de base do próprio ciclo, apresenta o resultado
+final e filtra o histórico pelo `cycleId`, sem misturar medições de outros projetos.
+O mesmo fluxo respeita as permissões do vínculo quando acessado por profissional.
+
 A criação de projeto utiliza duas etapas temporárias: linha de base e objetivo.
 Os dados não são persistidos entre as etapas; o ciclo ativo somente é criado
 depois da confirmação final do planejamento.
@@ -68,6 +73,13 @@ profissionais vinculados e suas ações pessoais; o profissional que abriu um
 paciente vê somente ações operacionais relacionadas à criação do projeto.
 Atividades físicas podem ser registradas sem projeto; peso e medidas corporais
 exigem um ciclo ativo para preservar a linha de base e o contexto histórico.
+
+A agenda profissional mantém compromissos e indisponibilidades em
+`professionalAgendas/{professionalId}/events`. Séries semanais usam um documento
+de origem; datas editadas ou removidas individualmente entram em
+`recurrence.excludedDates`, e ocorrências alteradas são persistidas separadamente
+com referência à série. Alterações futuras dividem a série sem reescrever seu
+histórico anterior.
 O perfil possui editores independentes para dados pessoais, linha de base,
 objetivo e preferências de atividades.
 No histórico de medidas, o lápis abre o formulário completo de registro com os
@@ -120,6 +132,13 @@ O Firebase Hosting usa a raiz como diretorio publico para manter os mesmos
 caminhos usados pelo GitHub Pages. A lista `hosting.ignore` de `firebase.json`
 impede a publicacao de testes, scripts, documentos internos, regras e
 dependencias.
+
+Na inicialização autenticada, o aplicativo mantém uma tela de carregamento até
+concluir a leitura do estado necessário. O estado local é usado imediatamente
+para aplicar o tema, mas o Dashboard só é exibido depois da reconciliação com o
+Firestore. Leituras independentes são executadas em paralelo, atualizações
+redundantes não são gravadas a cada acesso e a verificação do Service Worker é
+adiada até o navegador ficar ocioso.
 
 ```powershell
 firebase deploy --only hosting --project fitbodystats

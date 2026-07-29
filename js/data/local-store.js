@@ -21,7 +21,7 @@ export function createBlankState() {
     activeCycleId: null,
     goalPlan: createDefaultMonthlyPlan(defaultProfile),
     settings: {
-      theme: "light"
+      theme: "dark"
     }
   };
 }

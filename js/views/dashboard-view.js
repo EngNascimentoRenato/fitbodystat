@@ -180,7 +180,11 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
       </section>
 
       ${evolutionOnly ? "" : `<section class="grid four dashboard-metrics">
-        ${statCard("Peso atual", formatKg(latest?.weightKg), `${formatKg(latest?.weightKg - profile.startWeightKg)} desde o início`)}
+        ${statCard(
+          "Peso atual",
+          formatKg(latest?.weightKg),
+          `${formatKg(latest?.weightKg - profile.startWeightKg)} desde o dia ${formatDate(profile.startDate)}`
+        )}
         ${statCard("IMC", formatDecimal(latest?.bmi, 1), latest?.bmiClass || "Sem dados")}
         ${statCard("Cintura", formatCm(latest?.waistCm), `Inicial: ${formatCm(profile.startWaistCm)}`)}
         ${statCard(

@@ -60,7 +60,7 @@ function renderRecentWeeks(activities, goalDays, targetMinutes) {
   return `
     <section class="card">
       <h2>Últimas quatro semanas</h2>
-      <div class="grid four">
+      <div class="grid four recent-weeks-grid">
         ${weeks.map((week) => {
           const dayPercentage = Math.min(100, (week.count / Math.max(1, goalDays)) * 100);
           const minutePercentage = targetMinutes

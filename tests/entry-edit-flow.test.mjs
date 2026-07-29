@@ -2,10 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { defaultProfile } from "../js/models/profile-model.js";
+import { createBlankState } from "../js/data/local-store.js";
 
 test("novos perfis iniciam com meta opcional de trinta minutos", () => {
   assert.equal(defaultProfile.trackActivityDuration, true);
   assert.equal(defaultProfile.averageActivityDurationMinutes, 30);
+});
+
+test("novas instalações usam o tema escuro por padrão", () => {
+  assert.equal(createBlankState().settings.theme, "dark");
 });
 
 test("histórico encaminha a medição para o formulário completo de edição", async () => {

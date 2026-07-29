@@ -11,6 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { db } from "./firebase-core.js";
 import {
+  addCalendarDays,
   cancellationBlockInput,
   normalizeAgendaEvent,
   normalizeAvailability
@@ -51,6 +52,131 @@ export async function saveAgendaEvent(professionalId, input, existing = null) {
     createdAt: serverTimestamp()
   });
   return { id: reference.id, ...event };
+}
+
+export async function saveAgendaOccurrence(professionalId, source, occurrenceDate, input) {
+  if (!source?.id || source.recurrence?.frequency !== "weekly") {
+    throw new Error("Série recorrente não identificada.");
+  }
+  const excludedDates = [...new Set([
+    ...(source.recurrence.excludedDates || []),
+    occurrenceDate
+  ])].sort();
+  const updatedSource = normalizeAgendaEvent({
+    ...source,
+    recurrence: { ...source.recurrence, excludedDates }
+  }, professionalId, source);
+  const occurrence = normalizeAgendaEvent({
+    ...input,
+    date: occurrenceDate,
+    recurrence: { frequency: "none", weekDays: [], untilDate: null, excludedDates: [] },
+    seriesId: source.id,
+    occurrenceDate
+  }, professionalId);
+  const occurrenceReference = doc(agendaCollection(professionalId));
+  const batch = writeBatch(db);
+  batch.set(
+    doc(db, "professionalAgendas", professionalId, "events", source.id),
+    { ...updatedSource, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+  batch.set(occurrenceReference, {
+    ...occurrence,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+  return {
+    source: { id: source.id, ...updatedSource },
+    occurrence: { id: occurrenceReference.id, ...occurrence }
+  };
+}
+
+export async function splitAgendaSeries(professionalId, source, occurrenceDate, input) {
+  if (!source?.id || source.recurrence?.frequency !== "weekly") {
+    throw new Error("Série recorrente não identificada.");
+  }
+  const previousDate = addCalendarDays(occurrenceDate, -1);
+  if (previousDate < source.date) {
+    throw new Error("Use a opção de editar toda a série para a primeira ocorrência.");
+  }
+  const originalUntilDate = source.recurrence.untilDate;
+  const updatedSource = normalizeAgendaEvent({
+    ...source,
+    recurrence: { ...source.recurrence, untilDate: previousDate }
+  }, professionalId, source);
+  const nextSeries = normalizeAgendaEvent({
+    ...input,
+    date: occurrenceDate,
+    recurrence: {
+      ...input.recurrence,
+      frequency: "weekly",
+      untilDate: originalUntilDate,
+      excludedDates: (source.recurrence.excludedDates || [])
+        .filter((date) => date >= occurrenceDate)
+    },
+    seriesId: source.id
+  }, professionalId);
+  const nextReference = doc(agendaCollection(professionalId));
+  const batch = writeBatch(db);
+  batch.set(
+    doc(db, "professionalAgendas", professionalId, "events", source.id),
+    { ...updatedSource, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+  batch.set(nextReference, {
+    ...nextSeries,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  await batch.commit();
+  return {
+    source: { id: source.id, ...updatedSource },
+    nextSeries: { id: nextReference.id, ...nextSeries }
+  };
+}
+
+export async function excludeAgendaOccurrence(professionalId, source, occurrenceDate) {
+  if (!source?.id || source.recurrence?.frequency !== "weekly") {
+    throw new Error("Série recorrente não identificada.");
+  }
+  const event = normalizeAgendaEvent({
+    ...source,
+    recurrence: {
+      ...source.recurrence,
+      excludedDates: [...new Set([
+        ...(source.recurrence.excludedDates || []),
+        occurrenceDate
+      ])].sort()
+    }
+  }, professionalId, source);
+  await setDoc(
+    doc(db, "professionalAgendas", professionalId, "events", source.id),
+    { ...event, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+  return { id: source.id, ...event };
+}
+
+export async function truncateAgendaSeries(professionalId, source, occurrenceDate) {
+  if (!source?.id || source.recurrence?.frequency !== "weekly") {
+    throw new Error("Série recorrente não identificada.");
+  }
+  const untilDate = addCalendarDays(occurrenceDate, -1);
+  if (untilDate < source.date) {
+    await deleteAgendaEvent(professionalId, source.id);
+    return null;
+  }
+  const event = normalizeAgendaEvent({
+    ...source,
+    recurrence: { ...source.recurrence, untilDate }
+  }, professionalId, source);
+  await setDoc(
+    doc(db, "professionalAgendas", professionalId, "events", source.id),
+    { ...event, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+  return { id: source.id, ...event };
 }
 
 export async function deleteAgendaEvent(professionalId, eventId) {

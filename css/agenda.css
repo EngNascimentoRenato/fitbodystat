@@ -214,6 +214,11 @@
   font-size: 0.82rem;
 }
 
+.agenda-recurrence-mark {
+  color: currentColor;
+  font-weight: 700;
+}
+
 .agenda-event-time {
   color: var(--muted);
   font-size: 0.74rem;

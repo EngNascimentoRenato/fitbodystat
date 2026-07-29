@@ -84,8 +84,8 @@
 
 .button.primary {
   color: #fffaf0;
-  background: var(--primary);
-  border-color: var(--primary);
+  background: var(--primary-action);
+  border-color: var(--primary-action);
 }
 
 .button.danger {
@@ -419,8 +419,8 @@
   min-height: 40px;
   padding: 0.6rem 0.8rem;
   color: #fffaf0;
-  background: var(--primary);
-  border: 1px solid var(--primary);
+  background: var(--primary-action);
+  border: 1px solid var(--primary-action);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }

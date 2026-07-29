@@ -18,11 +18,15 @@ import {
 import {
   cancelAgendaAppointment,
   deleteAgendaEvent,
+  excludeAgendaOccurrence,
   listAgendaEvents,
   loadAgendaAvailability,
   reopenAgendaAppointment,
   saveAgendaAvailability,
-  saveAgendaEvent
+  saveAgendaEvent,
+  saveAgendaOccurrence,
+  splitAgendaSeries,
+  truncateAgendaSeries
 } from "../services/agenda-service.js";
 import { addMonths, formatDate, todayISO } from "../utils/date-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
@@ -58,6 +62,7 @@ const agendaUi = {
   filters: { status: "", patient: "", location: "" },
   detailOpen: false,
   detailEventId: null,
+  detailOccurrenceDate: null,
   cancelOpen: false,
   reopenOpen: false,
   editorOpen: false,
@@ -125,12 +130,14 @@ function renderStatusBadge(status) {
 
 function renderEventButton(event, compact = false) {
   const sourceId = event.sourceEventId || event.id;
+  const recurring = event.recurrence?.frequency === "weekly";
   return `
     <button class="agenda-event ${compact ? "compact" : ""} ${event.type === "block" ? "block" : ""}"
       type="button" data-agenda-event="${escapeAttribute(sourceId)}"
+      data-occurrence-date="${escapeAttribute(event.date)}"
       style="--event-color:${eventColor(event)}">
       <span class="agenda-event-time">${escapeHtml(event.startTime)}</span>
-      <strong>${escapeHtml(eventTitle(event))}</strong>
+      <strong>${escapeHtml(eventTitle(event))}${recurring ? ` <span class="agenda-recurrence-mark" title="Evento recorrente" aria-label="Evento recorrente">↻</span>` : ""}</strong>
       ${compact ? "" : renderStatusBadge(event.status)}
     </button>
   `;
@@ -349,6 +356,8 @@ function renderEditor(patients, professionalProfile = {}) {
   const bookingMode = event.bookingMode || "exclusive";
   const recurrence = event.recurrence || { frequency: "none", weekDays: [], untilDate: null };
   const recurrenceDays = new Set(recurrence.weekDays || []);
+  const occurrenceDate = event._occurrenceDate || event.date;
+  const isRecurringEdit = isEdit && recurrence.frequency === "weekly";
   const endTime = event.endTime || (() => {
     const [hours, minutes] = event.startTime.split(":").map(Number);
     const total = Math.min(hours * 60 + minutes + Number(event.durationMinutes || 60), 1439);
@@ -358,6 +367,8 @@ function renderEditor(patients, professionalProfile = {}) {
     <dialog class="agenda-dialog" id="agenda-dialog">
       <form class="form agenda-form" id="agenda-form">
         <input type="hidden" name="eventId" value="${escapeAttribute(event.id || "")}" />
+        <input type="hidden" name="sourceDate" value="${escapeAttribute(event.date || "")}" />
+        <input type="hidden" name="occurrenceDate" value="${escapeAttribute(occurrenceDate)}" />
         <header class="agenda-dialog-header">
           <div>
             <p class="eyebrow">${isEdit ? "Editar agenda" : "Novo item"}</p>
@@ -378,12 +389,31 @@ function renderEditor(patients, professionalProfile = {}) {
             <label><input type="radio" name="type" value="block" ${isBlock ? "checked" : ""} /><span>Indisponibilidade</span></label>
           </div>
         `}
+        ${isRecurringEdit ? `
+          <fieldset class="agenda-form-section agenda-series-scope">
+            <legend>Aplicar alterações</legend>
+            <div class="agenda-booking-switch">
+              <label>
+                <input type="radio" name="editScope" value="occurrence" checked />
+                <span><strong>Somente esta ocorrência</strong><small>${formatDate(occurrenceDate)}</small></span>
+              </label>
+              <label>
+                <input type="radio" name="editScope" value="future" />
+                <span><strong>Esta e as próximas</strong><small>Divide a série a partir desta data</small></span>
+              </label>
+              <label>
+                <input type="radio" name="editScope" value="series" />
+                <span><strong>Toda a série</strong><small>Altera inclusive ocorrências anteriores</small></span>
+              </label>
+            </div>
+          </fieldset>
+        ` : ""}
 
         <fieldset class="agenda-form-section">
           <legend>Quando</legend>
           <div class="field">
             <label for="agenda-date">Data</label>
-            <input id="agenda-date" name="date" type="date" required value="${escapeAttribute(event.date)}" />
+            <input id="agenda-date" name="date" type="date" required value="${escapeAttribute(occurrenceDate)}" />
           </div>
           <div class="form-grid agenda-appointment-time-fields" ${isBlock ? "hidden" : ""}>
             <div class="field">
@@ -411,30 +441,31 @@ function renderEditor(patients, professionalProfile = {}) {
                 <input id="agenda-end-time" name="endTime" type="time" value="${escapeAttribute(endTime)}" />
               </div>
             </div>
-            <div class="field">
-              <label for="agenda-recurrence">Repetição</label>
-              <select id="agenda-recurrence" name="recurrenceFrequency">
-                <option value="none" ${recurrence.frequency !== "weekly" ? "selected" : ""}>Não repetir</option>
-                <option value="weekly" ${recurrence.frequency === "weekly" ? "selected" : ""}>Semanalmente</option>
-              </select>
-            </div>
-            <div class="agenda-recurrence-fields" ${recurrence.frequency !== "weekly" ? "hidden" : ""}>
-              <fieldset>
-                <legend>Dias da semana</legend>
-                <div class="agenda-weekday-picker">
-                  ${weekDays.map((day) => `
-                    <label>
-                      <input type="checkbox" name="recurrenceWeekDays" value="${day.index}" ${recurrenceDays.has(day.index) ? "checked" : ""} />
-                      <span>${day.label.slice(0, 3)}</span>
-                    </label>
-                  `).join("")}
-                </div>
-              </fieldset>
-              <div class="field">
-                <label for="agenda-recurrence-until">Repetir até</label>
-                <input id="agenda-recurrence-until" name="recurrenceUntilDate" type="date"
-                  value="${escapeAttribute(recurrence.untilDate || "")}" />
+          </div>
+          <div class="field">
+            <label for="agenda-recurrence">Repetição</label>
+            <select id="agenda-recurrence" name="recurrenceFrequency">
+              <option value="none" ${recurrence.frequency !== "weekly" ? "selected" : ""}>Não repetir</option>
+              <option value="weekly" ${recurrence.frequency === "weekly" ? "selected" : ""}>Semanalmente</option>
+            </select>
+          </div>
+          <div class="agenda-recurrence-fields" ${recurrence.frequency !== "weekly" ? "hidden" : ""}>
+            <fieldset>
+              <legend>Dias da semana</legend>
+              <div class="agenda-weekday-picker">
+                ${weekDays.map((day) => `
+                  <label>
+                    <input type="checkbox" name="recurrenceWeekDays" value="${day.index}" ${recurrenceDays.has(day.index) ? "checked" : ""} />
+                    <span>${day.label.slice(0, 3)}</span>
+                  </label>
+                `).join("")}
               </div>
+            </fieldset>
+            <div class="field">
+              <label for="agenda-recurrence-until">Repetir até</label>
+              <input id="agenda-recurrence-until" name="recurrenceUntilDate" type="date"
+                min="${escapeAttribute(occurrenceDate)}"
+                value="${escapeAttribute(recurrence.untilDate || "")}" />
             </div>
           </div>
         </fieldset>
@@ -577,6 +608,7 @@ function renderEventDetails(event, patients) {
   const recurrenceLabel = event.recurrence?.frequency === "weekly"
     ? `Semanal até ${formatDate(event.recurrence.untilDate)}`
     : "Não se repete";
+  const isRecurring = event.recurrence?.frequency === "weekly";
   return `
     <dialog class="agenda-dialog agenda-details-dialog" id="agenda-details-dialog">
       <article>
@@ -600,6 +632,12 @@ function renderEventDetails(event, patients) {
                     `<option value="${value}" ${event.status === value ? "selected" : ""}>${label}</option>`
                   ).join("")}
               </select>
+              ${isRecurring ? `
+                <select name="statusScope" aria-label="Aplicar estado">
+                  <option value="occurrence">Somente esta ocorrência</option>
+                  <option value="series">Toda a série</option>
+                </select>
+              ` : ""}
               <button class="button" type="submit">Atualizar estado</button>
             </form>
           `}
@@ -611,7 +649,7 @@ function renderEventDetails(event, patients) {
           ${detailValue("Local ou link", isBlock ? "" : event.location)}
           ${detailValue("Ocupação", isBlock ? "" : bookingModeLabels[event.bookingMode] || "Exclusivo")}
           ${event.bookingMode === "group" ? detailValue("Capacidade", `${event.capacity} participantes`) : ""}
-          ${isBlock ? detailValue("Repetição", recurrenceLabel) : ""}
+          ${detailValue("Repetição", recurrenceLabel)}
           ${patient?.phone ? detailValue(
             "Telefone",
             `<a href="tel:${escapeAttribute(patient.phone)}">${escapeHtml(formatPhone(patient.phone))}</a>`,
@@ -631,7 +669,7 @@ function renderEventDetails(event, patients) {
               : "<span></span>"}
           <div class="button-row">
             <button class="button" id="close-agenda-details-secondary" type="button">Fechar</button>
-            <button class="button primary" id="edit-agenda-event" type="button">Editar</button>
+            <button class="button primary" id="edit-agenda-event" type="button">${isRecurring ? "Editar ocorrência ou série" : "Editar"}</button>
           </div>
         </footer>
       </article>
@@ -641,6 +679,7 @@ function renderEventDetails(event, patients) {
 
 function renderCancellationDialog(event) {
   if (!event || event.type !== "appointment") return "";
+  const isRecurring = event.recurrence?.frequency === "weekly";
   return `
     <dialog class="agenda-dialog agenda-cancel-dialog" id="agenda-cancel-dialog">
       <form class="form" id="agenda-cancel-form">
@@ -658,6 +697,15 @@ function renderCancellationDialog(event) {
           <label for="agenda-cancellation-reason">Motivo do cancelamento <span class="muted">(opcional)</span></label>
           <textarea id="agenda-cancellation-reason" name="reason" maxlength="500"></textarea>
         </div>
+        ${isRecurring ? `
+          <div class="field">
+            <label for="agenda-cancel-scope">Aplicar cancelamento</label>
+            <select id="agenda-cancel-scope" name="cancelScope">
+              <option value="occurrence">Somente esta ocorrência</option>
+              <option value="series">Toda a série</option>
+            </select>
+          </div>
+        ` : ""}
         <fieldset class="agenda-cancel-options">
           <legend>Bloqueio da agenda</legend>
           <label>
@@ -834,7 +882,10 @@ export function renderAgenda(authState) {
   const groups = eventsByDate(visibleEvents);
   const appointmentCount = visibleEvents.filter((event) => event.type === "appointment").length;
   const blockCount = visibleEvents.filter((event) => event.type === "block").length;
-  const detailEvent = events.find((event) => event.id === agendaUi.detailEventId) || null;
+  const detailSource = events.find((event) => event.id === agendaUi.detailEventId) || null;
+  const detailEvent = detailSource && agendaUi.detailOccurrenceDate
+    ? expandRecurringEvents([detailSource], [agendaUi.detailOccurrenceDate])[0] || detailSource
+    : detailSource;
   const linkedCancellationBlock = detailEvent
     ? events.find((event) =>
       event.type === "block"
@@ -918,8 +969,10 @@ async function refreshAgenda(context) {
   }
 }
 
-function openEditor(context, event = null, type = "appointment", date = agendaUi.anchor) {
-  agendaUi.draft = event ? { ...event } : blankDraft(type, date);
+function openEditor(context, event = null, type = "appointment", date = agendaUi.anchor, occurrenceDate = null) {
+  agendaUi.draft = event
+    ? { ...event, _occurrenceDate: occurrenceDate || event.date }
+    : blankDraft(type, date);
   agendaUi.detailOpen = false;
   agendaUi.cancelOpen = false;
   agendaUi.reopenOpen = false;
@@ -933,8 +986,9 @@ function closeEditor() {
   document.getElementById("agenda-dialog")?.close();
 }
 
-function openEventDetails(context, event) {
+function openEventDetails(context, event, occurrenceDate = event.date) {
   agendaUi.detailEventId = event.id;
+  agendaUi.detailOccurrenceDate = occurrenceDate;
   agendaUi.detailOpen = true;
   agendaUi.cancelOpen = false;
   agendaUi.reopenOpen = false;
@@ -946,6 +1000,7 @@ function closeEventDetails() {
   agendaUi.cancelOpen = false;
   agendaUi.reopenOpen = false;
   agendaUi.detailEventId = null;
+  agendaUi.detailOccurrenceDate = null;
   document.getElementById("agenda-details-dialog")?.close();
   document.getElementById("agenda-cancel-dialog")?.close();
   document.getElementById("agenda-reopen-dialog")?.close();
@@ -1027,12 +1082,12 @@ function updateEditorVisibility() {
     form.elements.capacity.disabled = isBlock || bookingMode !== "group";
   }
   if (form.elements.recurrenceUntilDate) {
-    form.elements.recurrenceUntilDate.required = isBlock && recurrence === "weekly";
-    if (isBlock && recurrence === "weekly" && !form.elements.recurrenceUntilDate.value) {
+    form.elements.recurrenceUntilDate.required = recurrence === "weekly";
+    if (recurrence === "weekly" && !form.elements.recurrenceUntilDate.value) {
       form.elements.recurrenceUntilDate.value = addMonths(form.elements.date.value, 3);
     }
   }
-  if (isBlock && recurrence === "weekly") {
+  if (recurrence === "weekly") {
     const checkedDays = [...form.querySelectorAll('input[name="recurrenceWeekDays"]:checked')];
     if (!checkedDays.length && form.elements.date.value) {
       const dayIndex = parseLocalDate(form.elements.date.value).getDay();
@@ -1080,9 +1135,10 @@ function eventInputFromForm(form, patients) {
     location: data.locationChoice === "__custom" ? data.locationCustom : data.locationChoice || "",
     bookingMode: type === "appointment" ? data.bookingMode || "exclusive" : "exclusive",
     recurrence: {
-      frequency: type === "block" ? data.recurrenceFrequency || "none" : "none",
+      frequency: data.recurrenceFrequency || "none",
       weekDays: formData.getAll("recurrenceWeekDays").map(Number),
-      untilDate: data.recurrenceUntilDate || null
+      untilDate: data.recurrenceUntilDate || null,
+      excludedDates: agendaUi.draft?.recurrence?.excludedDates || []
     }
   };
 }
@@ -1144,7 +1200,7 @@ export function bindAgenda(context) {
   document.querySelectorAll("[data-agenda-event]").forEach((button) => {
     button.addEventListener("click", () => {
       const event = (context.authState.agendaEvents || []).find((item) => item.id === button.dataset.agendaEvent);
-      if (event) openEventDetails(context, event);
+      if (event) openEventDetails(context, event, button.dataset.occurrenceDate || event.date);
     });
   });
 
@@ -1176,7 +1232,7 @@ export function bindAgenda(context) {
   document.getElementById("edit-agenda-event")?.addEventListener("click", () => {
     const event = (context.authState.agendaEvents || [])
       .find((item) => item.id === agendaUi.detailEventId);
-    if (event) openEditor(context, event);
+    if (event) openEditor(context, event, event.type, event.date, agendaUi.detailOccurrenceDate);
   });
   document.getElementById("agenda-quick-status-form")?.addEventListener("submit", async (statusEvent) => {
     statusEvent.preventDefault();
@@ -1190,6 +1246,32 @@ export function bindAgenda(context) {
       return;
     }
     submit.disabled = true;
+    const statusScope = form.elements.statusScope?.value || "series";
+    if (source.recurrence?.frequency === "weekly" && statusScope === "occurrence") {
+      try {
+        const occurrenceDate = agendaUi.detailOccurrenceDate || source.date;
+        const occurrence = expandRecurringEvents([source], [occurrenceDate])[0] || source;
+        const result = await saveAgendaOccurrence(
+          context.authState.user.uid,
+          source,
+          occurrenceDate,
+          { ...occurrence, status: form.elements.status.value }
+        );
+        context.authState.agendaEvents = (context.authState.agendaEvents || [])
+          .map((item) => item.id === source.id ? result.source : item)
+          .concat(result.occurrence)
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+        agendaUi.detailOpen = false;
+        agendaUi.detailEventId = null;
+        agendaUi.detailOccurrenceDate = null;
+        showToast("Estado atualizado somente nesta ocorrência.");
+        context.render();
+      } catch (error) {
+        submit.disabled = false;
+        showToast(`Não foi possível atualizar o estado: ${error.message}`);
+      }
+      return;
+    }
     const previousEvents = [...context.authState.agendaEvents];
     const candidate = normalizeAgendaEvent(
       { ...source, status: form.elements.status.value },
@@ -1247,13 +1329,19 @@ export function bindAgenda(context) {
     submit.disabled = true;
     try {
       const blockMode = form.elements.blockMode.value;
+      const cancelScope = form.elements.cancelScope?.value || "series";
+      const occurrenceDate = agendaUi.detailOccurrenceDate || source.date;
+      const cancellationTarget = source.recurrence?.frequency === "weekly"
+        && cancelScope === "occurrence"
+        ? expandRecurringEvents([source], [occurrenceDate])[0] || source
+        : source;
       const blockDetails = {
         date: form.elements.blockDate?.value,
         startTime: form.elements.blockStartTime?.value,
         endTime: form.elements.blockEndTime?.value,
         allDay: form.elements.blockAllDay?.checked === true
       };
-      const blockInput = cancellationBlockInput(source, {
+      const blockInput = cancellationBlockInput(cancellationTarget, {
         blockMode,
         blockDetails,
         reason: form.elements.reason.value
@@ -1273,6 +1361,38 @@ export function bindAgenda(context) {
           submit.disabled = false;
           return;
         }
+      }
+      if (source.recurrence?.frequency === "weekly" && cancelScope === "occurrence") {
+        const occurrenceResult = await saveAgendaOccurrence(
+          context.authState.user.uid,
+          source,
+          occurrenceDate,
+          {
+            ...cancellationTarget,
+            status: "cancelled",
+            cancellationReason: form.elements.reason.value
+          }
+        );
+        let savedBlock = null;
+        if (blockInput) {
+          savedBlock = await saveAgendaEvent(
+            context.authState.user.uid,
+            { ...blockInput, relatedEventId: occurrenceResult.occurrence.id }
+          );
+        }
+        context.authState.agendaEvents = (context.authState.agendaEvents || [])
+          .map((item) => item.id === source.id ? occurrenceResult.source : item)
+          .concat(occurrenceResult.occurrence, ...(savedBlock ? [savedBlock] : []))
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+        agendaUi.detailOpen = false;
+        agendaUi.cancelOpen = false;
+        agendaUi.detailEventId = null;
+        agendaUi.detailOccurrenceDate = null;
+        showToast(savedBlock
+          ? "Ocorrência cancelada e horário bloqueado."
+          : "Ocorrência cancelada.");
+        context.render();
+        return;
       }
       const result = await cancelAgendaAppointment(context.authState.user.uid, source, {
         reason: form.elements.reason.value,
@@ -1453,8 +1573,22 @@ export function bindAgenda(context) {
       const input = eventInputFromForm(form, context.authState.patients || []);
       const existing = (context.authState.agendaEvents || []).find((item) => item.id === input.eventId) || null;
       if (existing) input.type = existing.type;
+      const recurringEdit = existing?.recurrence?.frequency === "weekly";
+      const editScope = recurringEdit
+        ? input.editScope || "occurrence"
+        : "series";
+      if (recurringEdit && editScope === "series") {
+        input.date = input.sourceDate || existing.date;
+      }
+      const candidateInput = recurringEdit && editScope === "occurrence"
+        ? {
+            ...input,
+            date: input.occurrenceDate,
+            recurrence: { frequency: "none", weekDays: [], untilDate: null, excludedDates: [] }
+          }
+        : input;
       const candidate = normalizeAgendaEvent(
-        { ...input, timeZone: existing?.timeZone },
+        { ...candidateInput, timeZone: existing?.timeZone },
         context.authState.user.uid,
         existing || {}
       );
@@ -1464,22 +1598,74 @@ export function bindAgenda(context) {
         [{ id: existing?.id || "candidate", ...candidate }],
         dates
       );
-      const conflicts = candidateOccurrences.flatMap((occurrence) =>
-        eventConflicts(occurrence, existingOccurrences)
-      );
-      if (conflicts.length && !await confirmAction(
-        `Há ${new Set(conflicts.map((item) => item.sourceEventId || item.id)).size} item(ns) ocupando este período. Salvar mesmo assim?`
-      )) {
-        submit.disabled = false;
-        return;
+      const conflictingDates = candidateOccurrences
+        .filter((occurrence) => eventConflicts(occurrence, existingOccurrences).length)
+        .map((occurrence) => occurrence.date);
+      if (conflictingDates.length) {
+        const recurringCandidate = candidate.recurrence?.frequency === "weekly";
+        const proceed = await confirmAction({
+          title: recurringCandidate ? "Ignorar datas conflitantes?" : "Conflito de horário",
+          message: recurringCandidate
+            ? `${conflictingDates.length} ocorrência(s) coincidem com itens existentes. Essas datas não serão criadas.`
+            : "Já existe um item ocupando este período. Deseja salvar mesmo assim?",
+          confirmLabel: recurringCandidate ? "Ignorar e salvar" : "Salvar mesmo assim",
+          tone: "warning"
+        });
+        if (!proceed) {
+          submit.disabled = false;
+          return;
+        }
+        if (recurringCandidate) {
+          candidate.recurrence.excludedDates = [...new Set([
+            ...(candidate.recurrence.excludedDates || []),
+            ...conflictingDates
+          ])].sort();
+          input.recurrence.excludedDates = candidate.recurrence.excludedDates;
+        }
       }
-      if (!eventIsWithinAvailability(candidate, context.authState.agendaAvailability)
+      const outsideAvailability = candidateOccurrences.some((occurrence) =>
+        !eventIsWithinAvailability(occurrence, context.authState.agendaAvailability)
+      );
+      if (outsideAvailability
         && !await confirmAction("Este compromisso está fora dos horários habituais de atendimento. Salvar mesmo assim?")) {
         submit.disabled = false;
         return;
       }
 
       const previousEvents = [...(context.authState.agendaEvents || [])];
+      if (recurringEdit && editScope !== "series") {
+        try {
+          const result = editScope === "future"
+            ? await splitAgendaSeries(
+                context.authState.user.uid,
+                existing,
+                input.occurrenceDate,
+                input
+              )
+            : await saveAgendaOccurrence(
+                context.authState.user.uid,
+                existing,
+                input.occurrenceDate,
+                input
+              );
+          context.authState.agendaEvents = previousEvents
+            .map((item) => item.id === existing.id ? result.source : item);
+          if (result.occurrence) context.authState.agendaEvents.push(result.occurrence);
+          if (result.nextSeries) context.authState.agendaEvents.push(result.nextSeries);
+          context.authState.agendaEvents.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+          agendaUi.anchor = input.occurrenceDate;
+          agendaUi.editorOpen = false;
+          agendaUi.draft = null;
+          showToast(editScope === "future"
+            ? "Esta e as próximas ocorrências foram atualizadas."
+            : "Ocorrência atualizada sem alterar a série.");
+          context.render();
+        } catch (error) {
+          submit.disabled = false;
+          showToast(`Não foi possível salvar: ${error.message}`);
+        }
+        return;
+      }
       const temporaryId = existing?.id || `local-${Date.now()}`;
       const optimistic = { id: temporaryId, ...candidate };
       context.authState.agendaEvents = existing
@@ -1516,22 +1702,56 @@ export function bindAgenda(context) {
 
   document.getElementById("delete-agenda-event")?.addEventListener("click", async () => {
     const event = agendaUi.draft;
+    const form = document.getElementById("agenda-form");
+    const deleteScope = event?.recurrence?.frequency === "weekly"
+      ? form?.elements.editScope?.value || "occurrence"
+      : "series";
+    const deleteMessage = deleteScope === "occurrence"
+      ? "Somente esta ocorrência será removida da série."
+      : deleteScope === "future"
+        ? "Esta ocorrência e todas as seguintes serão removidas."
+        : "Toda a série e suas ocorrências serão removidas permanentemente.";
     if (!event?.id || !await confirmAction({
       title: "Excluir item da agenda?",
-      message: "Este item será removido permanentemente.",
+      message: deleteMessage,
       confirmLabel: "Excluir",
       tone: "danger"
     })) return;
     const previousEvents = [...(context.authState.agendaEvents || [])];
-    context.authState.agendaEvents = previousEvents.filter((item) => item.id !== event.id);
     agendaUi.editorOpen = false;
     agendaUi.draft = null;
-    context.render();
     try {
-      await deleteAgendaEvent(context.authState.user.uid, event.id);
-      showToast("Item excluído da agenda.");
+      if (deleteScope === "occurrence") {
+        const updated = await excludeAgendaOccurrence(
+          context.authState.user.uid,
+          event,
+          event._occurrenceDate || event.date
+        );
+        context.authState.agendaEvents = previousEvents
+          .map((item) => item.id === event.id ? updated : item);
+        showToast("Ocorrência removida da série.");
+      } else if (deleteScope === "future") {
+        const updated = await truncateAgendaSeries(
+          context.authState.user.uid,
+          event,
+          event._occurrenceDate || event.date
+        );
+        context.authState.agendaEvents = updated
+          ? previousEvents.map((item) => item.id === event.id ? updated : item)
+          : previousEvents.filter((item) => item.id !== event.id);
+        showToast("Esta e as próximas ocorrências foram removidas.");
+      } else {
+        await deleteAgendaEvent(context.authState.user.uid, event.id);
+        context.authState.agendaEvents = previousEvents.filter((item) => item.id !== event.id);
+        showToast(event.recurrence?.frequency === "weekly"
+          ? "Série excluída da agenda."
+          : "Item excluído da agenda.");
+      }
+      context.render();
     } catch (error) {
       context.authState.agendaEvents = previousEvents;
+      agendaUi.editorOpen = true;
+      agendaUi.draft = event;
       context.render();
       showToast(`Não foi possível excluir: ${error.message}`);
     }

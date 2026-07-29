@@ -353,6 +353,11 @@
 }
 
 @media (max-width: 760px) {
+  .recent-weeks-grid {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+
   .week-strip {
     gap: 0.25rem;
   }

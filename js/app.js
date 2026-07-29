@@ -75,6 +75,7 @@ let authState = {
 };
 let isApplyingCloudState = false;
 let authReady = false;
+let serviceWorkerScheduled = false;
 const pendingInvitationId = () => localStorage.getItem("fitbodystat-pending-invitation");
 
 function usesGoogle(user) {
@@ -82,7 +83,37 @@ function usesGoogle(user) {
 }
 
 function applyTheme() {
-  document.documentElement.dataset.theme = personalState.settings?.theme || "light";
+  document.documentElement.dataset.theme = personalState.settings?.theme || "dark";
+}
+
+function setAppLoading(loading, message = "Preparando seu acompanhamento...", error = false) {
+  const overlay = document.getElementById("app-loading");
+  const messageElement = document.getElementById("app-loading-message");
+  document.body.dataset.appLoading = String(loading);
+  if (!overlay) return;
+  overlay.hidden = !loading;
+  overlay.classList.toggle("is-error", error);
+  if (messageElement) messageElement.textContent = message;
+  overlay.querySelector(".app-loading-retry")?.remove();
+  if (loading && error) {
+    const retry = document.createElement("button");
+    retry.className = "button primary app-loading-retry";
+    retry.type = "button";
+    retry.textContent = "Tentar novamente";
+    retry.addEventListener("click", () => location.reload());
+    overlay.append(retry);
+  }
+}
+
+function scheduleServiceWorkerRegistration() {
+  if (serviceWorkerScheduled) return;
+  serviceWorkerScheduled = true;
+  const register = () => registerServiceWorker();
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(register, { timeout: 2500 });
+  } else {
+    window.setTimeout(register, 800);
+  }
 }
 
 function setPresentationMode(mode, shouldRender = true) {
@@ -369,7 +400,6 @@ document.getElementById("presentation-indicator")?.addEventListener("click", () 
 });
 
 window.addEventListener("hashchange", render);
-registerServiceWorker();
 
 async function completeOnboarding(payload) {
   const profile = { ...personalState.profile, ...(payload.profile || {}) };
@@ -418,8 +448,12 @@ observeAuth(async (user) => {
   try {
     authReady = true;
     authState.syncStatus = "Carregando dados da nuvem...";
-    render();
+    setAppLoading(true, "Carregando seus dados...");
+    personalState = loadState(user.uid);
+    state = personalState;
+    applyTheme();
 
+    const cloudStatePromise = loadCloudState(user.uid);
     let userDoc = await ensureUserDocument(user);
     if ((userDoc.role || "user") === "user") {
       try {
@@ -450,14 +484,25 @@ observeAuth(async (user) => {
     authState.invitations = null;
     authState.professionals = null;
     authState.activePatient = null;
-    authState.professionalProfile = authState.role === "professional"
-      ? await loadProfessionalProfile(user.uid)
-      : null;
+    const [professionalProfile, cloudState, invitations, professionals] = await Promise.all([
+      authState.role === "professional" ? loadProfessionalProfile(user.uid) : Promise.resolve(null),
+      cloudStatePromise,
+      listInvitationsForUser(user.email).catch((error) => {
+        console.warn("Não foi possível carregar convites durante a inicialização.", error);
+        return [];
+      }),
+      listProfessionalsForUser(user.uid).catch((error) => {
+        console.warn("Não foi possível carregar profissionais durante a inicialização.", error);
+        return [];
+      })
+    ]);
+    authState.professionalProfile = professionalProfile;
+    authState.invitations = invitations;
+    authState.professionals = professionals;
     authState.activeWorkspace = authState.role === "professional"
       ? loadDeviceWorkspace(user.uid, personalWorkspaceEnabled(authState))
       : authState.role === "admin" ? "admin" : "personal";
 
-    const cloudState = await loadCloudState(user.uid);
     const requiresCycleMigration = Boolean(
       cloudState?.profile
       && (!(cloudState.cycles || []).length
@@ -482,16 +527,6 @@ observeAuth(async (user) => {
     const accountName = user.displayName || userDoc.name || "";
     if (!personalState.profile.name && accountName) personalState.profile.name = accountName;
     authState.needsName = !String(personalState.profile.name || "").trim();
-    try {
-      [authState.invitations, authState.professionals] = await Promise.all([
-        listInvitationsForUser(user.email),
-        listProfessionalsForUser(user.uid)
-      ]);
-    } catch (error) {
-      console.warn("Não foi possível carregar vínculos durante a inicialização.", error);
-      authState.invitations = [];
-      authState.professionals = [];
-    }
     const personalProfileReady = Boolean(
       personalState.profile.name
       && personalState.profile.birthDate
@@ -510,20 +545,13 @@ observeAuth(async (user) => {
         && userDoc.onboardingCompleted !== true
         && !personalProfileReady;
     if (!authState.needsName && user.displayName !== personalState.profile.name) {
-      await updateCurrentUserName(personalState.profile.name);
-      await updateOwnDirectoryName(user.uid, personalState.profile.name);
+      Promise.all([
+        updateCurrentUserName(personalState.profile.name),
+        updateOwnDirectoryName(user.uid, personalState.profile.name)
+      ]).catch(() => {});
     }
     const actor = { uid: user.uid, role: authState.role };
-    if (cloudState?.profile) {
-      if (requiresCycleMigration) {
-        await saveCloudState(user.uid, personalState, actor);
-      } else {
-        await Promise.all([
-          saveProfileAndPlan(user.uid, personalState, actor),
-          saveSettings(user.uid, personalState.settings, actor)
-        ]);
-      }
-    } else {
+    if (cloudState?.profile && requiresCycleMigration) {
       await saveCloudState(user.uid, personalState, actor);
     }
     isApplyingCloudState = false;
@@ -542,14 +570,16 @@ observeAuth(async (user) => {
         ? "#/perfil"
         : authState.role === "professional"
           ? authState.activeWorkspace === "personal" ? "#/dashboard" : "#/agenda"
-          : authState.role === "admin" ? "#/admin" : "#/dashboard";
+        : authState.role === "admin" ? "#/admin" : "#/dashboard";
     }
+    setAppLoading(false);
+    render();
+    scheduleServiceWorkerRegistration();
   } catch (error) {
     isApplyingCloudState = false;
     authState.syncStatus = `Falha ao acessar o servidor: ${error.message}`;
+    setAppLoading(true, "Não foi possível carregar seus dados.", true);
   }
-
-  render();
 });
 
-if (!authReady) render();
+if (!authReady) setAppLoading(true);

@@ -67,10 +67,11 @@ function addMinutes(date, minutes) {
 }
 
 function normalizeRecurrence(input, date, type) {
-  if (type !== "block") return { frequency: "none", weekDays: [], untilDate: null };
   const source = input.recurrence || {};
   const frequency = recurrenceFrequencies.has(source.frequency) ? source.frequency : "none";
-  if (frequency === "none") return { frequency, weekDays: [], untilDate: null };
+  if (frequency === "none") {
+    return { frequency, weekDays: [], untilDate: null, excludedDates: [] };
+  }
 
   const dateDay = parseDate(date).getDay();
   const days = Array.isArray(source.weekDays)
@@ -80,7 +81,12 @@ function normalizeRecurrence(input, date, type) {
   const untilDate = validDate(source.untilDate) && source.untilDate >= date
     ? source.untilDate
     : addCalendarMonths(date, 3);
-  return { frequency, weekDays: weekDayValues, untilDate };
+  const excludedDates = Array.isArray(source.excludedDates)
+    ? [...new Set(source.excludedDates.filter((item) =>
+      validDate(item) && item >= date && item <= untilDate
+    ))].sort()
+    : [];
+  return { frequency, weekDays: weekDayValues, untilDate, excludedDates };
 }
 
 function resolveTiming(input, type) {
@@ -182,6 +188,10 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
     privateNotes: cleanText(input.privateNotes),
     cancellationReason: cleanText(input.cancellationReason, existing.cancellationReason),
     relatedEventId: cleanText(input.relatedEventId, existing.relatedEventId) || null,
+    seriesId: cleanText(input.seriesId, existing.seriesId) || null,
+    occurrenceDate: validDate(input.occurrenceDate)
+      ? input.occurrenceDate
+      : validDate(existing.occurrenceDate) ? existing.occurrenceDate : null,
     visibility: "private",
     confirmationStatus: existing.confirmationStatus || "not_requested",
     recurrence: normalizeRecurrence(input, date, type),
@@ -336,10 +346,12 @@ export function expandRecurringEvents(events, visibleDates) {
     if (event.recurrence?.frequency !== "weekly") return [event];
     const untilDate = event.recurrence.untilDate || event.date;
     const weekDaySet = new Set(event.recurrence.weekDays || []);
+    const excludedDates = new Set(event.recurrence.excludedDates || []);
     const occurrences = dates
       .filter((date) =>
         date >= event.date
         && date <= untilDate
+        && !excludedDates.has(date)
         && weekDaySet.has(parseDate(date).getDay())
       )
       .map((date) => ({

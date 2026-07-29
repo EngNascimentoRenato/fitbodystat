@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#25636f" />
+    <meta name="theme-color" content="#141716" />
     <title>FitBodyStat</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
@@ -17,7 +17,13 @@
     <link rel="stylesheet" href="css/activities.css" />
     <link rel="stylesheet" href="css/agenda.css" />
   </head>
-  <body>
+  <body data-app-loading="true">
+    <div class="app-loading" id="app-loading" role="status" aria-live="polite">
+      <span class="app-loading-mark" aria-hidden="true">FBS</span>
+      <span class="app-loading-spinner" aria-hidden="true"></span>
+      <strong id="app-loading-message">Preparando seu acompanhamento...</strong>
+      <small>Seus dados estão sendo carregados com segurança.</small>
+    </div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Menu principal">
         <a class="brand" id="brand-home" href="#/dashboard" aria-label="Ir para a página inicial">

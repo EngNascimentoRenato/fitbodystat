@@ -48,7 +48,15 @@ export async function ensureUserDocument(user) {
 
   const data = snapshot.data();
   if (data.status === "suspended") return data;
-  await setDoc(userRef, publicUserData(user, data.role || "user", data.status || "active"), { merge: true });
+  const nextPublicData = publicUserData(user, data.role || "user", data.status || "active");
+  const directoryChanged = data.uid !== nextPublicData.uid
+    || data.name !== nextPublicData.name
+    || data.email !== nextPublicData.email
+    || data.role !== nextPublicData.role
+    || data.status !== nextPublicData.status;
+  if (directoryChanged) {
+    await setDoc(userRef, nextPublicData, { merge: true });
+  }
   return data;
 }
 

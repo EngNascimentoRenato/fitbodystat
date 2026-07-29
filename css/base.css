@@ -22,6 +22,78 @@ body {
   font-family: var(--font);
 }
 
+.app-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 0.75rem;
+  place-content: center;
+  justify-items: center;
+  padding: 1.5rem;
+  color: var(--text);
+  background: var(--bg);
+  text-align: center;
+}
+
+.app-loading[hidden] {
+  display: none;
+}
+
+.app-loading-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  color: #fffaf0;
+  background: var(--primary-action);
+  border-radius: var(--radius);
+  font-weight: 800;
+}
+
+.app-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: app-loading-spin 700ms linear infinite;
+}
+
+.app-loading strong {
+  font-size: 1rem;
+}
+
+.app-loading small {
+  color: var(--muted);
+}
+
+.app-loading.is-error .app-loading-spinner {
+  display: none;
+}
+
+.app-loading-retry {
+  margin-top: 0.25rem;
+}
+
+body[data-app-loading="true"] .app-shell,
+body[data-app-loading="true"] .menu-backdrop {
+  visibility: hidden;
+}
+
+@keyframes app-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-spinner {
+    animation-duration: 1400ms;
+  }
+}
+
 button,
 input,
 select,

@@ -187,6 +187,56 @@ test("bloqueio aceita dia inteiro e recorrência semanal", () => {
   assert.ok(occurrences.every((item) => item.sourceEventId === "block-1"));
 });
 
+test("compromisso aceita recorrência semanal em vários dias", () => {
+  const event = normalizeAgendaEvent({
+    type: "appointment",
+    title: "Treino acompanhado",
+    date: "2026-08-03",
+    startTime: "08:00",
+    durationMinutes: 60,
+    patientId: "patient-1",
+    patientName: "Paciente",
+    recurrence: {
+      frequency: "weekly",
+      weekDays: [1, 3, 5],
+      untilDate: "2026-08-14"
+    }
+  }, "professional-1");
+
+  const occurrences = expandRecurringEvents([{
+    id: "series-1",
+    ...event
+  }], agendaViewDays("2026-08-05", "week"));
+
+  assert.equal(event.recurrence.frequency, "weekly");
+  assert.deepEqual(event.recurrence.weekDays, [1, 3, 5]);
+  assert.equal(occurrences.length, 3);
+  assert.ok(occurrences.every((item) => item.sourceEventId === "series-1"));
+});
+
+test("datas excluídas não são expandidas na série", () => {
+  const event = normalizeAgendaEvent({
+    type: "appointment",
+    date: "2026-08-03",
+    startTime: "08:00",
+    durationMinutes: 60,
+    guestName: "Paciente",
+    recurrence: {
+      frequency: "weekly",
+      weekDays: [1, 3, 5],
+      untilDate: "2026-08-14",
+      excludedDates: ["2026-08-05"]
+    }
+  }, "professional-1");
+  const dates = agendaViewDays("2026-08-05", "week");
+  const occurrences = expandRecurringEvents([{ id: "series-1", ...event }], dates);
+
+  assert.deepEqual(
+    occurrences.map((item) => item.date),
+    ["2026-08-03", "2026-08-07"]
+  );
+});
+
 test("normaliza vários períodos por dia e valida sobreposição", () => {
   const availability = normalizeAvailability({
     slotIntervalMinutes: 30,
