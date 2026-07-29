@@ -170,6 +170,7 @@ function bindMeasurementForm(state, persist, render) {
   methodField?.addEventListener("change", updateBodyFatFields);
   updateBodyFatFields();
   const historyRoute = () => location.hash.includes("/me/") ? "#/me/historico" : "#/historico";
+  const dashboardRoute = () => location.hash.includes("/me/") ? "#/me/dashboard" : "#/dashboard";
   const cancelMeasurement = async () => {
     if (entryHasPendingChanges && !await confirmAction({
       title: editingMeasurementId ? "Cancelar edição?" : "Descartar registro?",
@@ -182,7 +183,7 @@ function bindMeasurementForm(state, persist, render) {
     entryHasPendingChanges = false;
     const destination = editingMeasurementId
       ? historyRoute()
-      : location.hash.includes("/me/") ? "#/me/dashboard" : "#/dashboard";
+      : dashboardRoute();
     editingMeasurementId = null;
     location.hash = destination;
     render();
@@ -266,7 +267,7 @@ function bindMeasurementForm(state, persist, render) {
     const wasEditing = Boolean(editingMeasurementId);
     editingMeasurementId = null;
     showToast(wasEditing ? "Registro atualizado." : "Registro salvo.");
-    location.hash = wasEditing ? historyRoute() : "#/dashboard";
+    location.hash = wasEditing ? historyRoute() : dashboardRoute();
     render();
   });
 }
