@@ -105,7 +105,7 @@ function standardPersonalMenu(currentPath, accountLinks, prefix = "", hasActiveP
   ].join("");
 }
 
-export function renderMenu(currentPath, authState, theme = "light", hasActiveProject = true) {
+export function renderMenu(currentPath, authState, theme = "light", hasActiveProject = true, canInstall = false) {
   const menu = document.getElementById("main-menu");
   if (authState?.needsOnboarding || authState?.needsPersonalOnboarding) {
     menu.innerHTML = navSection("Primeiro acesso", [
@@ -132,6 +132,10 @@ export function renderMenu(currentPath, authState, theme = "light", hasActivePro
       <span class="nav-icon" aria-hidden="true">${renderIcon(theme === "dark" ? "sun" : "moon")}</span>
       <span>${theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
     </button>`,
+    canInstall ? `<button class="nav-link nav-action" id="sidebar-install-app" type="button" title="Instalar aplicativo">
+      <span class="nav-icon" aria-hidden="true">${renderIcon("download")}</span>
+      <span>Instalar aplicativo</span>
+    </button>` : "",
     navLink("/metodos", "Métodos e cálculos", "calculator", currentPath)
   ].join("");
 

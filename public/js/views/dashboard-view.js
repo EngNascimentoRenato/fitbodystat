@@ -68,6 +68,19 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
   if (!state.activeCycleId) {
     const pendingInvitations = Number(options.pendingInvitations) || 0;
     const professionalCount = Number(options.professionalCount) || 0;
+    const installCard = options.showInstallSuggestion ? `
+      <section class="card install-suggestion-card">
+        <div>
+          <p class="eyebrow">Acesso rápido</p>
+          <h2>Instale o FitBodyStat</h2>
+          <p class="muted">Abra como aplicativo no celular ou computador.</p>
+        </div>
+        <div class="button-row">
+          <button class="button" id="dashboard-install-app" type="button">Instalar aplicativo</button>
+          <button class="button text-button" id="dismiss-install-suggestion" type="button">Agora não</button>
+        </div>
+      </section>
+    ` : "";
     if (options.patientContext === true) {
       return `
         <div class="view-stack">
@@ -119,6 +132,7 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
             `}
           </section>
         ` : ""}
+        ${installCard}
       </div>
     `;
   }

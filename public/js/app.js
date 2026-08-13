@@ -25,7 +25,7 @@ import {
   updateCurrentUserName
 } from "./services/auth-service.js";
 import { activateProfessionalAccess } from "./services/role-service.js";
-import { registerServiceWorker } from "./services/pwa-service.js";
+import { initializePwaInstall, registerServiceWorker } from "./services/pwa-service.js";
 import {
   clearDeviceWorkspace,
   loadDeviceWorkspace,
@@ -77,6 +77,11 @@ let isApplyingCloudState = false;
 let authReady = false;
 let serviceWorkerScheduled = false;
 const pendingInvitationId = () => localStorage.getItem("fitbodystat-pending-invitation");
+
+initializePwaInstall();
+window.addEventListener("pwa-install-statechange", () => {
+  if (authReady) render();
+});
 
 function usesGoogle(user) {
   return user?.providerData?.some((provider) => provider.providerId === "google.com");

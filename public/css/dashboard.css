@@ -43,6 +43,18 @@
   min-width: 210px;
 }
 
+.install-suggestion-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.install-suggestion-card h2,
+.install-suggestion-card p:last-child {
+  margin-bottom: 0;
+}
+
 .hero-panel p {
   color: var(--muted);
 }
@@ -109,5 +121,10 @@
 
   .project-onboarding-action {
     width: 100%;
+  }
+
+  .install-suggestion-card {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

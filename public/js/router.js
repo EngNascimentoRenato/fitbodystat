@@ -16,6 +16,13 @@ import { renderAgenda, bindAgenda } from "./views/agenda-view.js";
 import { bindMeasurementHelp } from "./components/measurement-guide.js";
 import { bindObjectiveHelp } from "./components/objective-guide.js";
 import { showToast } from "./components/toast.js";
+import { showAlert } from "./components/modal.js";
+import {
+  dismissInstallSuggestion,
+  getPwaInstallState,
+  requestPwaInstall,
+  shouldShowInstallSuggestion
+} from "./services/pwa-service.js";
 
 const patientDataPaths = ["/dashboard", "/perfil", "/registro", "/historico", "/atividades", "/metas"];
 const personalDataPaths = ["/me/dashboard", "/me/perfil", "/me/registro", "/me/historico", "/me/atividades", "/me/metas"];
@@ -107,7 +114,8 @@ export function renderRoute(context) {
     activeRoute.path,
     context.authState,
     context.personalState.settings?.theme || "light",
-    Boolean(stateForRoute(activeRoute.path, context)?.activeCycleId)
+    Boolean(stateForRoute(activeRoute.path, context)?.activeCycleId),
+    getPwaInstallState().available
   );
   document.getElementById("sidebar-theme-toggle")?.addEventListener("click", () => {
     context.personalState.settings = context.personalState.settings || {};
@@ -115,13 +123,29 @@ export function renderRoute(context) {
     context.persistPersonal({ type: "settings" });
     context.render();
   });
+  const installApp = async () => {
+    const result = await requestPwaInstall();
+    if (result.outcome === "manual-ios") {
+      await showAlert({
+        title: "Instalar no iPhone",
+        message: "Abra esta pagina no Safari, toque em Compartilhar e depois em Adicionar a Tela de Inicio.",
+        confirmLabel: "Entendi"
+      });
+      return;
+    }
+    if (result.outcome === "unavailable") {
+      showToast("A instalacao nao esta disponivel neste navegador.", "info");
+    }
+  };
+  document.getElementById("sidebar-install-app")?.addEventListener("click", installApp);
 
   const viewMap = {
     "/dashboard": () => renderDashboard(context.state, "", {
       presentationMode: context.authState.presentationMode,
       pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length,
       professionalCount: (context.authState.professionals || []).length,
-      patientContext: Boolean(context.authState.activePatient)
+      patientContext: Boolean(context.authState.activePatient),
+      showInstallSuggestion: !context.authState.activePatient && shouldShowInstallSuggestion()
     }),
     "/primeiro-acesso": () => renderOnboarding(context.personalState, context.authState),
     "/perfil": () => renderProfile(context.state, {
@@ -139,7 +163,8 @@ export function renderRoute(context) {
       presentationMode: context.authState.presentationMode,
       pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length,
       professionalCount: (context.authState.professionals || []).length,
-      patientContext: false
+      patientContext: false,
+      showInstallSuggestion: shouldShowInstallSuggestion()
     }),
     "/me/perfil": () => renderProfile(context.personalState, {
       canEditContact: true,
@@ -165,6 +190,11 @@ export function renderRoute(context) {
   };
 
   app.innerHTML = (viewMap[activeRoute.path] || viewMap[fallbackPath(context.authState)])();
+
+  document.getElementById("dashboard-install-app")?.addEventListener("click", installApp);
+  document.getElementById("dismiss-install-suggestion")?.addEventListener("click", () => {
+    dismissInstallSuggestion();
+  });
 
   if (activeRoute.path === "/primeiro-acesso") bindOnboarding(context);
   if (activeRoute.path === "/perfil") bindProfile(context.state, context.persist, context.render);
