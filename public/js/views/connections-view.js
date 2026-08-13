@@ -1,0 +1,241 @@
+import {
+  listInvitationsForUser,
+  listProfessionalsForUser,
+  respondToCareInvitation,
+  revokeCareLink,
+  updateCareLinkPhoneSharing
+} from "../data/firestore-store.js";
+import { confirmAction } from "../components/modal.js";
+import { showToast } from "../components/toast.js";
+import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+import { formatPhone } from "../utils/phone-utils.js";
+import {
+  careAreaForProfession,
+  careAreaLabel,
+  professionalTypeLabel
+} from "../data/professional-catalog.js";
+
+function professionLabel(value) {
+  return professionalTypeLabel(value);
+}
+
+function invitationCareArea(invitation) {
+  return invitation.careArea
+    || careAreaForProfession(invitation.professionType || invitation.professionalArea);
+}
+
+function professionalCareArea(professional) {
+  return professional.link?.careArea
+    || professional.careArea
+    || careAreaForProfession(professional.professionType);
+}
+
+function conflictingProfessional(invitation, professionals) {
+  const careArea = invitationCareArea(invitation);
+  return professionals.find((professional) =>
+    professional.link?.status === "active"
+    && professionalCareArea(professional) === careArea
+    && professional.uid !== invitation.professionalId
+  ) || null;
+}
+
+export function renderConnections(authState, personalState) {
+  const pending = (authState.invitations || []).filter((item) => item.status === "pending");
+  const professionals = authState.professionals || [];
+  const ownPhone = personalState?.contact?.phone || "";
+  const profilePath = authState.role === "user" || authState.activeWorkspace === "personal"
+    ? "#/perfil"
+    : "#/me/perfil";
+
+  return `
+    <div class="view-stack">
+      <section class="card">
+        <div class="chart-header">
+          <div>
+            <h2>Convites pendentes</h2>
+            <p class="muted">O acesso aos seus dados só começa depois da sua confirmação.</p>
+            <p class="muted">É permitido um profissional responsável por Treinamento físico e um por Nutrição.</p>
+          </div>
+          <button class="button" id="refresh-connections" type="button">Atualizar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Profissional</th><th>Profissão / área</th><th>E-mail</th><th>Permissões</th><th>Telefone</th><th></th></tr></thead>
+            <tbody>
+              ${pending.map((invitation) => {
+                const conflict = conflictingProfessional(invitation, professionals);
+                const professionType = invitation.professionType || invitation.professionalArea;
+                const area = invitationCareArea(invitation);
+                return `
+                <tr>
+                  <td>${escapeHtml(invitation.professionalName || "Profissional")}</td>
+                  <td>
+                    ${escapeHtml(professionLabel(professionType))}
+                    <br><small>${escapeHtml(careAreaLabel(area))}</small>
+                  </td>
+                  <td>${escapeHtml(invitation.professionalEmail || "-")}</td>
+                  <td>
+                    Visualizar e atualizar acompanhamento
+                    ${invitation.permissions?.createCycles !== false ? "<br><small>Criar e ajustar projetos</small>" : ""}
+                  </td>
+                  <td>
+                    ${ownPhone ? `
+                      <label class="consent-option">
+                        <input type="checkbox" data-share-phone-invitation="${invitation.id}" />
+                        <span>Compartilhar ${escapeHtml(formatPhone(ownPhone))}</span>
+                      </label>
+                    ` : `<span class="muted">Não cadastrado. <a href="${profilePath}">Adicionar no perfil</a></span>`}
+                  </td>
+                  <td>
+                    ${conflict ? `
+                      <p class="form-notice compact-notice">
+                        Você já possui um profissional responsável por ${escapeHtml(careAreaLabel(area))}.
+                        Remova o vínculo atual antes de aceitar este convite.
+                      </p>
+                    ` : ""}
+                    <div class="button-row">
+                      <button class="button primary" data-accept-invitation="${invitation.id}" type="button"
+                        ${conflict ? `disabled title="Já existe um profissional nesta área"` : ""}>Aceitar</button>
+                      <button class="button" data-reject-invitation="${invitation.id}" type="button">Recusar</button>
+                    </div>
+                  </td>
+                </tr>
+              `;}).join("") || `<tr><td colspan="6">Nenhum convite pendente.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Profissionais vinculados</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Profissão / área</th><th>E-mail</th><th>Telefone profissional</th><th>Meu telefone</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              ${professionals.map((professional) => `
+                <tr>
+                  <td>${escapeHtml(professional.name || "Profissional")}</td>
+                  <td>
+                    ${escapeHtml(professionLabel(professional.professionType))}
+                    <br><small>${escapeHtml(careAreaLabel(professionalCareArea(professional)))}</small>
+                  </td>
+                  <td>${escapeHtml(professional.email || "-")}</td>
+                  <td>${professional.phone
+                    ? `<a href="tel:${escapeAttribute(professional.phone)}">${escapeHtml(formatPhone(professional.phone))}</a>`
+                    : "-"}</td>
+                  <td>
+                    ${ownPhone ? `
+                      <label class="consent-option">
+                        <input type="checkbox" data-share-phone-link="${professional.link.id}"
+                          ${professional.link.permissions?.sharePhone === true ? "checked" : ""} />
+                        <span>Compartilhar</span>
+                      </label>
+                    ` : `<a href="${profilePath}">Cadastrar telefone</a>`}
+                  </td>
+                  <td><span class="badge">Ativo</span></td>
+                  <td><button class="button danger" data-revoke-link="${professional.link.id}" type="button">Remover vínculo</button></td>
+                </tr>
+              `).join("") || `<tr><td colspan="7">Nenhum profissional vinculado.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+export function bindConnections(context) {
+  const refresh = async () => {
+    try {
+      const [invitations, professionals] = await Promise.all([
+        listInvitationsForUser(context.authState.user.email),
+        listProfessionalsForUser(context.authState.user.uid)
+      ]);
+      context.authState.invitations = invitations;
+      context.authState.professionals = professionals;
+      context.render();
+    } catch (error) {
+      showToast(`Não foi possível carregar os vínculos: ${error.message}`);
+    }
+  };
+
+  document.getElementById("refresh-connections")?.addEventListener("click", refresh);
+
+  const respond = async (invitationId, response) => {
+    const invitation = (context.authState.invitations || []).find((item) => item.id === invitationId);
+    if (!invitation) return;
+    const conflict = response === "accepted"
+      ? conflictingProfessional(invitation, context.authState.professionals || [])
+      : null;
+    if (conflict) {
+      showToast(`Você já possui um profissional responsável por ${careAreaLabel(invitationCareArea(invitation))}.`);
+      return;
+    }
+    const sharePhone = response === "accepted"
+      && document.querySelector(`[data-share-phone-invitation="${invitationId}"]`)?.checked === true;
+    if (response === "accepted" && !await confirmAction({
+      title: `Aceitar convite de ${invitation.professionalName || "profissional"}?`,
+      message: `Este profissional poderá visualizar e atualizar seu acompanhamento${invitation.permissions?.createCycles !== false ? ", incluindo a criação de projetos" : ""}.${sharePhone ? "\n\nSeu telefone também será compartilhado." : ""}`,
+      confirmLabel: "Aceitar e compartilhar",
+      tone: "warning"
+    })) return;
+    try {
+      await respondToCareInvitation(invitation, context.authState.user, response, {
+        sharePhone,
+        existingProfessionals: context.authState.professionals || []
+      });
+      if (localStorage.getItem("fitbodystat-pending-invitation") === invitation.id) {
+        localStorage.removeItem("fitbodystat-pending-invitation");
+      }
+      showToast(response === "accepted" ? "Vínculo confirmado." : "Convite recusado.");
+      await refresh();
+    } catch (error) {
+      showToast(`Não foi possível responder ao convite: ${error.message}`);
+    }
+  };
+
+  document.querySelectorAll("[data-accept-invitation]").forEach((button) => {
+    button.addEventListener("click", () => respond(button.dataset.acceptInvitation, "accepted"));
+  });
+  document.querySelectorAll("[data-reject-invitation]").forEach((button) => {
+    button.addEventListener("click", () => respond(button.dataset.rejectInvitation, "rejected"));
+  });
+  document.querySelectorAll("[data-revoke-link]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const professional = (context.authState.professionals || []).find((item) => item.link.id === button.dataset.revokeLink);
+      if (!professional || !await confirmAction({
+        title: "Remover acesso?",
+        message: "Este profissional deixará de acessar seus dados.",
+        confirmLabel: "Remover",
+        tone: "danger"
+      })) return;
+      try {
+        await revokeCareLink(professional.link, context.authState.user.uid);
+        showToast("Vínculo removido.");
+        await refresh();
+      } catch (error) {
+        showToast(`Não foi possível remover o vínculo: ${error.message}`);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-share-phone-link]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const professional = (context.authState.professionals || [])
+        .find((item) => item.link.id === input.dataset.sharePhoneLink);
+      if (!professional) return;
+      input.disabled = true;
+      try {
+        await updateCareLinkPhoneSharing(professional.link, input.checked);
+        showToast(input.checked ? "Telefone compartilhado com o profissional." : "Compartilhamento do telefone removido.");
+        await refresh();
+      } catch (error) {
+        input.checked = !input.checked;
+        input.disabled = false;
+        showToast(`Não foi possível alterar o compartilhamento: ${error.message}`);
+      }
+    });
+  });
+
+  if (!context.authState.invitations || !context.authState.professionals) refresh();
+}

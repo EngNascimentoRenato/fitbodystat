@@ -1,0 +1,208 @@
+import { activityLabel } from "../data/activity-catalog.js";
+import {
+  monthCalendar,
+  monthLabel,
+  formatActivityMinutes,
+  recentWeekTotals,
+  shiftMonth,
+  weeklyActivitySummary
+} from "../services/activity-service.js";
+import { formatDate, todayISO } from "../utils/date-utils.js";
+import { formatDecimal } from "../utils/number-utils.js";
+import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
+
+let visibleMonth = todayISO().slice(0, 7);
+
+const weekdayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const intensityLabels = {
+  light: "Leve",
+  moderate: "Moderada",
+  vigorous: "Intensa"
+};
+
+function activityNames(activity) {
+  const names = (activity.activityTypeIds || []).map(activityLabel);
+  if (activity.customActivityName) names.push(activity.customActivityName);
+  return names.join(", ") || "Atividade";
+}
+
+function renderCalendar(activities) {
+  const cells = monthCalendar(visibleMonth, activities);
+  const today = todayISO();
+  return `
+    <section class="card" data-activity-calendar>
+      <div class="calendar-toolbar">
+        <button class="icon-button" data-calendar-shift="-1" type="button" aria-label="Mês anterior">‹</button>
+        <h2>${monthLabel(visibleMonth)}</h2>
+        <button class="icon-button" data-calendar-shift="1" type="button" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="activity-calendar">
+        ${weekdayLabels.map((label) => `<span class="calendar-weekday">${label}</span>`).join("")}
+        ${cells.map((cell) => {
+          if (!cell) return `<div class="calendar-day empty"></div>`;
+          const active = cell.activity?.completed;
+          return `
+            <div class="calendar-day ${active ? "active" : ""} ${cell.date === today ? "today" : ""}"
+              title="${escapeAttribute(active ? activityNames(cell.activity) : formatDate(cell.date))}">
+              <strong>${cell.day}</strong>
+              ${active ? `<span class="calendar-check" aria-hidden="true">✓</span>` : ""}
+              ${active ? `<small>${escapeHtml(activityNames(cell.activity))}</small>` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderRecentWeeks(activities, goalDays, targetMinutes) {
+  const weeks = recentWeekTotals(activities);
+  return `
+    <section class="card">
+      <h2>Últimas quatro semanas</h2>
+      <div class="grid four recent-weeks-grid">
+        ${weeks.map((week) => {
+          const dayPercentage = Math.min(100, (week.count / Math.max(1, goalDays)) * 100);
+          const minutePercentage = targetMinutes
+            ? Math.min(100, (week.minutes / targetMinutes) * 100)
+            : 0;
+          return `
+            <article class="mini-stat">
+              <span>Semana de ${formatDate(week.start).slice(0, 5)}</span>
+              <strong>${week.count} ${week.count === 1 ? "dia" : "dias"}</strong>
+              <div class="weekly-progress-stack">
+                <div class="weekly-progress-line">
+                  <small>Dias</small>
+                  <small>${formatDecimal(dayPercentage, 0)}%</small>
+                  <div class="progress-track" aria-label="${formatDecimal(dayPercentage, 0)}% da meta de dias">
+                    <div class="progress-fill" style="width:${dayPercentage}%"></div>
+                  </div>
+                </div>
+                ${targetMinutes ? `
+                  <div class="weekly-progress-line duration">
+                    <small>Tempo</small>
+                    <small>${formatActivityMinutes(week.minutes)} de ${formatActivityMinutes(targetMinutes)}</small>
+                    <div class="progress-track" aria-label="${formatDecimal(minutePercentage, 0)}% da meta de duração">
+                      <div class="progress-fill" style="width:${minutePercentage}%"></div>
+                    </div>
+                  </div>
+                ` : ""}
+              </div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderHistory(activities, showDuration) {
+  const rows = [...activities].sort((a, b) => b.date.localeCompare(a.date));
+  return `
+    <section class="card">
+      <div class="chart-header">
+        <div>
+          <h2>Histórico de atividades</h2>
+          <p class="muted">Cada data representa um dia ativo.</p>
+        </div>
+      </div>
+      ${rows.length ? `
+        <div class="activity-history-list">
+          <div class="activity-history-header ${showDuration ? "" : "without-duration"}" aria-hidden="true">
+            <span>Data</span>
+            <span>Atividade</span>
+            ${showDuration ? "<span>Duração</span>" : ""}
+            <span>Intensidade</span>
+            <span>Observações</span>
+            <span>Ação</span>
+          </div>
+          ${rows.map((activity) => `
+            <article class="activity-history-row ${showDuration ? "" : "without-duration"}">
+              <strong>${formatDate(activity.date)}</strong>
+              <div class="activity-row-main">
+                <p>${escapeHtml(activityNames(activity))}</p>
+                <small>${escapeHtml(activity.notes || "")}</small>
+              </div>
+              ${showDuration ? `<span>${activity.durationMinutes ? `${activity.durationMinutes} min` : "-"}</span>` : ""}
+              <span>${intensityLabels[activity.intensity] || "-"}</span>
+              <span>${escapeHtml(activity.notes || "-")}</span>
+              <div class="table-actions">
+                <button class="icon-button activity-edit-button" data-edit-activity="${escapeAttribute(activity.date)}"
+                  type="button" aria-label="Editar atividade de ${escapeAttribute(formatDate(activity.date))}" title="Editar atividade">✎</button>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      ` : `<div class="empty-state"><p class="muted">Nenhuma atividade registrada.</p></div>`}
+    </section>
+  `;
+}
+
+export function renderActivities(state) {
+  const activities = state.activities || [];
+  const goalDays = state.profile.weeklyActivityGoalDays || 3;
+  const summary = weeklyActivitySummary(activities, goalDays);
+  const targetMinutes = goalDays * (Number(state.profile.averageActivityDurationMinutes) || 0);
+  const sortedActivities = [...activities].sort((a, b) => b.date.localeCompare(a.date));
+  const latestActivity = sortedActivities[0];
+  return `
+    <div class="view-stack">
+      <section class="grid three">
+        <article class="mini-stat">
+          <span>Esta semana</span>
+          <strong>${summary.completedDays} de ${summary.goalDays} dias</strong>
+          <small>${targetMinutes
+            ? `${formatActivityMinutes(summary.totalMinutes)} de ${formatActivityMinutes(targetMinutes)}`
+            : `${summary.progress}% da meta semanal`}</small>
+        </article>
+        <article class="mini-stat">
+          <span>Total registrado</span>
+          <strong>${activities.length} ${activities.length === 1 ? "dia" : "dias"}</strong>
+          <small>Desde o primeiro registro</small>
+        </article>
+        <article class="mini-stat">
+          <span>Última atividade</span>
+          <strong>${latestActivity ? formatDate(latestActivity.date) : "-"}</strong>
+          <small>${latestActivity ? activityNames(latestActivity) : "Sem registros"}</small>
+        </article>
+      </section>
+      ${renderCalendar(activities)}
+      ${renderRecentWeeks(activities, goalDays, targetMinutes)}
+      ${renderHistory(activities, Boolean(targetMinutes))}
+    </div>
+  `;
+}
+
+export function bindActivities(state, persist, render) {
+  document.querySelectorAll("[data-calendar-shift]").forEach((button) => {
+    button.addEventListener("click", () => {
+      visibleMonth = shiftMonth(visibleMonth, Number(button.dataset.calendarShift));
+      render();
+    });
+  });
+
+  const calendar = document.querySelector("[data-activity-calendar]");
+  let swipeStart = null;
+  calendar?.addEventListener("touchstart", (event) => {
+    const touch = event.changedTouches[0];
+    swipeStart = { x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  calendar?.addEventListener("touchend", (event) => {
+    if (!swipeStart) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - swipeStart.x;
+    const deltaY = touch.clientY - swipeStart.y;
+    swipeStart = null;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    visibleMonth = shiftMonth(visibleMonth, deltaX < 0 ? 1 : -1);
+    render();
+  }, { passive: true });
+
+  document.querySelectorAll("[data-edit-activity]").forEach((button) => {
+    button.addEventListener("click", () => {
+      sessionStorage.setItem("fitbodystat-edit-activity-date", button.dataset.editActivity);
+      location.hash = location.hash.includes("/me/") ? "#/me/registro" : "#/registro";
+    });
+  });
+
+}

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4efe5" />
+    <title>Entrar | FitBodyStat</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/forms.css" />
+  </head>
+  <body>
+    <main class="login-page">
+      <section class="login-panel card">
+        <a class="brand" href="login.html" aria-label="FitBodyStat">
+          <span class="brand-mark" aria-hidden="true">FBS</span>
+          <span>
+            <strong>FitBodyStat</strong>
+            <small>peso, medidas e composição</small>
+          </span>
+        </a>
+
+        <div class="invitation-login-notice" id="invitation-login-notice" hidden>
+          <strong>Você recebeu um convite profissional</strong>
+          <p>Crie sua conta ou entre com uma conta existente para consultar o convite e decidir se deseja compartilhar seu acompanhamento.</p>
+        </div>
+
+        <div class="login-grid">
+          <div class="form login-access-column">
+            <div>
+              <h1>Entrar</h1>
+              <p class="muted">Acesse sua conta e continue seu acompanhamento.</p>
+            </div>
+            <button class="button google-button" id="sign-in-google" type="button">Continuar com Google</button>
+            <div class="form-separator"><span>ou</span></div>
+            <form class="form" id="sign-in-form">
+              <div class="field">
+                <label for="login-email">E-mail</label>
+                <input id="login-email" name="email" type="email" autocomplete="email" required />
+              </div>
+              <div class="field">
+                <label for="login-password">Senha</label>
+                <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+              </div>
+              <div class="button-row">
+                <button class="button primary" type="submit">Entrar</button>
+                <button class="button text-button" id="forgot-password" type="button">Esqueci minha senha</button>
+              </div>
+            </form>
+          </div>
+
+          <form class="form registration-form login-registration-column" id="create-account-form">
+            <div>
+              <h2>Criar conta</h2>
+              <p class="muted">Cadastre-se com nome, e-mail e senha.</p>
+            </div>
+            <button class="button google-button invitation-google-button" type="button" hidden style="display: none">Continuar com Google</button>
+            <div class="form-separator invitation-google-separator" hidden><span>ou</span></div>
+            <div class="field">
+              <label for="create-name">Nome completo</label>
+              <input id="create-name" name="name" autocomplete="name" required minlength="2" />
+            </div>
+            <div class="field">
+              <label for="create-email">E-mail</label>
+              <input id="create-email" name="email" type="email" autocomplete="email" required />
+            </div>
+            <div class="field">
+              <label for="create-password">Senha</label>
+              <input id="create-password" name="password" type="password" autocomplete="new-password" required minlength="8" />
+              <span class="help-text">Mínimo de 8 caracteres, com pelo menos uma letra e um número.</span>
+            </div>
+            <div class="field">
+              <label for="confirm-password">Repetir senha</label>
+              <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
+            </div>
+            <div class="button-row">
+              <button class="button primary" type="submit">Criar conta</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="login-status muted" id="login-status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script type="module" src="js/login.js"></script>
+  </body>
+</html>

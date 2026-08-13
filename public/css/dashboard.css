@@ -1,0 +1,113 @@
+.hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 1rem;
+  align-items: center;
+}
+
+.dashboard-stack > * {
+  order: 4;
+}
+
+.dashboard-summary-card {
+  order: 1;
+}
+
+.dashboard-metrics {
+  order: 2;
+}
+
+.dashboard-stack > .activity-summary-card {
+  order: 3;
+}
+
+.project-onboarding-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  align-items: center;
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+}
+
+.project-onboarding-copy h2 {
+  margin-bottom: .5rem;
+}
+
+.project-onboarding-copy p:last-child {
+  max-width: 680px;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.project-onboarding-action {
+  min-width: 210px;
+}
+
+.hero-panel p {
+  color: var(--muted);
+}
+
+.progress-ring {
+  display: grid;
+  place-items: center;
+}
+
+.progress-ring svg {
+  width: 180px;
+  height: 180px;
+}
+
+.ring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 16;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 16;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.ring-text {
+  fill: var(--text);
+  font-size: 32px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+
+.ring-label {
+  fill: var(--muted);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+@media (max-width: 720px) {
+  .dashboard-stack > .activity-summary-card {
+    order: 1;
+  }
+
+  .dashboard-summary-card {
+    order: 2;
+  }
+
+  .dashboard-metrics {
+    order: 3;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .project-onboarding-card {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .project-onboarding-action {
+    width: 100%;
+  }
+}
