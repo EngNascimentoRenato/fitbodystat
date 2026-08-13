@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "fitbodystats"
+  },
+  "targets": {
+    "fitbodystats": {
+      "hosting": {
+        "app": [
+          "fitbodystats"
+        ]
+      }
+    }
   }
 }
