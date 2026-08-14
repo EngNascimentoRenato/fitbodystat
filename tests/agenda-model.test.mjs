@@ -81,7 +81,7 @@ test("permite pessoa avulsa e exige sua identificação", () => {
     date: "2026-07-27",
     startTime: "10:00",
     durationMinutes: 45
-  }, "professional-1"), /Selecione um paciente/);
+  }, "professional-1"), /Selecione um acompanhamento/);
 });
 
 test("bloqueio remove dados de paciente e usa estado próprio", () => {

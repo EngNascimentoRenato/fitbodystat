@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -17,9 +16,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { db } from "../services/firebase-core.js";
 import {
-  careAreaForProfession,
-  professionalCatalog
+  careAreaForProfession
 } from "./professional-catalog.js";
+import {
+  CARE_RELATIONSHIP_SCHEMA_VERSION,
+  createCareEpisode,
+  normalizeCareLink
+} from "../models/care-episode-model.js";
 
 function publicUserData(user, role = "user", status = "active") {
   return {
@@ -373,6 +376,21 @@ export async function listProfessionalRegistrations() {
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 
+export async function listProfessionalAccessRequests() {
+  const snapshot = await getDocs(collection(db, "professionalAccessRequests"));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+export async function listPersonalAccessRequests() {
+  const snapshot = await getDocs(collection(db, "personalAccessRequests"));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+export async function listPersonalAccessGrants() {
+  const snapshot = await getDocs(collection(db, "personalAccessGrants"));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
 export async function updateUserRole(userId, role) {
   await updateDoc(doc(db, "users", userId), {
     role,
@@ -383,44 +401,6 @@ export async function updateUserRole(userId, role) {
 export async function updateUserStatus(userId, status) {
   await updateDoc(doc(db, "users", userId), {
     status,
-    updatedAt: serverTimestamp()
-  });
-}
-
-export async function createCareInvitation(professional, patientEmail) {
-  const patientEmailLower = normalizeEmail(patientEmail);
-  const existing = await listInvitationsForProfessional(professional.uid);
-  const duplicate = existing.find((invitation) =>
-    invitation.patientEmailLower === patientEmailLower
-    && invitation.status === "pending"
-  );
-  if (duplicate) throw new Error("Já existe um convite pendente para este e-mail.");
-  const professionType = professional.professionType || "";
-  if (!professionalCatalog.some((item) => item.value === professionType)) {
-    throw new Error("Atualize o perfil com uma das áreas profissionais disponíveis antes de convidar pacientes.");
-  }
-  const careArea = careAreaForProfession(professionType);
-
-  return addDoc(collection(db, "careInvitations"), {
-    professionalId: professional.uid,
-    professionalName: professional.displayName || "",
-    professionalEmail: professional.email || "",
-    professionalArea: professionType,
-    professionType,
-    careArea,
-    patientEmailLower,
-    patientId: null,
-    status: "pending",
-    permissions: {
-      viewData: true,
-      editData: true,
-      createCycles: true
-    },
-    accessBenefit: {
-      source: "professional-link",
-      activeWhileLinked: true
-    },
-    createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
 }
@@ -448,6 +428,9 @@ export async function listAllCareInvitations() {
 
 export async function respondToCareInvitation(invitation, user, response, options = {}) {
   if (!['accepted', 'rejected'].includes(response)) throw new Error("Resposta inválida.");
+  if (invitation.expiresAt?.toDate?.().getTime() <= Date.now()) {
+    throw new Error("Este convite expirou. Solicite um novo convite ao profissional.");
+  }
 
   const invitationRef = doc(db, "careInvitations", invitation.id);
   if (response === "rejected") {
@@ -474,6 +457,7 @@ export async function respondToCareInvitation(invitation, user, response, option
 
   const linkId = `${invitation.professionalId}_${user.uid}`;
   const linkRef = doc(db, "careLinks", linkId);
+  const episodeRef = doc(db, "careEpisodes", invitation.id);
   const assignmentRef = doc(db, "users", user.uid, "careAreaAssignments", careArea);
   await runTransaction(db, async (transaction) => {
     const [invitationSnapshot, assignmentSnapshot] = await Promise.all([
@@ -496,25 +480,42 @@ export async function respondToCareInvitation(invitation, user, response, option
       respondedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+    const permissions = {
+      ...(invitation.permissions || { viewData: true, editData: true }),
+      createCycles: invitation.permissions?.createCycles !== false,
+      sharePhone: options.sharePhone === true
+    };
+    const accessBenefit = invitation.accessBenefit || {
+      source: "professional-link",
+      activeWhileLinked: true
+    };
+    const timestamp = serverTimestamp();
+    transaction.set(episodeRef, createCareEpisode({
+      episodeId: invitation.id,
+      linkId,
+      invitation,
+      patientId: user.uid,
+      professionType,
+      careArea,
+      permissions,
+      accessBenefit,
+      timestamp
+    }));
     transaction.set(linkRef, {
+      relationshipModelVersion: CARE_RELATIONSHIP_SCHEMA_VERSION,
+      activeEpisodeId: invitation.id,
+      episodeStatus: "active",
       invitationId: invitation.id,
       professionalId: invitation.professionalId,
       patientId: user.uid,
       professionType,
       careArea,
       status: "active",
-      permissions: {
-        ...(invitation.permissions || { viewData: true, editData: true }),
-        createCycles: invitation.permissions?.createCycles !== false,
-        sharePhone: options.sharePhone === true
-      },
+      permissions,
       originInvitationId: invitation.id,
-      accessBenefit: invitation.accessBenefit || {
-        source: "professional-link",
-        activeWhileLinked: true
-      },
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      accessBenefit,
+      createdAt: timestamp,
+      updatedAt: timestamp
     });
     if (!assignmentSnapshot.exists()) {
       transaction.set(assignmentRef, {
@@ -524,17 +525,11 @@ export async function respondToCareInvitation(invitation, user, response, option
         professionType,
         careArea,
         status: "active",
+        activeEpisodeId: invitation.id,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
     }
-  });
-}
-
-export async function cancelCareInvitation(invitationId) {
-  await updateDoc(doc(db, "careInvitations", invitationId), {
-    status: "cancelled",
-    updatedAt: serverTimestamp()
   });
 }
 
@@ -544,7 +539,7 @@ export async function listCareLinksForProfessional(professionalId) {
     where("professionalId", "==", professionalId)
   ));
   return snapshot.docs
-    .map((item) => ({ id: item.id, ...item.data() }))
+    .map((item) => normalizeCareLink({ id: item.id, ...item.data() }))
     .filter((item) => item.status === "active");
 }
 
@@ -554,7 +549,7 @@ export async function listCareLinksForUser(patientId) {
     where("patientId", "==", patientId)
   ));
   return snapshot.docs
-    .map((item) => ({ id: item.id, ...item.data() }))
+    .map((item) => normalizeCareLink({ id: item.id, ...item.data() }))
     .filter((item) => item.status === "active");
 }
 
@@ -594,15 +589,17 @@ export async function listPatientsForProfessional(professionalId) {
       latestMeasurement ? { type: "measurement", date: latestMeasurement.date } : null,
       latestActivity ? { type: "activity", date: latestActivity.date } : null
     ].filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
-    return {
-      ...user,
-      name: profile.name || user.name,
-      phone: contact.phone || "",
-      profile,
-      activeCycle,
-      lastRecord,
-      link
-    };
+      return {
+        ...user,
+        name: profile.name || user.name,
+        phone: contact.phone || "",
+        profile,
+        activeCycle,
+        lastMeasurement: latestMeasurement ? { type: "measurement", date: latestMeasurement.date } : null,
+        lastActivity: latestActivity ? { type: "activity", date: latestActivity.date } : null,
+        lastRecord,
+        link
+      };
   }));
   return patients.filter(Boolean);
 }
@@ -669,24 +666,39 @@ export async function listProfessionalsForUser(patientId) {
 
 export async function listAllCareLinks() {
   const snapshot = await getDocs(collection(db, "careLinks"));
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  return snapshot.docs.map((item) => normalizeCareLink({ id: item.id, ...item.data() }));
 }
 
 export async function revokeCareLink(link, actorId) {
   const linkRef = doc(db, "careLinks", link.id);
+  const episodeRef = link.activeEpisodeId
+    ? doc(db, "careEpisodes", link.activeEpisodeId)
+    : null;
   const assignmentRef = link.careArea
     ? doc(db, "users", link.patientId, "careAreaAssignments", link.careArea)
     : null;
   await runTransaction(db, async (transaction) => {
-    const assignmentSnapshot = assignmentRef ? await transaction.get(assignmentRef) : null;
+    const [assignmentSnapshot, episodeSnapshot] = await Promise.all([
+      assignmentRef ? transaction.get(assignmentRef) : Promise.resolve(null),
+      episodeRef ? transaction.get(episodeRef) : Promise.resolve(null)
+    ]);
     transaction.update(linkRef, {
       status: "revoked",
+      episodeStatus: "ended",
       revokedBy: actorId,
       revokedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
     if (assignmentSnapshot?.exists() && assignmentSnapshot.data().linkId === link.id) {
       transaction.delete(assignmentRef);
+    }
+    if (episodeSnapshot?.exists() && episodeSnapshot.data().status === "active") {
+      transaction.update(episodeRef, {
+        status: "ended",
+        endedBy: actorId,
+        endedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
     }
   });
 }

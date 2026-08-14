@@ -1310,7 +1310,7 @@ export function renderProfile(state, options = {}) {
           <p class="form-notice">Os dados iniciais poderão ser ajustados até o primeiro registro de acompanhamento.</p>
         ` : ""}
         ${editing === "baseline" && !canEditIdentity ? `
-          <p class="form-notice">Dados de identidade pertencem ao paciente e estão disponíveis somente para consulta. Você pode editar as informações corporais e o planejamento.</p>
+          <p class="form-notice">Os dados de identidade pertencem ao usuário e estão disponíveis somente para consulta. Você pode editar as informações corporais e o planejamento.</p>
         ` : ""}
         <div class="form-grid">
           <div class="field">

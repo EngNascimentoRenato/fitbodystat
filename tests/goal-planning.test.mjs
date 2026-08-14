@@ -253,6 +253,43 @@ test("jornada mantém marcos complementares fora da sequência principal", () =>
   assert.ok(journey.milestones.every((item) => item.mode !== "waist"));
 });
 
+test("não sugere cintura de referência fora do alcance planejado", () => {
+  const milestones = getMilestones({
+    goalType: "weight-loss",
+    heightCm: 165,
+    startWeightKg: 90,
+    startWaistCm: 112,
+    goalWeightKg: 85,
+    sex: "male"
+  }, { weightKg: 89, waistCm: 111 });
+
+  assert.equal(milestones.some((item) => item.id === "waist-reference"), false);
+});
+
+test("ganho inclui saída do baixo peso somente quando está no caminho", () => {
+  const milestones = getMilestones({
+    goalType: "weight-gain",
+    heightCm: 170,
+    startWeightKg: 50,
+    goalWeightKg: 58
+  }, { weightKg: 51 });
+
+  assert.equal(milestones.some((item) => item.id === "bmi-low-weight-exit"), true);
+});
+
+test("hipertrofia não descreve variação da balança como massa muscular", () => {
+  const milestones = getMilestones({
+    goalType: "muscle-gain",
+    heightCm: 175,
+    startWeightKg: 70,
+    goalWeightKg: 76
+  }, { weightKg: 71 });
+  const first = milestones.find((item) => item.id === "goal-path-25");
+
+  assert.match(first.detail, /variação de peso/);
+  assert.doesNotMatch(first.detail, /massa muscular/);
+});
+
 test("progresso total chega a cem sem depender do marco complementar", () => {
   const journey = getGoalJourney({
     goalType: "weight-loss",

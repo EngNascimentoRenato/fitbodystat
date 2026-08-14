@@ -36,6 +36,16 @@ export function careAreaLabel(value) {
   return careAreaLabels[value] || value || "Área não informada";
 }
 
+export function professionalAudienceTerms(professionType = "") {
+  const student = careAreaForProfession(professionType) === "physical-training";
+  return Object.freeze({
+    singular: student ? "aluno" : "paciente",
+    singularTitle: student ? "Aluno" : "Paciente",
+    plural: student ? "alunos" : "pacientes",
+    pluralTitle: student ? "Alunos" : "Pacientes"
+  });
+}
+
 export function professionalOptions(selected = "") {
   return professionalCatalog.map((item) =>
     `<option value="${item.value}" ${item.value === selected ? "selected" : ""}>${item.label}</option>`

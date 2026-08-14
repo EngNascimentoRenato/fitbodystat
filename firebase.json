@@ -2,6 +2,10 @@
   "firestore": {
     "rules": "private/firestore.rules"
   },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22"
+  },
   "hosting": {
     "target": "app",
     "public": "public",

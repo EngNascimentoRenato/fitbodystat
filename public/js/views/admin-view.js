@@ -1,12 +1,21 @@
 import {
-  cancelCareInvitation,
   listAllCareInvitations,
   listAllCareLinks,
+  listPersonalAccessGrants,
+  listPersonalAccessRequests,
+  listProfessionalAccessRequests,
   listProfessionalRegistrations,
   listUsers,
-  revokeCareLink,
   updateUserStatus
 } from "../data/firestore-store.js";
+import {
+  cancelProfessionalInvitation,
+  decidePersonalAlphaAccess,
+  decideProfessionalAlphaAccess,
+  endProfessionalCareEpisode,
+  grantPersonalAlphaAccess,
+  revokePersonalAlphaAccess
+} from "../services/professional-access-service.js";
 import {
   cancelProfessionalRegistration,
   registerProfessional,
@@ -16,6 +25,7 @@ import { confirmAction } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { buildAdminMetrics, formatAdminDate, percentage } from "../services/admin-metrics-service.js";
+import { professionalTypeLabel } from "../data/professional-catalog.js";
 
 const roleOptions = ["user", "professional", "admin"];
 const roleLabels = { user: "Usuário", professional: "Profissional", admin: "Administrador" };
@@ -164,6 +174,58 @@ function usersTable(users, currentUserId, onlyProfessionals = false) {
   `;
 }
 
+function personalAccessView(grants) {
+  const active = grants.filter((item) => item.status === "active");
+  return `
+    <section class="card">
+      <div class="chart-header">
+        <div><h2>Liberar acesso pessoal</h2><p class="muted">Autorize um e-mail a criar conta sem convite profissional durante a fase alfa.</p></div>
+      </div>
+      <form class="form" id="personal-access-form">
+        <div class="form-grid">
+          <div class="field"><label for="personal-access-email">E-mail</label><input id="personal-access-email" name="email" type="email" autocomplete="email" required /></div>
+        </div>
+        <div class="button-row"><button class="button primary" type="submit">Liberar acesso</button></div>
+      </form>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>E-mail autorizado</th><th>Situação</th><th></th></tr></thead>
+          <tbody>${active.map((grant) => `<tr>
+            <td>${escapeHtml(grant.emailLower || grant.id)}</td>
+            <td><span class="badge">Liberado</span></td>
+            <td><button class="button" type="button" data-revoke-personal-access="${escapeAttribute(grant.emailLower || grant.id)}">Revogar liberação</button></td>
+          </tr>`).join("") || `<tr><td colspan="3">Nenhuma liberação pessoal ativa.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function accessRequestsView(personalRequests, professionalRequests) {
+  const requests = [
+    ...personalRequests.map((item) => ({ ...item, accessType: "personal" })),
+    ...professionalRequests.map((item) => ({ ...item, accessType: "professional" }))
+  ].filter((item) => item.status === "pending")
+    .sort((first, second) => (second.createdAt?.seconds || 0) - (first.createdAt?.seconds || 0));
+  return `
+    <section class="card">
+      <div class="chart-header"><div><h2>Solicitações de acesso</h2><p class="muted">Analise pedidos antes de liberar a criação da conta na fase alfa.</p></div><span class="badge warning">${requests.length}</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Tipo</th><th>Área</th><th>Ações</th></tr></thead>
+          <tbody>${requests.map((item) => `<tr>
+            <td>${escapeHtml(item.name || "Nome pendente")}</td>
+            <td>${escapeHtml(item.emailLower || "-")}</td>
+            <td>${item.accessType === "professional" ? "Profissional" : "Uso pessoal"}</td>
+            <td>${item.accessType === "professional" ? escapeHtml(professionalTypeLabel(item.professionType) || "-") : "-"}</td>
+            <td><div class="button-row"><button class="button primary" type="button" data-decide-access-request="approved" data-access-type="${item.accessType}" data-request-id="${escapeAttribute(item.id)}">Aprovar</button><button class="button danger" type="button" data-decide-access-request="rejected" data-access-type="${item.accessType}" data-request-id="${escapeAttribute(item.id)}">Recusar</button></div></td>
+          </tr>`).join("") || `<tr><td colspan="5">Nenhuma solicitação aguardando análise.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
 function professionalsView(users, registrations, currentUserId) {
   return `
     <div class="view-stack">
@@ -227,7 +289,7 @@ function linksTable(users, links) {
       <div class="chart-header"><h2>Vínculos ativos</h2><button class="button" id="refresh-admin" type="button">Atualizar</button></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Profissional</th><th>Paciente</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Profissional</th><th>Usuário</th><th>Status</th><th></th></tr></thead>
           <tbody>
             ${activeLinks.map((link) => `
               <tr>
@@ -251,7 +313,7 @@ function invitationsTable(users, invitations) {
       <div class="chart-header"><h2>Convites pendentes</h2><button class="button" id="refresh-admin" type="button">Atualizar</button></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Profissional</th><th>Paciente</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Profissional</th><th>Usuário</th><th>Status</th><th></th></tr></thead>
           <tbody>
             ${pending.map((invitation) => `
               <tr>
@@ -276,8 +338,12 @@ export function renderAdmin(state, authState, section = "overview") {
   const links = authState.adminLinks || [];
   const invitations = authState.adminInvitations || [];
   const registrations = authState.adminProfessionalRegistrations || [];
-  if (section === "users") return usersTable(users, authState.user.uid);
+  const accessRequests = authState.adminProfessionalAccessRequests || [];
+  const personalAccessRequests = authState.adminPersonalAccessRequests || [];
+  const personalGrants = authState.adminPersonalAccessGrants || [];
+  if (section === "users") return `<div class="view-stack">${personalAccessView(personalGrants)}${usersTable(users, authState.user.uid)}</div>`;
   if (section === "professionals") return professionalsView(users, registrations, authState.user.uid);
+  if (section === "access-requests") return accessRequestsView(personalAccessRequests, accessRequests);
   if (section === "links") return linksTable(users, links);
   if (section === "invitations") return invitationsTable(users, invitations);
   return overview(users, links, invitations);
@@ -286,16 +352,22 @@ export function renderAdmin(state, authState, section = "overview") {
 export function bindAdmin(context) {
   const refresh = async () => {
     try {
-      const [users, links, invitations, registrations] = await Promise.all([
+      const [users, links, invitations, registrations, accessRequests, personalAccessRequests, personalGrants] = await Promise.all([
         listUsers(),
         listAllCareLinks(),
         listAllCareInvitations(),
-        listProfessionalRegistrations()
+        listProfessionalRegistrations(),
+        listProfessionalAccessRequests(),
+        listPersonalAccessRequests(),
+        listPersonalAccessGrants()
       ]);
       context.authState.adminUsers = users;
       context.authState.adminLinks = links;
       context.authState.adminInvitations = invitations;
       context.authState.adminProfessionalRegistrations = registrations;
+      context.authState.adminProfessionalAccessRequests = accessRequests;
+      context.authState.adminPersonalAccessRequests = personalAccessRequests;
+      context.authState.adminPersonalAccessGrants = personalGrants;
       context.render();
     } catch (error) {
       showToast(`Não foi possível carregar a administração: ${error.message}`);
@@ -303,6 +375,67 @@ export function bindAdmin(context) {
   };
 
   document.getElementById("refresh-admin")?.addEventListener("click", refresh);
+
+  document.getElementById("personal-access-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      await grantPersonalAlphaAccess(new FormData(event.currentTarget).get("email"));
+      event.currentTarget.reset();
+      showToast("Acesso pessoal liberado.");
+      await refresh();
+    } catch (error) {
+      showToast(`Não foi possível liberar o acesso: ${error.message}`);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.querySelectorAll("[data-revoke-personal-access]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!await confirmAction({
+        title: "Revogar liberação?",
+        message: "Esta ação impede apenas a criação futura da conta. Uma conta já criada não será excluída.",
+        confirmLabel: "Revogar",
+        tone: "warning"
+      })) return;
+      try {
+        await revokePersonalAlphaAccess(button.dataset.revokePersonalAccess);
+        showToast("Liberação revogada.");
+        await refresh();
+      } catch (error) {
+        showToast(`Não foi possível revogar: ${error.message}`);
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-decide-access-request]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const approved = button.dataset.decideAccessRequest === "approved";
+      if (!await confirmAction({
+        title: approved ? "Aprovar solicitação?" : "Recusar solicitação?",
+        message: approved
+          ? `O e-mail poderá criar uma conta de ${button.dataset.accessType === "professional" ? "profissional" : "uso pessoal"}. A autorização pessoal expira em sete dias.`
+          : "O pedido será encerrado sem liberar a criação da conta.",
+        confirmLabel: approved ? "Aprovar" : "Recusar",
+        tone: approved ? "default" : "danger"
+      })) return;
+      try {
+        const decide = button.dataset.accessType === "professional"
+          ? decideProfessionalAlphaAccess
+          : decidePersonalAlphaAccess;
+        const result = await decide(button.dataset.requestId, button.dataset.decideAccessRequest);
+        const decisionMessage = approved ? "Solicitação aprovada." : "Solicitação recusada.";
+        showToast(result.notification === "sent"
+          ? `${decisionMessage} E-mail enviado.`
+          : `${decisionMessage} O e-mail não pôde ser enviado.`);
+        await refresh();
+      } catch (error) {
+        showToast(`Não foi possível concluir a análise: ${error.message}`);
+      }
+    });
+  });
 
   document.getElementById("professional-registration-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -393,7 +526,7 @@ export function bindAdmin(context) {
         tone: "danger"
       })) return;
       try {
-        await revokeCareLink(link, context.authState.user.uid);
+        await endProfessionalCareEpisode(link.id, "not-specified");
         showToast("Vínculo encerrado.");
         await refresh();
       } catch (error) {
@@ -405,7 +538,7 @@ export function bindAdmin(context) {
   document.querySelectorAll("[data-admin-cancel-invitation]").forEach((button) => {
     button.addEventListener("click", async () => {
       try {
-        await cancelCareInvitation(button.dataset.adminCancelInvitation);
+        await cancelProfessionalInvitation(button.dataset.adminCancelInvitation);
         showToast("Convite cancelado.");
         await refresh();
       } catch (error) {
@@ -417,5 +550,8 @@ export function bindAdmin(context) {
   if (!context.authState.adminUsers
     || !context.authState.adminLinks
     || !context.authState.adminInvitations
-    || !context.authState.adminProfessionalRegistrations) refresh();
+    || !context.authState.adminProfessionalRegistrations
+    || !context.authState.adminProfessionalAccessRequests
+    || !context.authState.adminPersonalAccessRequests
+    || !context.authState.adminPersonalAccessGrants) refresh();
 }

@@ -1,5 +1,7 @@
 import { escapeHtml } from "./utils/html-utils.js";
 import { icon as renderIcon } from "./components/icon.js";
+import { professionalAudienceTerms } from "./data/professional-catalog.js";
+import { invitationIsPending } from "./utils/invitation-utils.js";
 
 export const routes = [
   { path: "/primeiro-acesso", title: "Primeiro acesso", eyebrow: "Configuração inicial", label: "Concluir cadastro", icon: "check" },
@@ -17,11 +19,12 @@ export const routes = [
   { path: "/me/metas", title: "Minhas metas", eyebrow: "Meu espaço", label: "Minhas metas", icon: "◎", roles: ["professional", "admin"] },
   { path: "/me/perfil", title: "Meu perfil", eyebrow: "Meu espaço", label: "Meu perfil", icon: "♙", roles: ["professional", "admin"] },
   { path: "/me/vinculos", title: "Meus profissionais", eyebrow: "Meu espaço", label: "Meus profissionais", icon: "↔", roles: ["professional", "admin"] },
-  { path: "/pacientes", title: "Pacientes", eyebrow: "Acompanhamento profissional", label: "Pacientes", icon: "♙", roles: ["professional"] },
+  { path: "/pacientes", title: "Acompanhamentos", eyebrow: "Área profissional", label: "Acompanhamentos", icon: "♙", roles: ["professional"] },
   { path: "/agenda", title: "Agenda", eyebrow: "Organização profissional", label: "Agenda", icon: "□", roles: ["professional"] },
   { path: "/admin", title: "Visão geral", eyebrow: "Administração", label: "Visão geral", icon: "▦", roles: ["admin"] },
   { path: "/admin/usuarios", title: "Usuários", eyebrow: "Administração", label: "Usuários", icon: "♙", roles: ["admin"] },
   { path: "/admin/profissionais", title: "Profissionais", eyebrow: "Administração", label: "Profissionais", icon: "◇", roles: ["admin"] },
+  { path: "/admin/solicitacoes", title: "Solicitações de acesso", eyebrow: "Administração", label: "Solicitações", icon: "?", roles: ["admin"] },
   { path: "/admin/vinculos", title: "Vínculos", eyebrow: "Administração", label: "Vínculos", icon: "↔", roles: ["admin"] },
   { path: "/admin/convites", title: "Convites pendentes", eyebrow: "Administração", label: "Convites pendentes", icon: "✉", roles: ["admin"] },
   { path: "/conta", title: "Conta", eyebrow: "Identidade e acesso", label: "Conta", icon: "○" },
@@ -141,7 +144,7 @@ export function renderMenu(currentPath, authState, theme = "light", hasActivePro
 
   if (authState.role === "user") {
     const showRelationships = Boolean(
-      (authState.invitations || []).some((item) => item.status === "pending")
+      (authState.invitations || []).some(invitationIsPending)
       || (authState.professionals || []).length
     );
     menu.innerHTML = standardPersonalMenu(currentPath, accountLinks, "", hasActiveProject, showRelationships);
@@ -151,19 +154,20 @@ export function renderMenu(currentPath, authState, theme = "light", hasActivePro
   if (authState.role === "professional") {
     if (authState.activeWorkspace === "personal") {
       const showRelationships = Boolean(
-        (authState.invitations || []).some((item) => item.status === "pending")
+        (authState.invitations || []).some(invitationIsPending)
         || (authState.professionals || []).length
       );
       menu.innerHTML = standardPersonalMenu(currentPath, accountLinks, "/me", hasActiveProject, showRelationships);
       return;
     }
+    const terms = professionalAudienceTerms(authState.professionalProfile?.professionType);
     const patient = authState.activePatient;
-    const patientLabel = authState.presentationMode === "off" ? patient?.name : "Paciente de demonstração";
-    const patientLinks = patient ? navSection(`Paciente: ${escapeHtml(patientLabel)}`, (hasActiveProject ? [
-      navLink("/dashboard", "Dashboard do paciente", "layout-dashboard", currentPath),
+    const patientLabel = authState.presentationMode === "off" ? patient?.name : "Usuário de demonstração";
+    const patientLinks = patient ? navSection(`${terms.singularTitle}: ${escapeHtml(patientLabel)}`, (hasActiveProject ? [
+      navLink("/dashboard", `Dashboard do ${terms.singular}`, "layout-dashboard", currentPath),
       navLink("/metas", "Metas e planejamento", "target", currentPath),
-      navLink("/atividades", "Atividades do paciente", "dumbbell", currentPath),
-      navLink("/historico", "Histórico do paciente", "history", currentPath),
+      navLink("/atividades", `Atividades do ${terms.singular}`, "dumbbell", currentPath),
+      navLink("/historico", `Histórico do ${terms.singular}`, "history", currentPath),
       navLink("/perfil", "Perfil corporal", "user-round", currentPath)
     ] : [
       navLink("/dashboard", "Iniciar acompanhamento", "layout-dashboard", currentPath),
@@ -173,7 +177,7 @@ export function renderMenu(currentPath, authState, theme = "light", hasActivePro
       patientLinks,
       navSection("Área profissional", [
         navLink("/agenda", "Agenda", "calendar-days", currentPath),
-        navLink("/pacientes", patient ? "Voltar aos pacientes" : "Pacientes", "users-round", currentPath)
+        navLink("/pacientes", patient ? "Voltar aos acompanhamentos" : "Acompanhamentos", "users-round", currentPath)
       ].join("")),
       navSection("Conta", accountLinks)
     ].join("");
@@ -184,6 +188,7 @@ export function renderMenu(currentPath, authState, theme = "light", hasActivePro
     navLink("/admin", "Visão geral", "layout-dashboard", currentPath),
     navLink("/admin/usuarios", "Usuários", "users-round", currentPath),
     navLink("/admin/profissionais", "Profissionais", "user-round", currentPath),
+    navLink("/admin/solicitacoes", "Solicitações", "inbox", currentPath),
     navLink("/admin/vinculos", "Vínculos", "link", currentPath),
     navLink("/admin/convites", "Convites pendentes", "mail", currentPath)
   ].join("");

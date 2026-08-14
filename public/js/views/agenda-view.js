@@ -32,6 +32,9 @@ import { addMonths, formatDate, todayISO } from "../utils/date-utils.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { formatPhone } from "../utils/phone-utils.js";
 import { anonymizeAgendaData, presentationIsActive } from "../utils/presentation-utils.js";
+import { professionalAudienceTerms } from "../data/professional-catalog.js";
+
+let audienceTerms = professionalAudienceTerms();
 
 const statusLabels = {
   scheduled: "Agendado",
@@ -311,7 +314,7 @@ function renderFilters(events, patients) {
         </select>
       </div>
       <div class="field">
-        <label for="agenda-filter-patient">Paciente</label>
+        <label for="agenda-filter-patient">${audienceTerms.singularTitle}</label>
         <select id="agenda-filter-patient">
           <option value="">Todos</option>
           ${patients.map((patient) => {
@@ -344,7 +347,7 @@ function activeFilterLabels(patients) {
     const patient = patients.find((item) => patientId(item) === agendaUi.filters.patient);
     labels.push(agendaUi.filters.patient === "__guest"
       ? "Pessoas avulsas"
-      : `Paciente: ${patient?.name || patient?.email || "Selecionado"}`);
+      : `${audienceTerms.singularTitle}: ${patient?.name || patient?.email || "Selecionado"}`);
   }
   if (agendaUi.filters.location) labels.push(`Local: ${agendaUi.filters.location}`);
   return labels;
@@ -525,7 +528,7 @@ function renderEditor(patients, professionalProfile = {}) {
             <legend>Atendimento</legend>
             <div class="form-grid">
               <div class="field">
-                <label for="agenda-patient">Paciente ou pessoa avulsa</label>
+                <label for="agenda-patient">${audienceTerms.singularTitle} ou pessoa avulsa</label>
                 <select id="agenda-patient" name="patientId">
                   ${patients.map((item) => {
                     const id = patientId(item);
@@ -709,7 +712,7 @@ function renderEventDetails(event, patients, readOnly = false) {
         </div>
 
         <dl class="agenda-detail-grid">
-          ${isBlock ? "" : detailValue("Paciente", person, { showEmpty: true })}
+          ${isBlock ? "" : detailValue(audienceTerms.singularTitle, person, { showEmpty: true })}
           ${detailValue("Modalidade", isBlock ? "" : modalityLabels[event.modality])}
           ${detailValue("Local ou link", isBlock ? "" : event.location)}
           ${detailValue("Ocupação", isBlock ? "" : bookingModeLabels[event.bookingMode] || "Exclusivo")}
@@ -938,6 +941,7 @@ export function renderAgenda(authState) {
     return `<section class="card empty-state"><h2>Acesso restrito</h2><p class="muted">Esta área é destinada a profissionais.</p></section>`;
   }
 
+  audienceTerms = professionalAudienceTerms(authState.professionalProfile?.professionType);
   const presentation = presentationIsActive(authState.presentationMode);
   const sourceEvents = authState.agendaEvents || [];
   const sourcePatients = authState.patients || [];

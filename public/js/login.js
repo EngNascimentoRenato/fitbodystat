@@ -7,6 +7,10 @@ import {
   signInWithGoogle,
   signOutUser
 } from "./services/auth-service.js";
+import {
+  requestPersonalAlphaAccess,
+  requestProfessionalAlphaAccess
+} from "./services/professional-access-service.js";
 
 const statusEl = document.getElementById("login-status");
 const signInForm = document.getElementById("sign-in-form");
@@ -50,6 +54,11 @@ function goToApp() {
 }
 
 function friendlyError(error) {
+  const rawMessage = String(error?.message || "");
+  if (error?.code === "auth/error-code:-47"
+    || /error-code:-47|fase alfa|convite|libera[cç][aã]o administrativa/i.test(rawMessage)) {
+    return "A fase alfa está disponível somente por convite ou liberação administrativa.";
+  }
   const messages = {
     "auth/invalid-credential": "E-mail ou senha inválidos.",
     "auth/email-already-in-use": "Este e-mail já possui uma conta. Entre ou recupere sua senha.",
@@ -60,6 +69,65 @@ function friendlyError(error) {
   };
   return messages[error.code] || error.message;
 }
+
+const personalRequestDialog = document.getElementById("personal-request-dialog");
+const closePersonalRequest = () => personalRequestDialog?.close();
+document.getElementById("open-personal-request")?.addEventListener("click", () => personalRequestDialog?.showModal());
+document.getElementById("close-personal-request")?.addEventListener("click", closePersonalRequest);
+document.getElementById("cancel-personal-request")?.addEventListener("click", closePersonalRequest);
+personalRequestDialog?.addEventListener("click", (event) => {
+  if (event.target === personalRequestDialog) closePersonalRequest();
+});
+document.getElementById("personal-request-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const data = new FormData(form);
+  button.disabled = true;
+  try {
+    await requestPersonalAlphaAccess({
+      name: data.get("name"),
+      email: data.get("email")
+    });
+    closePersonalRequest();
+    form.reset();
+    setStatus("Solicitação recebida. Você receberá um e-mail após a análise. Se aprovada, volte a esta página e crie a conta com o mesmo endereço.", "success");
+  } catch (error) {
+    setStatus(`Não foi possível enviar a solicitação: ${friendlyError(error)}`, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+const professionalRequestDialog = document.getElementById("professional-request-dialog");
+const closeProfessionalRequest = () => professionalRequestDialog?.close();
+document.getElementById("open-professional-request")?.addEventListener("click", () => professionalRequestDialog?.showModal());
+document.getElementById("close-professional-request")?.addEventListener("click", closeProfessionalRequest);
+document.getElementById("cancel-professional-request")?.addEventListener("click", closeProfessionalRequest);
+professionalRequestDialog?.addEventListener("click", (event) => {
+  if (event.target === professionalRequestDialog) closeProfessionalRequest();
+});
+document.getElementById("professional-request-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const data = new FormData(form);
+  button.disabled = true;
+  try {
+    await requestProfessionalAlphaAccess({
+      name: data.get("name"),
+      email: data.get("email"),
+      professionType: data.get("professionType")
+    });
+    closeProfessionalRequest();
+    form.reset();
+    setStatus("Solicitação recebida. Você receberá um e-mail após a análise. Se aprovada, volte a esta página e crie a conta profissional com o mesmo endereço.", "success");
+  } catch (error) {
+    setStatus(`Não foi possível enviar a solicitação: ${friendlyError(error)}`, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
 
 observeAuth((user) => {
   if (!handlingAuth && user && (user.emailVerified || usesGoogle(user))) goToApp();

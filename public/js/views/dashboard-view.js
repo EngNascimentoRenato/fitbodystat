@@ -82,12 +82,13 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
       </section>
     ` : "";
     if (options.patientContext === true) {
+      const terms = options.audienceTerms || { singular: "paciente", plural: "pacientes", singularTitle: "Paciente" };
       return `
         <div class="view-stack">
           <section class="card hero-panel">
             <div>
-              <p class="eyebrow">Paciente sem projeto</p>
-              <h2>Este paciente ainda não possui um projeto ativo</h2>
+              <p class="eyebrow">${terms.singularTitle} sem projeto</p>
+              <h2>Este ${terms.singular} ainda não possui um projeto ativo</h2>
               <p>Crie a linha de base e o planejamento quando houver informações suficientes para iniciar o acompanhamento.</p>
             </div>
           </section>
@@ -97,7 +98,7 @@ export function renderDashboard(state, routePrefix = "", options = {}) {
             <p class="muted">O projeto reunirá medidas iniciais, objetivo e ritmo planejado.</p>
             <div class="button-row">
               <a class="button primary" href="#/perfil">Criar projeto</a>
-              <a class="button" href="#/pacientes">Voltar aos pacientes</a>
+              <a class="button" href="#/pacientes">Voltar aos acompanhamentos</a>
             </div>
           </section>
         </div>

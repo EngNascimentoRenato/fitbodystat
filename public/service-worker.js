@@ -22,6 +22,8 @@ const APP_SHELL = [
   "./js/menu.js",
   "./js/config/firebase-config.example.js",
   "./js/config/firebase-config.js",
+  "./js/config/app-check-config.js",
+  "./js/config/app-check-config.example.js",
   "./js/config/app-version.js",
   "./js/data/local-store.js",
   "./js/data/firestore-store.js",
@@ -47,6 +49,7 @@ const APP_SHELL = [
   "./js/services/agenda-service.js",
   "./js/services/admin-metrics-service.js",
   "./js/services/role-service.js",
+  "./js/services/professional-access-service.js",
   "./js/services/workspace-service.js",
   "./js/views/dashboard-view.js",
   "./js/views/profile-view.js",
@@ -83,7 +86,8 @@ const APP_SHELL = [
   "./js/utils/phone-utils.js",
   "./js/utils/validation-utils.js",
   "./js/utils/html-utils.js",
-  "./js/utils/presentation-utils.js"
+  "./js/utils/presentation-utils.js",
+  "./js/utils/invitation-utils.js"
 ];
 
 async function cacheAppShell() {

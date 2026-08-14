@@ -139,7 +139,7 @@ export function normalizeAgendaEvent(input, professionalId, existing = {}) {
   const patientName = patientId ? cleanText(input.patientName) : "";
   const guestName = type === "appointment" && !patientId ? cleanText(input.guestName) : "";
   if (type === "appointment" && !patientId && !guestName) {
-    throw new Error("Selecione um paciente ou informe o nome da pessoa.");
+    throw new Error("Selecione um acompanhamento ou informe o nome da pessoa.");
   }
 
   const status = type === "block"

@@ -5,6 +5,7 @@ import {
   INITIAL_CYCLE_ID,
   activeCycle,
   closeActiveCycle,
+  cycleIdForLegacyEntry,
   cycleHasMeasurements,
   ensureCycleState,
   startNewCycle,
@@ -185,4 +186,59 @@ test("encerra projeto substituído preservando motivo e histórico", () => {
   assert.equal(closed.cycles[0].status, "replaced");
   assert.equal(closed.cycles[0].endReason, "Objetivo principal será redefinido em um novo projeto.");
   assert.equal(closed.activeCycleId, null);
+});
+
+test("não considera encerrado um ciclo apontado por activeCycleId antigo", () => {
+  const state = ensureCycleState({
+    profile: {},
+    activeCycleId: "encerrado",
+    cycles: [{
+      id: "encerrado",
+      status: "completed",
+      startedAt: "2026-01-01",
+      endedAt: "2026-06-01",
+      startWeightKg: 90
+    }],
+    entries: []
+  });
+
+  assert.equal(state.activeCycleId, null);
+  assert.equal(activeCycle(state), null);
+});
+
+test("normaliza projetos ativos duplicados preservando apenas o selecionado", () => {
+  const state = ensureCycleState({
+    profile: {},
+    activeCycleId: "atual",
+    cycles: [
+      { id: "anterior", status: "active", startedAt: "2026-01-01", startWeightKg: 90 },
+      { id: "atual", status: "active", startedAt: "2026-06-01", startWeightKg: 84 }
+    ],
+    entries: []
+  });
+
+  assert.equal(state.cycles.filter((cycle) => cycle.status === "active").length, 1);
+  assert.equal(activeCycle(state).id, "atual");
+  assert.equal(state.cycles.find((cycle) => cycle.id === "anterior").status, "replaced");
+});
+
+test("associa registro legado ao ciclo correspondente à sua data", () => {
+  const cycles = [
+    { id: "primeiro", status: "completed", startedAt: "2026-01-01", endedAt: "2026-05-31" },
+    { id: "segundo", status: "active", startedAt: "2026-06-01", endedAt: null }
+  ];
+
+  assert.equal(cycleIdForLegacyEntry({ date: "2026-03-10" }, cycles), "primeiro");
+  assert.equal(cycleIdForLegacyEntry({ date: "2026-07-10" }, cycles), "segundo");
+
+  const state = ensureCycleState({
+    profile: {},
+    activeCycleId: "segundo",
+    cycles,
+    entries: [
+      { id: "old", date: "2026-03-10", weightKg: 90 },
+      { id: "new", date: "2026-07-10", weightKg: 84 }
+    ]
+  });
+  assert.deepEqual(state.entries.map((entry) => entry.cycleId), ["primeiro", "segundo"]);
 });

@@ -25,9 +25,9 @@ test("anonimiza pacientes e conteúdo identificável da agenda", () => {
     privateNotes: "Informação privada"
   }], [{ uid: "p1", name: "Nome real", email: "real@example.com", phone: "65999999999" }]);
 
-  assert.equal(result.patients[0].name, "Paciente 01");
+  assert.equal(result.patients[0].name, "Usuário 01");
   assert.equal(result.patients[0].phone, "");
-  assert.equal(result.events[0].patientName, "Paciente 01");
+  assert.equal(result.events[0].patientName, "Usuário 01");
   assert.equal(result.events[0].location, demonstrationLabel("location"));
   assert.equal(result.events[0].privateNotes, "");
 });

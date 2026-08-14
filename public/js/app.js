@@ -25,6 +25,7 @@ import {
   updateCurrentUserName
 } from "./services/auth-service.js";
 import { activateProfessionalAccess } from "./services/role-service.js";
+import { invitationIsPending } from "./utils/invitation-utils.js";
 import { initializePwaInstall, registerServiceWorker } from "./services/pwa-service.js";
 import {
   clearDeviceWorkspace,
@@ -34,6 +35,7 @@ import {
 } from "./services/workspace-service.js";
 import { renderRoute } from "./router.js";
 import { icon as renderIcon } from "./components/icon.js";
+import { professionalAudienceTerms } from "./data/professional-catalog.js";
 import { escapeHtml } from "./utils/html-utils.js";
 import {
   ensureCycleState,
@@ -168,7 +170,7 @@ function persist(change) {
 
   saveChangeToCloud(authState.activePatient.uid, state, change)
     .then(() => {
-      authState.syncStatus = "Dados do paciente sincronizados.";
+      authState.syncStatus = "Dados do acompanhamento sincronizados.";
     })
     .catch((error) => {
       authState.syncStatus = `Falha ao sincronizar: ${error.message}`;
@@ -220,10 +222,11 @@ async function openPatient(patientOrId) {
   if (!patient) throw new Error("Usuário não encontrado.");
 
   if (!authState.activePatient) personalState = state;
-  authState.syncStatus = "Carregando dados do paciente...";
+  const terms = professionalAudienceTerms(authState.professionalProfile?.professionType);
+  authState.syncStatus = `Carregando dados do ${terms.singular}...`;
   authState.activePatient = {
     uid: patient.uid || patient.id,
-    name: patient.name || patient.email || "Paciente",
+    name: patient.name || patient.email || terms.singularTitle,
     email: patient.email || "",
     phone: patient.phone || "",
     link: patient.link || null
@@ -231,7 +234,7 @@ async function openPatient(patientOrId) {
   state = normalizeState((await loadCloudState(authState.activePatient.uid, {
     includeContact: patient.link?.permissions?.sharePhone === true
   })) || {});
-  authState.syncStatus = "Dados do paciente carregados.";
+  authState.syncStatus = `Dados do ${terms.singular} carregados.`;
   location.hash = "#/dashboard";
   render();
 }
@@ -283,6 +286,7 @@ function renderPatientContext() {
   const patient = authState.activePatient;
   container.hidden = !patient;
   const protectIdentity = authState.presentationMode !== "off";
+  const terms = professionalAudienceTerms(authState.professionalProfile?.professionType);
   const maskedEmail = (() => {
     const [name, domain] = String(patient?.email || "").split("@");
     if (!domain) return "";
@@ -291,11 +295,11 @@ function renderPatientContext() {
   container.innerHTML = patient ? `
     <div>
       <span>Acompanhando</span>
-      <strong>${protectIdentity ? "Paciente de demonstração" : escapeHtml(patient.name)}</strong>
+      <strong>${protectIdentity ? "Usuário de demonstração" : escapeHtml(patient.name)}</strong>
       ${protectIdentity ? "" : `<small>${escapeHtml(maskedEmail)}</small>`}
     </div>
     <button class="icon-button patient-context-close" id="close-patient" type="button"
-      aria-label="Encerrar visualização do paciente" title="Encerrar visualização">${renderIcon("x")}</button>
+      aria-label="Encerrar visualização do ${terms.singular}" title="Encerrar visualização">${renderIcon("x")}</button>
   ` : "";
   document.getElementById("close-patient")?.addEventListener("click", closePatient);
 }
@@ -487,8 +491,12 @@ observeAuth(async (user) => {
     authState.adminLinks = null;
     authState.adminInvitations = null;
     authState.adminProfessionalRegistrations = null;
+    authState.adminProfessionalAccessRequests = null;
+    authState.adminPersonalAccessRequests = null;
+    authState.adminPersonalAccessGrants = null;
     authState.patients = null;
     authState.sentInvitations = null;
+    authState.professionalAccessSummary = null;
     authState.agendaEvents = null;
     authState.agendaAvailability = null;
     authState.invitations = null;
@@ -517,6 +525,12 @@ observeAuth(async (user) => {
       cloudState?.profile
       && (!(cloudState.cycles || []).length
         || (cloudState.entries || []).some((entry) => !entry.cycleId)
+        || (cloudState.cycles || []).filter((cycle) => cycle.status === "active").length > 1
+        || Boolean(
+          cloudState.activeCycleId
+          && !(cloudState.cycles || []).some((cycle) =>
+            cycle.id === cloudState.activeCycleId && cycle.status === "active")
+        )
         || (cloudState.cycles || []).some((cycle) =>
           cycle.id === "initial-cycle"
           && !profileHasCycleData(cycle)
@@ -568,7 +582,7 @@ observeAuth(async (user) => {
 
     if (!location.hash) {
       const hasPendingSharedInvitation = (authState.invitations || [])
-        .some((invitation) => invitation.id === pendingInvitationId() && invitation.status === "pending");
+        .some((invitation) => invitation.id === pendingInvitationId() && invitationIsPending(invitation));
       if (hasPendingSharedInvitation && !authState.needsOnboarding) {
         localStorage.removeItem("fitbodystat-pending-invitation");
       }

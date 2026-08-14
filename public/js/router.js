@@ -17,6 +17,7 @@ import { bindMeasurementHelp } from "./components/measurement-guide.js";
 import { bindObjectiveHelp } from "./components/objective-guide.js";
 import { showToast } from "./components/toast.js";
 import { showAlert } from "./components/modal.js";
+import { professionalAudienceTerms } from "./data/professional-catalog.js";
 import {
   dismissInstallSuggestion,
   getPwaInstallState,
@@ -55,13 +56,14 @@ function stateForRoute(path, context) {
 }
 
 function configureTopbar(activeRoute, authState, context) {
+  const terms = professionalAudienceTerms(authState.professionalProfile?.professionType);
   const action = document.getElementById("topbar-action");
   const isDataView = dataPaths.includes(activeRoute.path);
   const hasActiveProject = Boolean(stateForRoute(activeRoute.path, context)?.activeCycleId);
   action.hidden = !isDataView || !hasActiveProject;
   action.href = activeRoute.path.startsWith("/me/") ? "#/me/registro" : "#/registro";
   const actionLabel = authState.activePatient
-    ? "Novo registro do paciente"
+    ? `Novo registro do ${terms.singular}`
     : authState.role === "user" || authState.activeWorkspace === "personal"
       ? "Novo registro"
       : "Meu novo registro";
@@ -70,13 +72,13 @@ function configureTopbar(activeRoute, authState, context) {
 
   if (!authState.activePatient || !patientDataPaths.includes(activeRoute.path)) return;
   const patientTitles = {
-    "/dashboard": ["Dashboard do paciente", "Acompanhamento profissional"],
-    "/perfil": ["Perfil corporal", "Paciente selecionado"],
-    "/registro": ["Novo registro do paciente", "Paciente selecionado"],
-    "/historico": ["Histórico do paciente", "Paciente selecionado"],
-    "/metas": ["Metas e planejamento", "Paciente selecionado"]
+    "/dashboard": [`Dashboard do ${terms.singular}`, "Acompanhamento profissional"],
+    "/perfil": ["Perfil corporal", `${terms.singularTitle} selecionado`],
+    "/registro": [`Novo registro do ${terms.singular}`, `${terms.singularTitle} selecionado`],
+    "/historico": [`Histórico do ${terms.singular}`, `${terms.singularTitle} selecionado`],
+    "/metas": ["Metas e planejamento", `${terms.singularTitle} selecionado`]
   };
-  patientTitles["/atividades"] = ["Atividades do paciente", "Frequência de atividades"];
+  patientTitles["/atividades"] = [`Atividades do ${terms.singular}`, "Frequência de atividades"];
   const [title, eyebrow] = patientTitles[activeRoute.path];
   document.getElementById("route-title").textContent = title;
   document.getElementById("route-eyebrow").textContent = eyebrow;
@@ -145,6 +147,7 @@ export function renderRoute(context) {
       pendingInvitations: (context.authState.invitations || []).filter((item) => item.status === "pending").length,
       professionalCount: (context.authState.professionals || []).length,
       patientContext: Boolean(context.authState.activePatient),
+      audienceTerms: professionalAudienceTerms(context.authState.professionalProfile?.professionType),
       showInstallSuggestion: !context.authState.activePatient && shouldShowInstallSuggestion()
     }),
     "/primeiro-acesso": () => renderOnboarding(context.personalState, context.authState),
@@ -182,6 +185,7 @@ export function renderRoute(context) {
     "/admin": () => renderAdmin(context.state, context.authState, "overview"),
     "/admin/usuarios": () => renderAdmin(context.state, context.authState, "users"),
     "/admin/profissionais": () => renderAdmin(context.state, context.authState, "professionals"),
+    "/admin/solicitacoes": () => renderAdmin(context.state, context.authState, "access-requests"),
     "/admin/vinculos": () => renderAdmin(context.state, context.authState, "links"),
     "/admin/convites": () => renderAdmin(context.state, context.authState, "invitations"),
     "/conta": () => renderAccount(context.personalState, context.authState),

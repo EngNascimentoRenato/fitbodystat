@@ -2,13 +2,15 @@ import {
   listInvitationsForUser,
   listProfessionalsForUser,
   respondToCareInvitation,
-  revokeCareLink,
   updateCareLinkPhoneSharing
 } from "../data/firestore-store.js";
+import { endProfessionalCareEpisode } from "../services/professional-access-service.js";
 import { confirmAction } from "../components/modal.js";
+import { requestCareEndDetails } from "../components/care-end-dialog.js";
 import { showToast } from "../components/toast.js";
 import { escapeAttribute, escapeHtml } from "../utils/html-utils.js";
 import { formatPhone } from "../utils/phone-utils.js";
+import { invitationIsPending } from "../utils/invitation-utils.js";
 import {
   careAreaForProfession,
   careAreaLabel,
@@ -40,7 +42,7 @@ function conflictingProfessional(invitation, professionals) {
 }
 
 export function renderConnections(authState, personalState) {
-  const pending = (authState.invitations || []).filter((item) => item.status === "pending");
+  const pending = (authState.invitations || []).filter(invitationIsPending);
   const professionals = authState.professionals || [];
   const ownPhone = personalState?.contact?.phone || "";
   const profilePath = authState.role === "user" || authState.activeWorkspace === "personal"
@@ -133,7 +135,8 @@ export function renderConnections(authState, personalState) {
                     ` : `<a href="${profilePath}">Cadastrar telefone</a>`}
                   </td>
                   <td><span class="badge">Ativo</span></td>
-                  <td><button class="button danger" data-revoke-link="${professional.link.id}" type="button">Remover vínculo</button></td>
+                  <td><button class="button danger" data-end-care-link="${professional.link.id}" type="button"
+                    aria-label="Encerrar acompanhamento" title="Encerrar acompanhamento">Encerrar</button></td>
                 </tr>
               `).join("") || `<tr><td colspan="7">Nenhum profissional vinculado.</td></tr>`}
             </tbody>
@@ -200,21 +203,21 @@ export function bindConnections(context) {
   document.querySelectorAll("[data-reject-invitation]").forEach((button) => {
     button.addEventListener("click", () => respond(button.dataset.rejectInvitation, "rejected"));
   });
-  document.querySelectorAll("[data-revoke-link]").forEach((button) => {
+  document.querySelectorAll("[data-end-care-link]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const professional = (context.authState.professionals || []).find((item) => item.link.id === button.dataset.revokeLink);
-      if (!professional || !await confirmAction({
-        title: "Remover acesso?",
-        message: "Este profissional deixará de acessar seus dados.",
-        confirmLabel: "Remover",
-        tone: "danger"
-      })) return;
+      const professional = (context.authState.professionals || [])
+        .find((item) => item.link.id === button.dataset.endCareLink);
+      if (!professional) return;
+      const decision = await requestCareEndDetails(professional.name || "O profissional");
+      if (!decision) return;
+      button.disabled = true;
       try {
-        await revokeCareLink(professional.link, context.authState.user.uid);
-        showToast("Vínculo removido.");
+        await endProfessionalCareEpisode(professional.link.id, decision.reasonCode, decision.reasonDetails);
+        showToast("Acompanhamento encerrado. O histórico do período foi preservado.");
         await refresh();
       } catch (error) {
-        showToast(`Não foi possível remover o vínculo: ${error.message}`);
+        button.disabled = false;
+        showToast(`Não foi possível encerrar o acompanhamento: ${error.message}`);
       }
     });
   });

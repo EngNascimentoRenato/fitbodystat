@@ -20,7 +20,7 @@
           <span class="brand-mark" aria-hidden="true">FBS</span>
           <span>
             <strong>FitBodyStat</strong>
-            <small>peso, medidas e composição</small>
+            <small>peso, medidas e evolução</small>
           </span>
         </a>
 
@@ -56,7 +56,7 @@
           <form class="form registration-form login-registration-column" id="create-account-form">
             <div>
               <h2>Criar conta</h2>
-              <p class="muted">Cadastre-se com nome, e-mail e senha.</p>
+              <p class="muted">Na fase alfa, o cadastro requer convite ou liberação prévia.</p>
             </div>
             <button class="button google-button invitation-google-button" type="button" hidden style="display: none">Continuar com Google</button>
             <div class="form-separator invitation-google-separator" hidden><span>ou</span></div>
@@ -79,12 +79,68 @@
             </div>
             <div class="button-row">
               <button class="button primary" type="submit">Criar conta</button>
+              <button class="button" id="open-personal-request" type="button">Solicitar acesso</button>
+              <button class="button" id="open-professional-request" type="button">Sou profissional</button>
             </div>
           </form>
         </div>
 
         <p class="login-status muted" id="login-status" aria-live="polite"></p>
       </section>
+
+      <dialog class="access-request-dialog" id="professional-request-dialog">
+        <form class="form access-request-content" id="professional-request-form">
+          <header class="patient-dialog-header">
+            <div><span class="eyebrow">Fase alfa</span><h2>Solicitar acesso profissional</h2></div>
+            <button class="icon-button" id="close-professional-request" type="button" aria-label="Fechar">×</button>
+          </header>
+          <p class="muted">A administração analisará a solicitação antes da criação da conta profissional.</p>
+          <div class="field">
+            <label for="request-professional-name">Nome completo</label>
+            <input id="request-professional-name" name="name" autocomplete="name" minlength="2" required />
+          </div>
+          <div class="field">
+            <label for="request-professional-email">E-mail</label>
+            <input id="request-professional-email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="request-profession-type">Área profissional</label>
+            <select id="request-profession-type" name="professionType" required>
+              <option value="">Selecione</option>
+              <option value="personal-trainer">Personal Trainer</option>
+              <option value="physical-educator">Educador(a) Físico(a)</option>
+              <option value="nutritionist">Nutricionista</option>
+              <option value="nutrologist">Nutrólogo(a)</option>
+            </select>
+          </div>
+          <footer class="patient-dialog-actions">
+            <button class="button" id="cancel-professional-request" type="button">Cancelar</button>
+            <button class="button primary" type="submit">Enviar solicitação</button>
+          </footer>
+        </form>
+      </dialog>
+
+      <dialog class="access-request-dialog" id="personal-request-dialog">
+        <form class="form access-request-content" id="personal-request-form">
+          <header class="patient-dialog-header">
+            <div><span class="eyebrow">Fase alfa</span><h2>Solicitar acesso pessoal</h2></div>
+            <button class="icon-button" id="close-personal-request" type="button" aria-label="Fechar">×</button>
+          </header>
+          <p class="muted">Envie seus dados para análise. A solicitação não cria uma conta nem garante liberação imediata.</p>
+          <div class="field">
+            <label for="request-personal-name">Nome completo</label>
+            <input id="request-personal-name" name="name" autocomplete="name" minlength="2" required />
+          </div>
+          <div class="field">
+            <label for="request-personal-email">E-mail</label>
+            <input id="request-personal-email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <footer class="patient-dialog-actions">
+            <button class="button" id="cancel-personal-request" type="button">Cancelar</button>
+            <button class="button primary" type="submit">Enviar solicitação</button>
+          </footer>
+        </form>
+      </dialog>
     </main>
     <script type="module" src="js/login.js"></script>
   </body>

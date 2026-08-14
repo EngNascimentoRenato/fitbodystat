@@ -58,9 +58,36 @@ export function cycleFromProfile(profile = {}, overrides = {}) {
 
 export function activeCycle(state = {}) {
   const cycles = state.cycles || [];
-  return cycles.find((cycle) => cycle.id === state.activeCycleId)
+  return cycles.find((cycle) => cycle.id === state.activeCycleId && cycle.status === "active")
     || cycles.find((cycle) => cycle.status === "active")
     || null;
+}
+
+function cycleDate(value) {
+  const date = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+}
+
+export function cycleIdForLegacyEntry(entry = {}, cycles = []) {
+  const entryDate = cycleDate(entry.date);
+  const ordered = [...cycles]
+    .filter((cycle) => cycle?.id)
+    .sort((a, b) => String(cycleDate(a.startedAt) || "").localeCompare(cycleDate(b.startedAt) || ""));
+  if (!ordered.length) return null;
+  if (!entryDate) return ordered.length === 1 ? ordered[0].id : null;
+
+  const withinCycle = ordered.filter((cycle) => {
+    const start = cycleDate(cycle.startedAt);
+    const end = cycleDate(cycle.endedAt);
+    return (!start || start <= entryDate) && (!end || entryDate <= end);
+  });
+  if (withinCycle.length) return withinCycle.at(-1).id;
+
+  const preceding = ordered.filter((cycle) => {
+    const start = cycleDate(cycle.startedAt);
+    return start && start <= entryDate;
+  });
+  return preceding.at(-1)?.id || ordered[0].id;
 }
 
 export function cycleHasMeasurements(state = {}, cycleId = state.activeCycleId) {
@@ -97,17 +124,24 @@ export function ensureCycleState(state = {}) {
     activeCycleId = INITIAL_CYCLE_ID;
   }
 
-  const selected = cycles.find((cycle) => cycle.id === activeCycleId)
-    || cycles.find((cycle) => cycle.status === "active")
+  const activeCycles = cycles.filter((cycle) => cycle.status === "active");
+  const selected = activeCycles.find((cycle) => cycle.id === activeCycleId)
+    || activeCycles.at(-1)
     || null;
   if (selected) {
     activeCycleId = selected.id;
     cycles = cycles.map((cycle) => ({
       ...cycle,
-      status: cycle.id === selected.id && cycle.status === "active"
-        ? "active"
-        : cycle.status
+      status: cycle.status === "active" && cycle.id !== selected.id ? "replaced" : cycle.status,
+      endedAt: cycle.status === "active" && cycle.id !== selected.id
+        ? cycle.endedAt || cycleDate(selected.startedAt) || new Date().toISOString().slice(0, 10)
+        : cycle.endedAt,
+      endReason: cycle.status === "active" && cycle.id !== selected.id
+        ? cycle.endReason || "Projeto ativo duplicado encerrado durante a normalização dos dados."
+        : cycle.endReason
     }));
+  } else {
+    activeCycleId = null;
   }
 
   return {
@@ -120,7 +154,7 @@ export function ensureCycleState(state = {}) {
     },
     entries: (state.entries || []).map((entry) => ({
       ...entry,
-      cycleId: entry.cycleId || activeCycleId || null
+      cycleId: entry.cycleId || cycleIdForLegacyEntry(entry, cycles) || activeCycleId || null
     }))
   };
 }

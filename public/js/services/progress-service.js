@@ -316,23 +316,45 @@ export function getSuggestedMilestones(profile, latest) {
       });
     }
   } else {
+    const gainDetail = profile.goalType === "recovery"
+      ? "recuperação de peso acumulada"
+      : profile.goalType === "muscle-gain"
+        ? "variação de peso acumulada no projeto"
+        : "ganho de peso acumulado";
     [25, 50, 75].forEach((percentage) => {
       const target = start + (goal - start) * (percentage / 100);
       candidates.push({
         id: `goal-path-${percentage}`,
         title: `${percentage}% do caminho até a meta`,
         target,
-        detail: `${Math.abs(target - start).toFixed(1).replace(".", ",")} kg de ganho acumulado`,
+        detail: `${Math.abs(target - start).toFixed(1).replace(".", ",")} kg de ${gainDetail}`,
         mode
       });
     });
+
+    const lowWeightExit = finiteNumber(weightForBmi(profile.heightCm, 18.5));
+    if (lowWeightExit !== null && targetIsOnPath(lowWeightExit, start, goal, mode)) {
+      candidates.push({
+        id: "bmi-low-weight-exit",
+        title: "Sair do baixo peso",
+        target: lowWeightExit,
+        detail: "IMC igual ou superior a 18,5",
+        mode
+      });
+    }
   }
 
   candidates.push({
     id: "weight-goal",
     title: "Meta de peso",
     target: goal,
-    detail: mode === "gain" ? "Peso final planejado para ganho" : "Peso final planejado para perda",
+    detail: mode === "gain"
+      ? profile.goalType === "recovery"
+        ? "Peso final planejado para recuperação"
+        : profile.goalType === "muscle-gain"
+          ? "Peso de referência do projeto de hipertrofia"
+          : "Peso final planejado para ganho"
+      : "Peso final planejado para perda",
     mode,
     isGoal: true
   });
@@ -344,11 +366,16 @@ export function getSuggestedMilestones(profile, latest) {
   const startWaist = finiteNumber(profile.startWaistCm);
   const currentWaist = finiteNumber(latest?.waistCm) ?? startWaist;
   const waistTarget = profile.sex === "female" ? 88 : profile.sex === "male" ? 102 : null;
+  const expectedGoalWaist = startWaist !== null && goal !== null && start !== null
+    ? startWaist + (goal - start)
+    : null;
   if (mode === "loss"
     && startWaist !== null
     && currentWaist !== null
     && waistTarget !== null
-    && startWaist > waistTarget) {
+    && startWaist > waistTarget
+    && expectedGoalWaist !== null
+    && expectedGoalWaist < waistTarget) {
     weightMilestones.push({
       id: "waist-reference",
       title: `Cintura abaixo de ${waistTarget} cm`,

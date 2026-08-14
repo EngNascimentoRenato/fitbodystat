@@ -4,7 +4,7 @@ export function presentationIsActive(mode) {
 
 export function demonstrationLabel(type = "user", index = null) {
   if (type === "patient") {
-    return Number.isInteger(index) ? `Paciente ${String(index + 1).padStart(2, "0")}` : "Paciente de demonstração";
+    return Number.isInteger(index) ? `Usuário ${String(index + 1).padStart(2, "0")}` : "Usuário de demonstração";
   }
   if (type === "professional") return "Profissional de demonstração";
   if (type === "guest") return "Pessoa de demonstração";

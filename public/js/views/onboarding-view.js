@@ -280,7 +280,7 @@ function professionalOnboarding(authState) {
 
       <section class="card">
         <h2>Privacidade por padrão</h2>
-        <p class="muted">O acesso profissional ficará limitado aos pacientes que confirmarem um vínculo. A administração gerencia contas, mas não acessa dados corporais ou históricos pessoais.</p>
+        <p class="muted">O acesso profissional ficará limitado aos usuários que confirmarem um vínculo. A administração gerencia contas, mas não acessa dados corporais ou históricos pessoais.</p>
       </section>
 
       <div class="button-row onboarding-submit">
